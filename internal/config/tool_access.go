@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/remoteconfig"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -21,6 +23,7 @@ var (
 // local operator UI. It includes the adjacent specialist-locality policy but
 // is not a general-purpose configuration editor.
 type ToolAccess struct {
+	RemoteAdvertisement   remoteconfig.Advertisement
 	SkillsEnabled         bool
 	SkillsAutoDraft       bool
 	SkillsRoot            string
@@ -61,6 +64,10 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	if err != nil {
 		return ToolAccess{}, "", err
 	}
+	setConfigScalar(root, []string{"remote_advertisement", "enabled"}, "!!bool", boolText(next.RemoteAdvertisement.Enabled))
+	setConfigScalar(root, []string{"remote_advertisement", "interface"}, "!!str", next.RemoteAdvertisement.Interface)
+	setConfigScalar(root, []string{"remote_advertisement", "name"}, "!!str", next.RemoteAdvertisement.Name)
+	setConfigScalar(root, []string{"remote_advertisement", "ssh_port"}, "!!int", strconv.Itoa(next.RemoteAdvertisement.SSHPort))
 	setConfigScalar(root, []string{"tools", "enabled"}, "!!bool", boolText(next.Enabled))
 	setConfigScalar(root, []string{"tools", "read_root"}, "!!str", next.ReadRoot)
 	setConfigScalar(root, []string{"workers", "delegate_read_tools"}, "!!bool", boolText(next.DelegateReadTools))
@@ -147,7 +154,7 @@ func setConfigScalar(node *yaml.Node, path []string, tag, value string) {
 }
 
 func toolAccess(settings Settings) ToolAccess {
-	return ToolAccess{SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
+	return ToolAccess{RemoteAdvertisement: settings.RemoteAdvertisement, SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
 }
 
 func boolText(value bool) string {

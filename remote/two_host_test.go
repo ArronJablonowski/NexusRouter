@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/remoteconfig"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"go.yaml.in/yaml/v3"
 )
@@ -73,6 +74,9 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	defer provider.Close()
 	cfg := config.Defaults()
 	cfg.Mode = "local_only"
+	if os.Getenv("NEXUS_REMOTE_TEST_ADVERTISE_FROM_CONFIG") == "1" {
+		cfg.RemoteAdvertisement = remoteconfig.Advertisement{Enabled: true, Interface: os.Getenv("NEXUS_REMOTE_TEST_ADVERTISE_INTERFACE"), Name: "node-a", SSHPort: 22}
+	}
 	cfg.Tools.Enabled = false
 	cfg.Hardware.AutoProfile = true
 	cfg.Workers.Max = 1
@@ -126,7 +130,11 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	}
 	defer cleanup()
 	_, localPort, _ := net.SplitHostPort(strings.TrimPrefix(provider.URL, "http://"))
-	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port, "proxy_port": host.ProxyPort, "advertise_interface": os.Getenv("NEXUS_REMOTE_TEST_ADVERTISE_INTERFACE")})
+	advertisedInterface := os.Getenv("NEXUS_REMOTE_TEST_ADVERTISE_INTERFACE")
+	if os.Getenv("NEXUS_REMOTE_TEST_ADVERTISE_FROM_CONFIG") == "1" {
+		advertisedInterface = ""
+	}
+	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port, "proxy_port": host.ProxyPort, "advertise_interface": advertisedInterface})
 	runCtx, stopRun := context.WithCancel(ctx)
 	defer stopRun()
 	args := append(append([]string{}, ssh...), "-o", "ExitOnForwardFailure=yes", "-R", fmt.Sprintf("127.0.0.1:%d:127.0.0.1:%s", host.ProviderPort, localPort), user+"@"+address, "python3 -c "+quote(twoHostRun))

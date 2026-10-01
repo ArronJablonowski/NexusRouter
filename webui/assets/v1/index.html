@@ -204,6 +204,12 @@
             </label>
             <label class="setting-field" for="tools-read-root"><strong>Approved read root</strong><small>Use an absolute directory path. Models cannot read outside this boundary.</small></label>
             <input id="tools-read-root" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="/Users/name/project" aria-describedby="settings-validation">
+            <h3>Advertise this remote host</h3>
+            <label class="setting-toggle" for="remote-advertise-enabled"><span><strong>Enable LAN discovery</strong><small>Off by default. Other devices see connection hints, but must pair before routing tasks.</small></span><span class="switch"><input id="remote-advertise-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
+            <label for="remote-advertise-interface">Network interface</label><input id="remote-advertise-interface" type="text" maxlength="64" autocomplete="off" spellcheck="false" placeholder="en1 or eth0">
+            <label for="remote-advertise-name">Advertised TLS name</label><input id="remote-advertise-name" type="text" maxlength="253" autocomplete="off" spellcheck="false" placeholder="node-a">
+            <label for="remote-advertise-ssh-port">SSH port hint (optional)</label><input id="remote-advertise-ssh-port" type="number" min="1" max="65535" step="1" placeholder="22">
+            <p class="settings-intro">Save, then restart the remote host using this configuration. Explicit service advertisement flags override these saved values. The host verifies its private IPv4 interface and certificate when starting. This does not install SSH, pair peers, or start a remote service.</p>
             <p id="settings-validation" class="field-error" role="alert" hidden></p>
             <div class="button-row"><button id="save-settings" type="submit">Save settings</button><button id="reset-settings" class="secondary" type="button">Reset changes</button></div>
             <output id="settings-status" class="settings-status" role="status" aria-live="polite">Loading settings…</output>

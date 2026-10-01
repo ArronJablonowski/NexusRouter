@@ -1782,3 +1782,40 @@ explicit argv and incomplete/unsafe settings. No live installed service changed;
 new advertised templates still need native-manager discovery qualification.
 Full combined repository validation/ordinary push remains queued behind the
 live systemd gate; only preceding waiting checkpoint superseded.
+
+## 2026-10-01: Web UI remote advertisement settings
+
+User-requested Settings controls now expose disabled-by-default LAN advertising,
+network interface, TLS name and optional SSH port. Shared inert validation backs
+config and browser contract. The existing authenticated/CSRF-protected settings
+endpoint persists remote_advertisement through expected-file-digest atomic
+updates; active/saved projections show restart required. Read-only loaded-config
+summary is explicitly not a remote-host health claim. The remote serve command
+reads the saved block on startup when explicit advertisement CLI flags are absent.
+No live reload, SSH installation, pairing, trust mutation or service restart is
+performed by saving. UI explains same-config ownership and CLI precedence.
+
+Real Chrome verifies default-off, invalid incomplete form rejection, valid save,
+reset/reload persistence, restart badge and 390px layout. Persistence tests verify
+actual config reload, stale digest rejection and no invalid-file replacement.
+Initial fixtures failed because one retained enabled skills without a configured
+root and the browser acted before initialization; fixtures corrected. Focused
+config/browser race passed1.456s/2.145s; full config4.617s, BFF6.019s, webui11.354s,
+remotecli1.923s, remoteconfig1.199s; vet/source/diff and CLI compile passed. Reviewed
+asset digest be49df0ff697df2c5abbec170f779c027f4f0b89a72bde25fcfee52296a46ddb.
+
+Cross-built fresh Linux ARM64 production host, transferred and SHA-256 verified
+69f5d6d6aa5c8c061328193068ba6496266767c148e78e5ed595af8bc05903ff.
+Physical Mac-to-Spark test used saved advertisement config with NO advertisement
+CLI flags. Exact unverified discovery, HTTPS/SSH lifecycle, response loss and
+crash reconciliation passed52.09s/Mac race package53.717s; Linux host not race
+instrumented. Eight synthetic provider calls, no real model inference.
+
+The earlier separate launchd self-browse fixture failed to observe its advertised
+instance (3.26s), not claimed passed. Its pending patch/helper and failure record
+are preserved in reporting outputs/launchd-discovery-pending.* for independent
+Spark-browse investigation. That test change is not included here. Native service
+advertisement qualification remains open. Full combined gate/normal push queued
+behind live frozen systemd validation; no production daemon replaced.
+
+Complete remote race suite also passed26.230s after config integration.

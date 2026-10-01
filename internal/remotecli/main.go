@@ -364,6 +364,9 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	if err != nil {
 		return err
 	}
+	if advertiseInterface == "" && advertiseName == "" && advertiseSSH == 0 && cfg.RemoteAdvertisement.Enabled {
+		advertiseInterface, advertiseName, advertiseSSH = cfg.RemoteAdvertisement.Interface, cfg.RemoteAdvertisement.Name, cfg.RemoteAdvertisement.SSHPort
+	}
 	var ledger *harness.EvidenceStore
 	if len(cfg.NativeHarnesses) > 0 && cfg.NativeHarnessEvidenceDir == "" {
 		return remote.ErrInvalid

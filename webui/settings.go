@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"github.com/ArronJablonowski/NexusRouter/remoteconfig"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,17 +14,21 @@ var settingsDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 const MaxSettingsRootBytes = 4096
 
 type ToolAccessSettings struct {
-	SkillsEnabled         bool   `json:"skills_enabled"`
-	SkillsAutoDraft       bool   `json:"skills_auto_draft"`
-	SkillsRoot            string `json:"skills_root"`
-	SkillsScope           string `json:"skills_scope"`
-	ToolsEnabled          bool   `json:"tools_enabled"`
-	DelegateReadTools     bool   `json:"delegate_read_tools"`
-	ReadRoot              string `json:"read_root"`
-	SpecialistsAllowCloud bool   `json:"specialists_allow_cloud"`
+	RemoteAdvertisement   remoteconfig.Advertisement `json:"remote_advertisement"`
+	SkillsEnabled         bool                       `json:"skills_enabled"`
+	SkillsAutoDraft       bool                       `json:"skills_auto_draft"`
+	SkillsRoot            string                     `json:"skills_root"`
+	SkillsScope           string                     `json:"skills_scope"`
+	ToolsEnabled          bool                       `json:"tools_enabled"`
+	DelegateReadTools     bool                       `json:"delegate_read_tools"`
+	ReadRoot              string                     `json:"read_root"`
+	SpecialistsAllowCloud bool                       `json:"specialists_allow_cloud"`
 }
 
 func (s ToolAccessSettings) Validate() error {
+	if s.RemoteAdvertisement.Validate() != nil {
+		return ErrContract
+	}
 	if len(s.SkillsRoot) > 4096 || !utf8.ValidString(s.SkillsRoot) || strings.ContainsFunc(s.SkillsRoot, unicode.IsControl) || len(s.SkillsScope) > 64 {
 		return ErrContract
 	}

@@ -1480,6 +1480,30 @@ nexus remote service-template --platform launchd \
   --key /private/nexus/key.pem --ca /private/nexus/ca.pem
 ```
 
+The web UI **Settings → Advertise this remote host** can save the enabled
+switch, interface, advertised TLS name and optional SSH port hint. Changes use
+the existing authenticated, CSRF-protected, expected-file-digest settings write.
+They do not start a listener or mutate trust. The loaded-config summary is not
+a remote-host health report. Restart the remote host with the same config file
+for saved changes to take effect; an already running host does not hot-reload.
+
+These settings are persisted as:
+
+```yaml
+remote_advertisement:
+  enabled: false
+  interface: en1
+  name: node-a
+  ssh_port: 22
+```
+
+`nexus remote serve` uses that block when advertisement CLI options are absent.
+Explicit advertisement flags take precedence as a complete set. To manage the
+values through the web UI, generate the service without advertisement flags and
+use the same configuration file as the UI daemon. Enabling requires interface
+and lowercase TLS name; port zero or an empty web field means no SSH hint.
+Host startup still validates its private IPv4 interface and certificate.
+
 To include explicit LAN advertising in the generated service, add
 `--advertise-interface INTERFACE --advertise-name TLS_NAME`, optionally with
 `--advertise-ssh-port PORT`. The renderer requires both interface and name, a

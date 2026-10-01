@@ -10,17 +10,19 @@
 	const badge = document.querySelector("#settings-restart-badge"), activeSummary = document.querySelector("#active-settings");
 	const connection = document.querySelector("#connection-state");
 	const skillsEnabled=document.querySelector("#skills-enabled"), skillsDraft=document.querySelector("#skills-auto-draft"), skillsRoot=document.querySelector("#skills-root"), skillsScope=document.querySelector("#skills-scope");
+ const advertiseEnabled=document.querySelector("#remote-advertise-enabled"), advertiseInterface=document.querySelector("#remote-advertise-interface"), advertiseName=document.querySelector("#remote-advertise-name"), advertiseSSH=document.querySelector("#remote-advertise-ssh-port");
+ function validAdvertisement(a) {return a && typeof a.enabled==="boolean" && typeof a.interface==="string" && typeof a.name==="string" && Number.isInteger(a.ssh_port) && a.ssh_port>=0 && a.ssh_port<=65535 && (!a.interface || /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/.test(a.interface)) && a.name.length<=253 && (!a.name || a.name.split(".").every(label=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) && (!a.enabled || Boolean(a.interface&&a.name));}
  const digestPattern = /^[0-9a-f]{64}$/;
 	let csrf = "", projection = null, loading = false;
 	chat.hidden = true; workboards.hidden = true; models.hidden = true; view.hidden = false;
 	function validAccess(value) {
-		return value && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
+		return value && validAdvertisement(value.remote_advertisement) && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
 	}
 	function validProjection(value) {
 		return value && value.version === 1 && digestPattern.test(value.digest) && validAccess(value.active) && validAccess(value.saved) && typeof value.restart_required === "boolean" && value.restart_required === (JSON.stringify(value.active) !== JSON.stringify(value.saved));
 	}
 	function setStatus(message, failed) { status.textContent = message; status.classList.toggle("error", Boolean(failed)); }
-	function setBusy(value) { loading = value; [skillsEnabled,skillsDraft,skillsRoot,skillsScope].forEach(n=>n.disabled=value); save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
+	function setBusy(value) { loading = value; [skillsEnabled,skillsDraft,skillsRoot,skillsScope,advertiseEnabled,advertiseInterface,advertiseName,advertiseSSH].forEach(n=>n.disabled=value); save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
 	function syncDependency() {
 		if (!tools.checked) delegated.checked = false;
 		delegated.disabled = loading || !tools.checked;
@@ -32,6 +34,7 @@
 	}
 	function render(value) {
 		projection = value;
+ advertiseEnabled.checked=value.saved.remote_advertisement.enabled;advertiseInterface.value=value.saved.remote_advertisement.interface;advertiseName.value=value.saved.remote_advertisement.name;advertiseSSH.value=value.saved.remote_advertisement.ssh_port||"";
  skillsEnabled.checked=value.saved.skills_enabled;skillsDraft.checked=value.saved.skills_auto_draft;skillsRoot.value=value.saved.skills_root;skillsScope.value=value.saved.skills_scope;
 		tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
 		badge.hidden = !value.restart_required; activeSummary.replaceChildren();
@@ -39,9 +42,11 @@
  addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
 		addSummary("Delegated reads", value.active.delegate_read_tools ? "Enabled" : "Disabled");
 		addSummary("Specialist models", value.active.specialists_allow_cloud ? "Local and cloud" : "Local only");
-		addSummary("Read root", value.active.read_root || "Not configured");
+		addSummary("Remote advertisement in loaded config",value.active.remote_advertisement.enabled?"Enabled (remote host status not checked)":"Disabled");
+ addSummary("Advertised interface",value.active.remote_advertisement.interface||"Not configured");addSummary("Advertised TLS name",value.active.remote_advertisement.name||"Not configured");addSummary("SSH port hint",value.active.remote_advertisement.ssh_port?String(value.active.remote_advertisement.ssh_port):"None");
+ addSummary("Read root", value.active.read_root || "Not configured");
 		syncDependency(); validation.hidden = true;
-		setStatus(value.restart_required ? "Settings are saved. Restart NexusRouter to activate them." : "Saved settings match the running daemon.", false);
+		setStatus(value.restart_required ? "Settings are saved. Restart the owning service to activate them; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
 	}
 	function load() {
 		setBusy(true); setStatus("Loading settings…", false);
@@ -52,10 +57,11 @@
 			projection = null; setStatus("Settings could not be loaded.", true);
 		}).finally(() => setBusy(false));
 	}
-	function formValue() { return {skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
+	function formValue() { return {remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
 	function validate(value) {
 		let message = "";
-		if (value.tools_enabled && !value.read_root) message = "An absolute read root is required when file tools are enabled.";
+		if (!validAdvertisement(value.remote_advertisement)) message = "Use a valid interface, lowercase TLS name, and optional SSH port from 1 to 65535. Interface and TLS name are required when discovery is enabled.";
+ else if (value.tools_enabled && !value.read_root) message = "An absolute read root is required when file tools are enabled.";
 		else if (!validAccess(value)) message = "Enter a valid absolute directory path and review the dependent permissions.";
 		validation.textContent = message; validation.hidden = !message; root.setAttribute("aria-invalid", message ? "true" : "false");
 		return !message;
