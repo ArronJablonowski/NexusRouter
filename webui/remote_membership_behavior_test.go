@@ -29,5 +29,6 @@ func TestRemoteMembershipBrowserFencesAndUncertainWrites(t *testing.T) {
  verified.checked=true;form.handlers.submit({preventDefault(){}});await tick();if(posts.length!==2)throw Error('replayed uncertain mutation');
  if(!nodes.get('#remote-status').textContent.includes('Refresh'))throw Error('missing recovery instruction');
  nodes.get('#remote-refresh').handlers.click();await tick();if(form.hidden||peers.children.length!==1)throw Error('refresh failed');
+ let autoMounts=0;window.NexusRemoteAutomatic={attach(parent,base,csrf){if(base!=='/console'||csrf!=='token')throw Error('lost authority');autoMounts++;parent.append(element());}};page.automatic_enabled=true;nodes.get('#remote-refresh').handlers.click();await tick();if(autoMounts!==1||peers.children.length!==2)throw Error('automatic opt-in missing');
  })().catch(e=>{console.error(e);process.exit(1)});`)
 }

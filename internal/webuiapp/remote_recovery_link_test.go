@@ -13,12 +13,15 @@ func TestRemoteRecoveryFragmentLoadsProductionShellWithoutDispatch(t *testing.T)
 	cookie, _ := authenticateBrowser(t, h)
 	d := &browserDispatchFake{}
 	h.remoteDispatcher = d
+	a := &automaticBrowserFake{}
+	h.remoteAutomatic = a
 	server := httptest.NewServer(h)
 	defer server.Close()
 	for _, tc := range []struct {
 		suffix string
 		want   int
 	}{
+		{"#remote_auto_request=automatic-browser-01", http.StatusOK},
 		{"#remote_peer=node-a&remote_request=request-browser-0001", http.StatusOK},
 		{"?remote_peer=node-a&remote_request=request-browser-0001", http.StatusBadRequest},
 	} {
@@ -44,7 +47,7 @@ func TestRemoteRecoveryFragmentLoadsProductionShellWithoutDispatch(t *testing.T)
 			t.Fatal("missing production shell")
 		}
 	}
-	if d.calls != 0 {
+	if d.calls != 0 || a.dispatches != 0 || a.reads != 0 {
 		t.Fatal("opening recovery URL dispatched work")
 	}
 }

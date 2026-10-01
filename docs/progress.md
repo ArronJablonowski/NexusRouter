@@ -1242,3 +1242,23 @@ Configuration tests reject absent dispatch authority, disabled UI and unsafe
 paths. These checks do not prove full automatic browser behavior: Settings form,
 recovery UI and outcome review integration remain unfinished. Full repository
 gate/push and physical two-host qualification remain pending.
+
+## 2026-10-01 — Settings automatic remote selection and recovery
+
+Added an opt-in automatic model/harness request form using the production browser
+API. Exact requirements are reviewed before one send; field edits invalidate the
+review. Request ID is saved in a URL fragment before dispatch, with no prompt or
+credential persistence. Reload offers read-only destination lookup and existing
+status/result/progress/cancel controls, never candidate reselection or replay.
+Uncertain responses remain explicitly uncertain. Independent new work replaces
+the recovery link and is labeled separately from retries.
+
+Behavior tests cover stale review, duplicate clicks, failed recovery-link writes,
+reload, prompt-free status and opt-in rendering. Real production HTTP fixture
+accepts the automatic fragment without any dispatch or status call. Real IAB
+verification using production assets with synthetic responses observed exactly
+one dispatch (503), reload, one recorded-status lookup, then one task status
+lookup. Screenshot/call evidence: reporting outputs/remote-automatic-browser-qa.
+This is UI evidence, not physical-host, inference-quality or end-to-end selector
+qualification. Browser quality-review integration and remaining remote product
+gaps are still open. No daemon configuration or live inference changed.

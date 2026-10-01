@@ -1171,7 +1171,7 @@ operations retain their existing exact-request checks. Missing or uncertain
 remote status remains an error, never evidence of successful completion. Browser
 integration with automatic routing remains separate work.
 
-### Automatic browser API (opt-in; Settings form pending)
+### Automatic browser routing (opt-in)
 
 `web_ui.remote_automatic_evidence_directory` is empty by default. Enabling it
 requires the existing remote dispatch directory, task controls, client credentials
@@ -1195,5 +1195,12 @@ inspection using the original caller identity. Responses project task metadata;
 private config digests and transport diagnostics are excluded. Neither endpoint
 automatically retries, changes destination after uncertainty, or grades results.
 The existing exact-intent outcome/evaluation workflow remains necessary to add
-quality evidence. Settings form, UI recovery and browser review integration are
-not yet connected to these APIs. No live configuration is enabled by this change.
+quality evidence. Settings exposes an automatic request form only when this opt-in is enabled.
+Review the task requirements, then confirm one selection and dispatch. Before
+sending, the page saves only the request ID in a URL fragment; prompts and
+credentials are not stored in browser persistence. Reload never resends. Use
+Find saved destination and status to recover the bound peer, then the existing
+status/result, lifecycle progress and cancellation controls. Starting another
+independent request replaces the recovery link and may duplicate unresolved work;
+preserve earlier IDs and inspect them first. Browser quality-review integration
+is still pending. No live configuration is enabled by this change.
