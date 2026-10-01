@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
@@ -63,4 +64,14 @@ func (c *Client) ReviewHarnessOutcome(ctx context.Context, ledger *harness.Evide
 		return err
 	}
 	return ledger.AppendReview(ctx, review, time.Now().UTC())
+}
+
+// ReconcileHarnessAudit binds a completed durable RunAudit operation to the
+// joint ledger as advisory AI evidence. It performs no evaluator/inference call,
+// never overwrites an existing different review head, and is safe to retry.
+func (c *Client) ReconcileHarnessAudit(ctx context.Context, ledger *harness.EvidenceStore, task, operation string) (harness.Review, error) {
+	if !c.valid(ctx) {
+		return harness.Review{}, ErrAdmission
+	}
+	return app.ReconcileHarnessAudit(ctx, c.database, ledger, task, operation)
 }

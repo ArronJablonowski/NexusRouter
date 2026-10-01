@@ -143,16 +143,19 @@ type Request struct {
 }
 
 type Result struct {
-	HarnessOutcome       *harness.Execution
-	HarnessSelection     *harness.Selection
-	Version              int
-	PreviousTaskIDs      []string
-	RouteEstimatedCost   *float64
-	AuditID, AuditStatus string
-	TaskID, Text         string
-	Turns                int
-	FinishReason         string
-	Usage                *providers.Usage
+	HarnessOutcome          *harness.Execution
+	HarnessSelection        *harness.Selection
+	HarnessReview           *harness.Review
+	HarnessReviewStatus     string
+	HarnessAuditOperationID string
+	Version                 int
+	PreviousTaskIDs         []string
+	RouteEstimatedCost      *float64
+	AuditID, AuditStatus    string
+	TaskID, Text            string
+	Turns                   int
+	FinishReason            string
+	Usage                   *providers.Usage
 }
 
 func New(options ConfigOptions) (*Client, error) {
@@ -209,7 +212,7 @@ func (r Request) internal() app.Request {
 	return app.Request{HarnessID: r.HarnessID, SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
 }
 func publicResult(r app.Result) Result {
-	return Result{Version: 1, HarnessOutcome: r.HarnessOutcome, HarnessSelection: r.HarnessSelection, PreviousTaskIDs: r.PreviousTaskIDs, RouteEstimatedCost: r.RouteEstimatedCost, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}
+	return Result{Version: 1, HarnessOutcome: r.HarnessOutcome, HarnessSelection: r.HarnessSelection, HarnessReview: r.HarnessReview, HarnessReviewStatus: r.HarnessReviewStatus, HarnessAuditOperationID: r.HarnessAuditOperationID, PreviousTaskIDs: r.PreviousTaskIDs, RouteEstimatedCost: r.RouteEstimatedCost, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}
 }
 func (c *Client) valid(ctx context.Context) bool { return c != nil && c.service != nil && ctx != nil }
 

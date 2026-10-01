@@ -136,18 +136,21 @@ func validRuntimeHostWorkerID(value string) bool {
 }
 
 type Result struct {
-	HarnessOutcome       *harness.Execution
-	HarnessSelection     *harness.Selection
-	PreviousTaskIDs      []string
-	RouteEstimatedCost   *float64
-	retryable            bool
-	fallbackModelIDs     []string
-	reservedCost         float64
-	AuditID, AuditStatus string
-	TaskID, Text         string
-	Turns                int
-	FinishReason         string
-	Usage                *providers.Usage
+	HarnessOutcome          *harness.Execution
+	HarnessSelection        *harness.Selection
+	HarnessReview           *harness.Review
+	HarnessReviewStatus     string
+	HarnessAuditOperationID string
+	PreviousTaskIDs         []string
+	RouteEstimatedCost      *float64
+	retryable               bool
+	fallbackModelIDs        []string
+	reservedCost            float64
+	AuditID, AuditStatus    string
+	TaskID, Text            string
+	Turns                   int
+	FinishReason            string
+	Usage                   *providers.Usage
 }
 
 // runExplicitAdmitted MUST only be called after resource admission. Local

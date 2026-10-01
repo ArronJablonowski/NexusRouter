@@ -46,17 +46,10 @@ func recordAudit(ctx context.Context, tx *sql.Tx, r evaluation.AuditRecord) erro
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	var started, ended, terminal int
-	err = tx.QueryRowContext(ctx, `SELECT
-	 (SELECT count(*) FROM events WHERE task_id=? AND json_extract(body,'$.attempt_id')=? AND json_extract(body,'$.kind')='turn.started'),
-	 (SELECT count(*) FROM events WHERE task_id=? AND json_extract(body,'$.attempt_id')=? AND json_extract(body,'$.kind')='turn.completed'),
-	 (SELECT count(*) FROM task_heads WHERE task_id=? AND state IN ('completed','failed'))`, r.TaskID, r.AttemptID, r.TaskID, r.AttemptID, r.TaskID).Scan(&started, &ended, &terminal)
-	if err != nil {
+	if err = validateAuditSource(ctx, tx, r.TaskID, r.AttemptID, r.SourceKind); err != nil {
 		return err
 	}
-	if started != 1 || ended != 1 || terminal != 1 {
-		return evaluation.ErrAudit
-	}
+
 	if _, err = tx.ExecContext(ctx, "INSERT INTO audit_records(id,task_id,body) VALUES(?,?,?)", r.ID, r.TaskID, body); err != nil {
 		return err
 	}

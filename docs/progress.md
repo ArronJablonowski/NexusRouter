@@ -9720,3 +9720,36 @@ Only Pi is currently registered as a native adapter. This is not a ranking acros
 all requested harnesses or proof of globally optimal routing. Evaluation scheduling,
 remaining adapters, tools, durable queues/accounting and held-out comparisons are
 still open, and DAR-132 remains In Progress.
+
+
+## Native automatic advisory evaluation — DAR-132 (2026-10-01)
+
+Extended the existing durable audit workflow to canonical completed harness
+executions, using an explicit source kind and execution digest rather than
+invented provider-turn events. Audit admission and commit verify the native
+start/terminal/output binding; public status preserves that provenance. Existing
+provider-turn records remain compatible and retain their original semantics.
+
+Configured automatic review now runs after successful native execution. The
+stable per-task operation key prevents evaluator replay; SDK reconciliation can
+repair ledger delivery without repeating candidate or reviewer inference.
+Accepted/rejected findings become capped automated_ai evidence, abstention stays
+unverified, and evaluator failures produce no quality vote. Existing operator
+heads cannot be silently replaced. Candidate completion, audit operation/record,
+and learning status are separately visible in the SDK result.
+
+Verification: installed-Pi automatic-review fixtures passed accept/reject/abstain/
+failure cases (12.132s after final result-field change), with one candidate and
+one evaluator invocation each and no promotion to confirmed evidence. Native audit
+replay/failure/operator-head tests passed (6.061s). Audit/review regressions passed
+under race in evaluation (1.330s), runtime (15.229s) and telemetry (148.241s).
+The combined SDK regression run exposed one conflict-classification expectation;
+fixed the ledger to check expected head before supersession chronology, then the
+failing SDK tests and focused ledger tests passed. The source/targeted-vet gate
+is rerun for the final checkpoint. Full repository validation remains pending
+before push; no live service, external reviewer or model inference was invoked.
+
+Still open: other native harnesses, authorized tools, durable native queue
+registration, CLI/API configuration, full usage/cost reporting, explicit model
+and harness quality qualification, and physical remote-system qualification.
+DAR-132 and the overall Linear objective remain In Progress.

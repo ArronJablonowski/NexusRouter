@@ -58,7 +58,7 @@ func (s *Store) admitReview(ctx context.Context, r evaluation.ReviewAttempt, pub
 		}
 		same := string(priorBody) == string(body)
 		if public {
-			same = prior.TaskID == r.TaskID && prior.AttemptID == r.AttemptID && prior.EvaluatorModel == r.EvaluatorModel && prior.EvaluatorProvider == r.EvaluatorProvider && prior.ReviewerID == r.ReviewerID && prior.RequestDigest == r.RequestDigest && prior.EstimatedCost == r.EstimatedCost
+			same = prior.TaskID == r.TaskID && prior.AttemptID == r.AttemptID && prior.SourceKind == r.SourceKind && prior.EvaluatorModel == r.EvaluatorModel && prior.EvaluatorProvider == r.EvaluatorProvider && prior.ReviewerID == r.ReviewerID && prior.RequestDigest == r.RequestDigest && prior.EstimatedCost == r.EstimatedCost
 		}
 		if !same {
 			return evaluation.ReviewAttempt{}, false, ErrConflict
@@ -71,17 +71,10 @@ func (s *Store) admitReview(ctx context.Context, r evaluation.ReviewAttempt, pub
 	if !errors.Is(err, sql.ErrNoRows) {
 		return evaluation.ReviewAttempt{}, false, err
 	}
-	var started, ended, terminal int
-	err = tx.QueryRowContext(ctx, `SELECT
-	 (SELECT count(*) FROM events WHERE task_id=? AND json_extract(body,'$.attempt_id')=? AND json_extract(body,'$.kind')='turn.started'),
-	 (SELECT count(*) FROM events WHERE task_id=? AND json_extract(body,'$.attempt_id')=? AND json_extract(body,'$.kind')='turn.completed'),
-	 (SELECT count(*) FROM task_heads WHERE task_id=? AND state IN ('completed','failed'))`, r.TaskID, r.AttemptID, r.TaskID, r.AttemptID, r.TaskID).Scan(&started, &ended, &terminal)
-	if err != nil {
+	if err = validateAuditSource(ctx, tx, r.TaskID, r.AttemptID, r.SourceKind); err != nil {
 		return evaluation.ReviewAttempt{}, false, err
 	}
-	if started != 1 || ended != 1 || terminal != 1 {
-		return evaluation.ReviewAttempt{}, false, evaluation.ErrAudit
-	}
+
 	if _, err = tx.ExecContext(ctx, "INSERT INTO review_attempts VALUES(?,?,?,?)", r.ID, r.TaskID, r.Status, body); err != nil {
 		return evaluation.ReviewAttempt{}, false, err
 	}
@@ -109,7 +102,7 @@ func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) er
 // CompleteReview commits advisory evidence and its successful lifecycle together.
 // A conflict or persistence error rolls back both changes. Exact retries are safe.
 func (s *Store) CompleteReview(ctx context.Context, r evaluation.ReviewAttempt, a evaluation.AuditRecord) error {
-	if r.Validate() != nil || a.Validate() != nil || r.Status != "completed" || r.AuditID != a.ID || r.TaskID != a.TaskID || r.AttemptID != a.AttemptID || r.EvaluatorModel != a.EvaluatorModel || r.EvaluatorProvider != a.EvaluatorProvider || (r.ReviewerID != "" && r.ReviewerID != a.Audit.EvaluatorID) {
+	if r.Validate() != nil || a.Validate() != nil || r.Status != "completed" || r.AuditID != a.ID || r.TaskID != a.TaskID || r.AttemptID != a.AttemptID || r.SourceKind != a.SourceKind || r.EvaluatorModel != a.EvaluatorModel || r.EvaluatorProvider != a.EvaluatorProvider || (r.ReviewerID != "" && r.ReviewerID != a.Audit.EvaluatorID) {
 		return evaluation.ErrAudit
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -165,7 +158,7 @@ func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) e
 		}
 		return nil
 	}
-	if prior.TaskID != r.TaskID || prior.AttemptID != r.AttemptID || prior.EvaluatorModel != r.EvaluatorModel || prior.EvaluatorProvider != r.EvaluatorProvider || prior.ReviewerID != r.ReviewerID || prior.RequestDigest != r.RequestDigest || prior.EstimatedCost != r.EstimatedCost || !prior.StartedAt.Equal(r.StartedAt) {
+	if prior.TaskID != r.TaskID || prior.AttemptID != r.AttemptID || prior.SourceKind != r.SourceKind || prior.EvaluatorModel != r.EvaluatorModel || prior.EvaluatorProvider != r.EvaluatorProvider || prior.ReviewerID != r.ReviewerID || prior.RequestDigest != r.RequestDigest || prior.EstimatedCost != r.EstimatedCost || !prior.StartedAt.Equal(r.StartedAt) {
 		return ErrConflict
 	}
 	if r.Status == "completed" {
@@ -178,7 +171,7 @@ func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) e
 		if err != nil {
 			return err
 		}
-		if a.TaskID != r.TaskID || a.AttemptID != r.AttemptID || a.EvaluatorModel != r.EvaluatorModel || a.EvaluatorProvider != r.EvaluatorProvider || (r.ReviewerID != "" && a.Audit.EvaluatorID != r.ReviewerID) {
+		if a.TaskID != r.TaskID || a.AttemptID != r.AttemptID || a.SourceKind != r.SourceKind || a.EvaluatorModel != r.EvaluatorModel || a.EvaluatorProvider != r.EvaluatorProvider || (r.ReviewerID != "" && a.Audit.EvaluatorID != r.ReviewerID) {
 			return evaluation.ErrAudit
 		}
 	}

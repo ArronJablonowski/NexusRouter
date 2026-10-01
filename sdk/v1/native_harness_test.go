@@ -29,7 +29,7 @@ import (
 func nativeSDKClient(t *testing.T, endpoint string, overhead uint64, tools bool) (*sdk.Client, *atomic.Int32) {
 	return nativeSDKProviderClient(t, endpoint, overhead, tools, "openai_compatible")
 }
-func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, tools bool, providerKind string) (*sdk.Client, *atomic.Int32) {
+func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, tools bool, providerKind string, configure ...func(*config.Settings, *sdk.ConfigOptions)) (*sdk.Client, *atomic.Int32) {
 	t.Helper()
 	executable, e := exec.LookPath("pi")
 	if e != nil {
@@ -49,6 +49,10 @@ func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, too
 	cfg.Providers = []config.Provider{{ID: "native-local", Kind: providerKind, Endpoint: endpoint, APIKeyEnv: "NATIVE_TEST_SECRET", RequestTimeout: "15s"}}
 	zero := 0.0
 	cfg.Models = []config.Model{{ID: "chat", Provider: "native-local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 16384, Capabilities: []string{"chat", "writing"}, EstimatedCost: &zero}}
+	extra := sdk.ConfigOptions{}
+	for _, change := range configure {
+		change(&cfg, &extra)
+	}
 	body, e = yaml.Marshal(cfg)
 	if e != nil {
 		t.Fatal(e)
@@ -58,7 +62,7 @@ func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, too
 		t.Fatal(e)
 	}
 	profiled := &atomic.Int32{}
-	client, e := sdk.New(sdk.ConfigOptions{ProjectFile: path, LookupSecret: func(name string) string {
+	client, e := sdk.New(sdk.ConfigOptions{Evaluator: extra.Evaluator, HarnessEvidence: extra.HarnessEvidence, ProjectFile: path, LookupSecret: func(name string) string {
 		if name == "NATIVE_TEST_SECRET" {
 			return "native-fixture-secret"
 		}

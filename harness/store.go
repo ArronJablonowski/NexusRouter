@@ -203,14 +203,19 @@ func (s *EvidenceStore) AppendReview(ctx context.Context, review Review, now tim
 	if e != nil && !errors.Is(e, sql.ErrNoRows) {
 		return e
 	}
+	var headTime time.Time
 	if e == nil {
 		var head Review
-		if json.Unmarshal(old, &head) != nil || head.Validate() != nil || head.ID != headID || head.ExecutionDigest != review.ExecutionDigest || review.CreatedAt.Before(head.CreatedAt) {
+		if json.Unmarshal(old, &head) != nil || head.Validate() != nil || head.ID != headID || head.ExecutionDigest != review.ExecutionDigest {
 			return ErrInvalid
 		}
+		headTime = head.CreatedAt
 	}
 	if review.ExpectedHead != headID {
 		return ErrConflict
+	}
+	if !headTime.IsZero() && review.CreatedAt.Before(headTime) {
+		return ErrInvalid
 	}
 	if review.Verdict == "withdrawn" && headID == "" {
 		return ErrInvalid

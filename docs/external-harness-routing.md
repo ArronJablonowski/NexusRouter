@@ -248,14 +248,14 @@ through the single-request policy gateway, retaining their roles. The durable
 start records the same context; successful terminal events bind the delivered,
 redacted text to `Result.HarnessOutcome`. `ReadEvents` exposes that canonical
 outcome. Text streaming currently delivers the committed final text once; it does
-not promise live token deltas. Unknown registrations, model mismatches, queued submissions, continuation/compaction, evaluation workers,
+not promise live token deltas. Unknown registrations, model mismatches, queued submissions, continuation/compaction,
 delegation, tools and unsupported capabilities are rejected without a substitute
 execution. Deterministic response-contract failure is terminal, without repair or
 hidden inference retry.
 
 `Result.Usage` remains absent: Pi's normalized harness-reported counters must not
 be presented as provider-measured usage. Durable usage/cost accounting, ordinary
-automatic quality evaluation, broader model/harness selection across adapters,
+broader model/harness selection across adapters,
 CLI/API registration, tools and other harness adapters
 remain outstanding. A successful execution alone creates no quality vote.
 
@@ -283,9 +283,8 @@ Identical retries preserve one vote, including replay after a later revision;
 withdrawal removes the active vote without rewriting history. The existing
 `Snapshot` and accuracy-first `harness.Select` consume these current heads with
 method-specific confidence and exact model/harness/configuration/task binding.
-This SDK bridge makes evaluated outcomes available to selection. Automatic
-invocation of evaluation remains unfinished; registered-pair SDK selection is
-described below. A completed run still contributes no quality sample until an
+This SDK bridge makes evaluated outcomes available to selection. Opt-in automatic
+evaluation and registered-pair SDK selection are described below. A completed run still contributes no quality sample until an
 actual bound evaluation is supplied.
 
 
@@ -347,7 +346,46 @@ restart; unreviewed outputs never acquire a success vote automatically.
 Current registered adapters are Pi text-only routes, with native Ollama or
 OpenAI-compatible providers. This is selection among the registered eligible
 pairs, not a claim of the globally best model/harness or a comparative ranking
-against unimplemented Hermes/OpenClaw/Goose/OpenHands adapters. Automatic
-evaluation scheduling, additional adapters, tools, queued registration authority,
+against unimplemented Hermes/OpenClaw/Goose/OpenHands adapters. Additional adapters, tools, queued registration authority,
 CLI/API configuration, durable usage/cost accounting and held-out qualification
 remain required for the full feature.
+
+
+## Automatic advisory evaluation and learning
+
+The existing `evaluation.judge`, `evaluation.auto_review_model` and bounded
+`evaluation.auto_review_max_cost` settings now apply to completed native harness
+runs. Supply `ConfigOptions.HarnessEvidence` to ingest the resulting evaluated
+feedback; without it the audit remains durable and learning reports
+`not_configured`. The reviewer can use the ordinary independently admitted model
+path or the configured `ConfigOptions.Evaluator` extension. These are operator
+configuration choices; no reviewer, provider or live configuration is enabled by
+the library automatically.
+
+Native audits use the existing durable RunAudit workflow. `SourceKind: "harness"`
+means the legacy `SourceAttemptID`/`AttemptID` field holds the exact canonical
+execution digest; it does not claim a provider-turn identity. Admission and audit
+commit independently verify the canonical start/completion/output binding.
+Started but interrupted reviews stay inspectable and never silently reinvoke.
+Failed and incomplete native tasks are ineligible. Existing provider-turn audits
+keep their empty source kind and original semantics.
+
+Automatic review uses the stable idempotency key
+`native-auto-review-v1:<taskID>`. `Result.HarnessAuditOperationID` supports
+InspectAudit/ReadAuditEvents; `Result.AuditID` remains the audit record ID.
+`ReconcileHarnessAudit(ctx, ledger, taskID, operationID)` can repair ledger delivery
+without repeating candidate or reviewer inference. Review identity/time derive
+from the persisted audit, so identical retries do not add weight.
+
+`HarnessReview` and `HarnessReviewStatus` report learning separately from execution.
+A successful candidate remains a completed execution when the evaluator rejects,
+abstains or fails; the returned text is not a quality guarantee. Accepted/rejected
+audits become `automated_ai` evidence with capped advisory weight, including when
+an in-process evaluator produced them. Quality is currently the binary verdict
+(1 for accept, 0 for reject), not an invented multidimensional rubric score.
+Abstention/zero confidence yields unverified evidence; evaluation failure yields
+no quality vote. An existing different operator review head causes `conflict`
+rather than silent supersession. Ledger failures report `failed`; retry audit
+reconciliation, not Run. Automatic reviews never claim human or deterministic
+provenance. Human/deterministic feedback continues through the explicitly trusted
+review API when the host has independently established that evaluation method.

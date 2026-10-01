@@ -204,6 +204,9 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 		}
 	}
 	if runErr == nil && r.runtimeHostAdmission == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
+		if result.HarnessOutcome != nil {
+			return s.reviewNativeCompleted(ctx, result), runErr
+		}
 		audit, auditErr := s.AuditTask(ctx, result.TaskID, s.settings.Evaluation.AutoReviewModel, s.settings.Evaluation.AutoReviewMaxCost)
 		result.AuditStatus = "failed"
 		if auditErr == nil {

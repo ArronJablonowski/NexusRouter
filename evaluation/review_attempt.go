@@ -11,6 +11,8 @@ import (
 // ReviewAttempt records dispatch and terminal state without prompts or raw
 // provider errors. A durable started state also identifies interrupted reviews.
 type ReviewAttempt struct {
+	// SourceKind is empty for provider turns; harness uses the execution digest in AttemptID.
+	SourceKind                                               string `json:",omitempty"`
 	Version                                                  int
 	ID, TaskID, AttemptID, EvaluatorModel, EvaluatorProvider string
 	ReviewerID                                               string `json:",omitempty"`
@@ -27,7 +29,7 @@ type ReviewAttempt struct {
 }
 
 func (r ReviewAttempt) Validate() error {
-	if r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.StartedAt.IsZero() || !reviewCost(r.EstimatedCost) {
+	if !validAuditSource(r.SourceKind, r.AttemptID) || r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.StartedAt.IsZero() || !reviewCost(r.EstimatedCost) {
 		return ErrAudit
 	}
 	// Both fields are absent on rows written before public audit operations.
@@ -61,4 +63,15 @@ func (r ReviewAttempt) Validate() error {
 func auditDigest(s string) bool {
 	b, err := hex.DecodeString(s)
 	return err == nil && len(b) == 32 && strings.ToLower(s) == s
+}
+
+func validAuditSource(kind, id string) bool {
+	switch kind {
+	case "":
+		return auditLabel(id)
+	case "harness":
+		return auditDigest(id)
+	default:
+		return false
+	}
 }

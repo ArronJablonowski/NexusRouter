@@ -11,6 +11,8 @@ import (
 // The host supplies attribution, timing, evidence references and measured usage;
 // model output supplies only Audit. Sensitive findings require host redaction.
 type AuditRecord struct {
+	// SourceKind is empty for provider turns; harness uses the execution digest in AttemptID.
+	SourceKind                        string `json:",omitempty"`
 	Version                           int
 	ID, TaskID, AttemptID             string
 	EvaluatorModel, EvaluatorProvider string
@@ -22,7 +24,7 @@ type AuditRecord struct {
 }
 
 func (r AuditRecord) Validate() error {
-	if r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.Time.IsZero() || r.Elapsed < 0 || r.Elapsed > MaxReviewDuration {
+	if !validAuditSource(r.SourceKind, r.AttemptID) || r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.Time.IsZero() || r.Elapsed < 0 || r.Elapsed > MaxReviewDuration {
 		return ErrAudit
 	}
 	if r.Usage != nil && (r.Usage.InputTokens < 0 || r.Usage.OutputTokens < 0) {

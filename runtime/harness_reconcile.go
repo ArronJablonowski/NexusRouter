@@ -25,6 +25,19 @@ func RecordHarnessOutcome(ctx context.Context, reader HarnessJournalReader, ledg
 	if err != nil {
 		return harness.Execution{}, ErrPersistence
 	}
+	outcome, err := ValidateHarnessOutcome(events, taskID)
+	if err != nil {
+		return harness.Execution{}, err
+	}
+	if err := ledger.AppendExecution(ctx, outcome, now); err != nil {
+		return harness.Execution{}, err
+	}
+	return outcome, nil
+}
+
+// ValidateHarnessOutcome verifies the canonical completed native task protocol.
+// Callers must obtain events from their trusted journal, not imported JSON.
+func ValidateHarnessOutcome(events []Event, taskID string) (harness.Execution, error) {
 	if len(events) != 2 {
 		return harness.Execution{}, ErrProtocol
 	}
@@ -35,9 +48,6 @@ func RecordHarnessOutcome(ctx context.Context, reader HarnessJournalReader, ledg
 	outcome := *last.Data.HarnessOutcome
 	if outcome.Actual != first.Data.Harness.Identity || outcome.Task != first.Data.Harness.Task {
 		return harness.Execution{}, ErrProtocol
-	}
-	if err := ledger.AppendExecution(ctx, outcome, now); err != nil {
-		return harness.Execution{}, err
 	}
 	return outcome, nil
 }

@@ -86,7 +86,7 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 	if r.HarnessID == "" {
 		return r, nil
 	}
-	if r.submissionID != "" || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" || s.settings.Evaluation.AutoReviewModel != "" {
+	if r.submissionID != "" || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" {
 		return Request{}, ErrHarnessUnsupported
 	}
 	if r.HarnessID == "auto" {

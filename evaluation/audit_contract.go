@@ -59,6 +59,7 @@ func auditIdempotencyKey(key string) bool {
 // output, tool payload, or raw-error fields. Findings are task-derived content
 // and must receive the same authorization and handling as task inspection.
 type AuditStatus struct {
+	SourceKind          string `json:"source_kind,omitempty"`
 	Version             int    `json:"version"`
 	ID                  string `json:"id"`
 	TaskID              string `json:"task_id"`
@@ -100,7 +101,7 @@ func validAuditPublicStatus(s string) bool {
 }
 
 func (s AuditStatus) Validate() error {
-	if s.Version != 1 || !ValidAuditOperationID(s.ID) || !ValidAuditOperationID(s.TaskID) || !ValidAuditOperationID(s.SourceAttemptID) || !validAuditPublicStatus(s.Status) || !ValidAuditOperationID(s.ReviewerID) || !auditLabel(s.EvaluatorModel) || !auditLabel(s.EvaluatorProvider) || s.Findings == nil || s.EvidenceRefs == nil || len(s.Findings) > 64 || len(s.EvidenceRefs) > 256 || len(s.EvidencePrecedence) != len(fixedAuditEvidencePrecedence) || s.StartedAt == nil || s.StartedAt.IsZero() || s.StartedAt.Location() != time.UTC || s.ElapsedMillis < 0 || s.ElapsedMillis > MaxReviewDuration.Milliseconds() {
+	if !validAuditSource(s.SourceKind, s.SourceAttemptID) || s.Version != 1 || !ValidAuditOperationID(s.ID) || !ValidAuditOperationID(s.TaskID) || !ValidAuditOperationID(s.SourceAttemptID) || !validAuditPublicStatus(s.Status) || !ValidAuditOperationID(s.ReviewerID) || !auditLabel(s.EvaluatorModel) || !auditLabel(s.EvaluatorProvider) || s.Findings == nil || s.EvidenceRefs == nil || len(s.Findings) > 64 || len(s.EvidenceRefs) > 256 || len(s.EvidencePrecedence) != len(fixedAuditEvidencePrecedence) || s.StartedAt == nil || s.StartedAt.IsZero() || s.StartedAt.Location() != time.UTC || s.ElapsedMillis < 0 || s.ElapsedMillis > MaxReviewDuration.Milliseconds() {
 		return ErrAudit
 	}
 	for i, source := range fixedAuditEvidencePrecedence {
@@ -156,7 +157,7 @@ func NewAuditStatus(r ReviewAttempt, a *AuditRecord) (AuditStatus, error) {
 		return AuditStatus{}, ErrAudit
 	}
 	started := r.StartedAt.UTC()
-	out := AuditStatus{Version: 1, ID: r.ID, TaskID: r.TaskID, SourceAttemptID: r.AttemptID, ReviewerID: r.ReviewerID, EvaluatorModel: r.EvaluatorModel, EvaluatorProvider: r.EvaluatorProvider, Findings: []AuditFinding{}, EvidenceRefs: []string{}, EvidencePrecedence: AuditEvidencePrecedence(), StartedAt: &started}
+	out := AuditStatus{Version: 1, SourceKind: r.SourceKind, ID: r.ID, TaskID: r.TaskID, SourceAttemptID: r.AttemptID, ReviewerID: r.ReviewerID, EvaluatorModel: r.EvaluatorModel, EvaluatorProvider: r.EvaluatorProvider, Findings: []AuditFinding{}, EvidenceRefs: []string{}, EvidencePrecedence: AuditEvidencePrecedence(), StartedAt: &started}
 	switch r.Status {
 	case "started":
 		if a != nil {
@@ -174,7 +175,7 @@ func NewAuditStatus(r ReviewAttempt, a *AuditRecord) (AuditStatus, error) {
 		finished := r.FinishedAt.UTC()
 		out.FinishedAt = &finished
 	case "completed":
-		if a == nil || a.Validate() != nil || r.AuditID != a.ID || r.TaskID != a.TaskID || r.AttemptID != a.AttemptID || r.EvaluatorModel != a.EvaluatorModel || r.EvaluatorProvider != a.EvaluatorProvider || r.ReviewerID != a.Audit.EvaluatorID || a.Time.Before(r.StartedAt) || a.Time.After(r.FinishedAt) || a.Elapsed > a.Time.Sub(r.StartedAt) {
+		if a == nil || a.Validate() != nil || r.AuditID != a.ID || r.TaskID != a.TaskID || r.AttemptID != a.AttemptID || r.SourceKind != a.SourceKind || r.EvaluatorModel != a.EvaluatorModel || r.EvaluatorProvider != a.EvaluatorProvider || r.ReviewerID != a.Audit.EvaluatorID || a.Time.Before(r.StartedAt) || a.Time.After(r.FinishedAt) || a.Elapsed > a.Time.Sub(r.StartedAt) {
 			return AuditStatus{}, ErrAudit
 		}
 		out.Status = map[string]string{"accept": "completed", "reject": "rejected", "abstain": "abstained"}[a.Audit.Verdict]
