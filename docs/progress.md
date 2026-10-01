@@ -10981,3 +10981,23 @@ Full repository gate/push remains queued behind the older SDK run. Its telemetry
 child was freshly observed consuming CPU; no restart or frozen-checkout edit was
 performed. Other harness tool adapters and held-out comparative evidence remain
 required for DAR-132.
+
+### 2026-10-01 — DAR-132 ordered native tool rendezvous for Goose
+
+Installed Goose 1.52.0 interface probes showed that MCP tool requests can arrive
+in reverse provider proposal order. Added an opt-in ordered tool bridge: the host
+registers verified proposals in canonical order, and concurrent native arrivals
+wait for their predecessor. A waiting call never launches an unrequested one.
+Exact retries use cached results; cancellation, timeout, failed execution and
+terminal tool results fence later effects. This includes cancellation of the
+first call before it acquires the execution slot. Existing Pi/OpenHands bridge
+construction retains its existing behavior.
+
+Focused race tests passed (1.522s), covering reverse arrivals, duplicate requests
+and registrations, missing predecessors, cancellation/close/timeout, terminal
+and recoverable failures, and the canceled-first-call regression. Targeted vet,
+source formatting/size and diff checks passed. This is a shared prerequisite;
+Goose MCP transport, child-only tool aliases, native lifecycle reconciliation,
+SDK opt-in and installed-binary tool qualification remain to be implemented.
+No Goose tool-execution readiness or comparative model quality is claimed.
+Full repository validation/push is queued behind the frozen SDK gate.

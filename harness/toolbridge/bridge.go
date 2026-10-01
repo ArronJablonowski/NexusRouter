@@ -36,6 +36,7 @@ type entry struct {
 	execution runtime.ToolExecution
 	started   bool
 	done      chan struct{}
+	before    <-chan struct{}
 	result    runtime.ToolResult
 	err       error
 }
@@ -51,6 +52,8 @@ type Bridge struct {
 	halted  bool
 	slot    chan struct{}
 	calls   map[string]*entry
+	ordered bool
+	tail    <-chan struct{}
 	wg      sync.WaitGroup
 }
 
@@ -96,7 +99,12 @@ func (b *Bridge) Register(x runtime.ToolExecution) error {
 	if len(b.calls) >= b.limit {
 		return ErrDenied
 	}
-	b.calls[x.Call.ID] = &entry{execution: x, done: make(chan struct{})}
+	e := &entry{execution: x, done: make(chan struct{})}
+	if b.ordered {
+		e.before = b.tail
+		b.tail = e.done
+	}
+	b.calls[x.Call.ID] = e
 	return nil
 }
 func (b *Bridge) Close() { b.cancel(); b.mu.Lock(); b.closed = true; b.mu.Unlock(); b.wg.Wait() }
@@ -118,7 +126,7 @@ func (b *Bridge) execute(ctx context.Context, id string) (runtime.ToolResult, er
 		defer b.wg.Done()
 		call, cancel := context.WithTimeout(b.ctx, b.timeout)
 		stop := context.AfterFunc(ctx, cancel)
-		result, err := b.invokeRegistered(call, e.execution)
+		result, err := b.invokeInOrder(call, e)
 		stop()
 		cancel()
 		e.result, e.err = result, err
