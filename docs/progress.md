@@ -10116,3 +10116,26 @@ source gate and diff checks passed. Full repository gate queued before push.
 Official CLI 1.16.0 and SDK 1.50.1 were installed only in reporting private runtime
 paths. No live provider requests or router settings changed. Tool-bearing OpenHands
 workflows remain in scope and incomplete.
+
+## OpenHands admitted execution — DAR-132 (2026-10-01)
+
+Added OpenHands Run/RunTask around the embedded pinned SDK bridge: host admission,
+policy transport, interpreter hash verification, private HOME/workspace, bounded
+stdout/deadline/process group cleanup and canonical task journaling. Identity
+binds bridge code, interpreter, dependency-manifest attestation and host policy.
+Installed Python packages remain trusted; the manifest digest is an attestation,
+not an independent per-package integrity check or an OS sandbox.
+
+The shared gateway verifies actual upstream model and normal stream completion
+before the runner can return matching native text. OpenHands' automatic prompt
+cache key is explicitly disabled using its native capability override, preserving
+the gateway's existing request allowlist. No gateway validation was weakened.
+
+Native fixture race tests passed (14.364s): both OpenAI-compatible and Ollama
+completion, durable outcomes and duplicate task refusal, cancellation joining
+provider cleanup before admission release, truncated output without repeat
+inference, false native success without provider dispatch, interpreter mismatch
+and admission denial. Process-group/orphan/output-bound tests passed separately.
+Targeted vet/source/diff checks passed. Full gate queued before push. Public SDK
+registration, joint model-harness learning tests, tools and measured usage remain
+incomplete. No live model request or configuration change was made.

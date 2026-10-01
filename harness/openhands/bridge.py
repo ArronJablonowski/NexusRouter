@@ -54,7 +54,7 @@ def main():
               num_retries=0, timeout=config["timeout_seconds"], stream=True,
               max_input_tokens=config["context_tokens"],
               max_output_tokens=config["max_output_tokens"], reasoning_effort=None,
-              caching_prompt=False)
+              caching_prompt=False, capability_overrides={"supports_prompt_cache_key": False})
     agent = Agent(llm=llm, tools=[], include_default_tools=[], mcp_config={},
                   condenser=None, critic=None)
     conversation = Conversation(agent=agent, workspace=config["workspace"], visualizer=None,
