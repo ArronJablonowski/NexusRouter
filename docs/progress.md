@@ -11001,3 +11001,28 @@ Goose MCP transport, child-only tool aliases, native lifecycle reconciliation,
 SDK opt-in and installed-binary tool qualification remain to be implemented.
 No Goose tool-execution readiness or comparative model quality is claimed.
 Full repository validation/push is queued behind the frozen SDK gate.
+
+### 2026-10-01 — DAR-132 private Goose MCP transport qualification
+
+Added a private stateless MCP handler over the ordered bridge. It authenticates
+loopback requests with a per-run token, snapshots the host tool catalogue, and
+supports only initialization, tool listing and verified tool-call retrieval.
+Goose's original provider call ID must match a registered host proposal; tool
+name and structured arguments must also match, preserving large integer values.
+Native session/cwd metadata confers no authority. Changed calls, duplicate JSON
+keys, invalid IDs, batches, foreign origins and unauthorized transports reject
+without effects. Exact native retries return the cached host result.
+
+Installed Goose 1.52.0 passed the native MCP rendezvous fixture (race driver,
+1.630s): its named extension exposed only nexus__lookup, executed two distinct
+same-argument call IDs in host order, returned both correctly bound results and
+completed a second provider turn. This fixture uses controlled provider data and
+a test executor, not SDK journal qualification or real-model quality evidence.
+The toolbridge and Goose package race tests passed (1.554s and 2.197s); targeted
+vet/source/diff checks passed. Gateway alias projection, native lifecycle/output
+reconciliation and application opt-in remain outstanding.
+
+The frozen SDK full gate completed with exactly the two previously reviewed
+releasepack license-evidence failures; no additional package/test failures or
+panic were found. The current branch includes the validated dbdb477 correction.
+A fresh full gate will run against this clean committed checkpoint before push.
