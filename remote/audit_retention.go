@@ -5,10 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
-	"io"
-	"os"
-	"path/filepath"
 	"reflect"
 	"time"
 )
@@ -84,7 +80,7 @@ func ArchiveAudit(ctx context.Context, directory, instance, path string, through
 	if err = tx.Commit(); err != nil {
 		return zero, err
 	}
-	if err = publishAuditArchive(path, body); err != nil {
+	if err = publishPrivateDocument(path, body, maxAuditArchiveBytes); err != nil {
 		return zero, err
 	}
 	return archive.receipt(body), nil
@@ -99,7 +95,7 @@ func PruneAudit(ctx context.Context, directory, instance, path, expected string)
 	if !id(instance) || len(expected) != 64 {
 		return zero, ErrInvalid
 	}
-	body, err := readAuditArchive(path, true)
+	body, err := readPrivateDocument(path, maxAuditArchiveBytes, true)
 	if err != nil {
 		return zero, err
 	}
@@ -180,101 +176,4 @@ func checkAuditIdentity(ctx context.Context, tx *sql.Tx, instance string) error 
 }
 func (a auditArchive) receipt(body []byte) AuditArchiveReceipt {
 	return AuditArchiveReceipt{Instance: a.Instance, Through: a.Through, Entries: len(a.Entries), SHA256: certificateDigest(body)}
-}
-func archiveParent(path string) (string, error) {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
-		return "", ErrInvalid
-	}
-	parent := filepath.Dir(path)
-	st, err := os.Lstat(parent)
-	if err != nil || !st.IsDir() || st.Mode()&os.ModeSymlink != 0 || st.Mode().Perm()&0077 != 0 {
-		return "", ErrDenied
-	}
-	return parent, nil
-}
-func syncArchiveParent(path string) error {
-	directory, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	return directory.Sync()
-}
-func readAuditArchive(path string, sync bool) ([]byte, error) {
-	if _, err := archiveParent(path); err != nil {
-		return nil, err
-	}
-	st, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if !st.Mode().IsRegular() || st.Mode().Perm()&0077 != 0 || st.Size() > maxAuditArchiveBytes {
-		return nil, ErrDenied
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	actual, err := f.Stat()
-	if err != nil || !os.SameFile(st, actual) {
-		return nil, ErrDenied
-	}
-	body, err := io.ReadAll(io.LimitReader(f, maxAuditArchiveBytes+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(body) > maxAuditArchiveBytes {
-		return nil, ErrInvalid
-	}
-	if sync {
-		if err = f.Sync(); err != nil {
-			return nil, err
-		}
-		if err = syncArchiveParent(path); err != nil {
-			return nil, err
-		}
-	}
-	return body, nil
-}
-func publishAuditArchive(path string, body []byte) error {
-	parent, err := archiveParent(path)
-	if err != nil {
-		return err
-	}
-	compare := func() error {
-		saved, err := readAuditArchive(path, true)
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(saved, body) {
-			return ErrConflict
-		}
-		return nil
-	}
-	if err = compare(); err == nil {
-		return nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	f, err := os.CreateTemp(parent, ".nexus-audit-")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
-	if _, err = f.Write(body); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	if err = os.Link(f.Name(), path); err != nil && !errors.Is(err, os.ErrExist) {
-		return err
-	}
-	return compare()
 }

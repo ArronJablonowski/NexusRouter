@@ -11644,3 +11644,26 @@ retention with operator-managed archive backups, not scheduled deletion, SQLite
 file compaction, cryptographic administrator attestation or replay-ID expiration.
 Full make check and push remain queued behind the live earlier gate; physical
 second-host qualification, pairing UI and background remote evaluation stay open.
+
+### DAR-133 / DAR-132 — durable remote evaluator attempts (2026-10-01)
+
+Added trusted embedding-host APIs `EvaluateRecordedOutcome` and
+`EvaluateAutomaticOutcome` using the existing evaluator extension contract.
+Canonical output is reauthenticated before evaluation; exact input/receipt,
+evaluator descriptor, locality and timeout are durably bound before the sole
+invocation. Concurrent/restarted calls never replay an uncertain evaluator.
+Validated terminal results persist before ledger reconciliation, allowing a
+later authorized call to repair feedback without invoking the evaluator again.
+Private tasks reject nonlocal evaluators. Failures/abstentions never become passes;
+accept/reject remains advisory AI evidence. Concurrent operator heads win.
+
+Focused remote evaluation/retention race tests passed (5.952s), including explicit
+policy conflicts, one-call/one-sample retries, concurrent admission, missing
+terminal persistence, evaluator panic/failure/abstention, private-data rejection,
+revocation between evaluation and feedback, and operator review races. The common
+bounded private-file publication helper now serves archives and evaluator records;
+retention regression tests remain included. Full remote/shared-CLI race packages
+passed (18.570s/1.937s), and vet/source/diff passed. Main CLI evaluator configuration,
+background scheduling, review UI and production evaluation qualification remain
+open; no live task or evaluator inference was run. Full repository gate/push
+remains serialized behind the current capacity validation.

@@ -841,3 +841,45 @@ external attestation or protection against an administrator rewriting both the
 database and archive. The operator remains responsible for backup durability,
 access permissions, archive lifetime and applicable retention requirements.
 No live journal is pruned merely by upgrading or starting NexusRouter.
+
+### Durable caller-side evaluator attempts
+
+Embedding hosts can call `Client.EvaluateRecordedOutcome` with the original
+request and a trusted `RemoteEvaluator`, or `EvaluateAutomaticOutcome` with the
+original automatic request. Both authenticate the saved destination, canonical
+completion, actual model/harness identity and exact output before evaluation.
+They never dispatch task inference, run discovery or replace a saved route.
+
+The evaluator uses the public `evaluation.Evaluator` interface. The host must
+supply a fixed descriptor and enforce the evaluator's resource, cost, credential,
+network and secret-handling policies. `Local` is trusted host configuration, not
+a claim accepted from a peer or model; private tasks reject nonlocal evaluators.
+The invocation is bounded to at most five minutes with cooperative cancellation.
+An in-process extension is trusted host code, not an isolation boundary.
+
+One attempt is durably claimed per receipt under the existing private,
+caller/destination-separated evidence root. Admission binds the exact input hash,
+evaluator descriptor, locality and timeout before invoking the evaluator. Keep
+this root stable. Do not delete an attempt or choose a new root to retry an
+uncertain invocation. Concurrent callers cannot invoke the same admitted attempt
+a second time. Missing admission/terminal persistence leaves it unresolved;
+there is no automatic timeout-based reclaim or retry of evaluator inference.
+
+Validated results are saved before applying feedback. A later call with the same
+policy and request reauthenticates completion and reconciles the saved result
+without invoking the evaluator again. This repairs, for example, an interrupted
+ledger write after successful evaluation. Revocation blocks reconciliation until
+explicitly resolved. Changed evaluator/input/policy conflicts with the admission.
+Failed evaluations create no quality feedback; abstention produces unverified
+feedback. Accept/reject is always `automated_ai` advisory evidence, never a human
+or deterministic verdict. Current operator heads are not superseded. A result
+can remain completed with `review_applied=false` on conflict, independently of
+the already successful original task. `review_applied=true` means the review was
+recorded, not that a later operator revision cannot become the current head.
+
+Attempt files contain hashes and host provenance. The saved advisory audit can
+quote reviewed content in its findings, so its private directory and backups
+must receive the same protection as the source task. Raw evaluator errors are
+not persisted. This API supplies durable orchestration; configuring concrete
+provider-backed evaluators in the main CLI, background scheduling and review UI
+remain separate integration work. No evaluator is enabled by default.
