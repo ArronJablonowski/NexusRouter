@@ -283,10 +283,15 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		}
 		cursorKey := sha256.Sum256(append([]byte("darwin-browser-stream-v1\x00"), []byte(token)...))
 		var remoteInspector webuiapp.RemoteInspector
+		var remoteTaskController webuiapp.RemoteTaskController
 		if c := s.WebUI.RemoteClient; c != nil {
-			remoteInspector = &remote.Client{Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
+			client := &remote.Client{Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
+			remoteInspector = client
+			if s.WebUI.RemoteTaskControls {
+				remoteTaskController = client
+			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,

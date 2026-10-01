@@ -7,7 +7,7 @@ import (
 
 func TestRemoteInspectionExplicitBoundedPagingAndFailure(t *testing.T) {
 	script := string(mustAsset(t, "assets/v1/remote-inspection.js"))
-	runRoutingMapScript(t, `const vm=require('vm');function element(){return {children:[],handlers:{},hidden:false,textContent:'',setAttribute(){},append(...x){this.children.push(...x)},addEventListener(k,f){this.handlers[k]=f}}};
+	runRoutingMapScript(t, `const vm=require('vm');function element(){return {children:[],handlers:{},hidden:false,textContent:'',setAttribute(){},append(...x){this.children.push(...x)},replaceChildren(){this.children=[]},addEventListener(k,f){this.handlers[k]=f}}};
  const card=element(),document={createElement:element},window={};let requests=[],fail=false;
  const fetch=async(url,options)=>{const input=JSON.parse(options.body);requests.push({url,options,input});if(fail)return {ok:false};return {ok:true,json:async()=>({version:1,observed_at:'2026-10-01T18:00:00Z',...(input.view==='info'?{info:{version:1,instance:'node-a',available:true}}:{tasks:{version:1,instance:'node-a',after:input.after,next:'request-cursor-0001',has_more:!input.after,tasks:[]}})})}};
  vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch});window.NexusRemoteInspection.attach(card,{id:'node-a'},'/console','csrf');

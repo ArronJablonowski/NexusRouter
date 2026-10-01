@@ -20,11 +20,12 @@ type membershipRequest struct {
 }
 
 type membershipPage struct {
-	InspectionEnabled bool             `json:"inspection_enabled"`
-	Version           int              `json:"version"`
-	Enabled           bool             `json:"enabled"`
-	Digest            string           `json:"digest,omitempty"`
-	Registry          *remote.Registry `json:"registry,omitempty"`
+	TaskControlsEnabled bool             `json:"task_controls_enabled"`
+	InspectionEnabled   bool             `json:"inspection_enabled"`
+	Version             int              `json:"version"`
+	Enabled             bool             `json:"enabled"`
+	Digest              string           `json:"digest,omitempty"`
+	Registry            *remote.Registry `json:"registry,omitempty"`
 }
 
 func (h *Handler) serveRemoteMembership(w http.ResponseWriter, r *http.Request) bool {
@@ -101,6 +102,6 @@ func (h *Handler) serveRemoteMembership(w http.ResponseWriter, r *http.Request) 
 			return true
 		}
 	}
-	h.writeJSON(w, http.StatusOK, membershipPage{InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
+	h.writeJSON(w, http.StatusOK, membershipPage{TaskControlsEnabled: h.remoteTaskController != nil, InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
 	return true
 }

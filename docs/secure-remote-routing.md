@@ -1052,3 +1052,28 @@ model quality, reserve capacity, or grant routing authority. A failed inspection
 clears the prior result and remains unavailable/unknown; it is not a task failure
 or quality rejection. The browser cannot supply a URL, trust file or credentials.
 Physical two-system and cross-platform browser-to-SSH qualification remain open.
+
+### Browser task status, results and cancellation
+
+`web_ui.remote_task_controls: true` separately enables task controls and requires
+the configured remote client. It defaults to false; existing inspection setup
+does not silently acquire a cancellation UI. Each listed caller-owned request
+can load its current status and successful result text. The UI only offers
+cancellation after loading an active queued/running submission, and requires an
+explicit confirmation identifying the request and peer.
+
+The BFF checks session/CSRF authority and validates the original instance/request
+IDs. Cancellation first re-reads that request through the configured client,
+requires the expected submission ID and an active state, then calls Cancel once.
+The remote service's caller ownership and `inspect`/`cancel` scopes remain
+required. No request is dispatched or retried. Cancellation races with normal
+completion; a returned cancellation request is not a promise that work stopped.
+An uncertain response clears the actionable browser state until the operator
+loads current status again. Results are rendered as text and the browser
+projection excludes the destination configuration digest and lease metadata.
+
+Status is manually refreshed; this is not event streaming. The controls apply
+to the configured certificate's submissions, shared by authorized browser
+operators. They do not authorize task dispatch, change peer scopes, revoke
+credentials or enable controls on another daemon. No live configuration or
+remote work is changed by building this feature.

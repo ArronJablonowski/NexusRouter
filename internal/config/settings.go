@@ -51,6 +51,7 @@ type WebUIRemoteClient struct {
 }
 
 type WebUI struct {
+	RemoteTaskControls            bool               `yaml:"remote_task_controls" json:"remote_task_controls"`
 	RemoteClient                  *WebUIRemoteClient `yaml:"remote_client,omitempty" json:"remote_client,omitempty"`
 	RemoteTrustFile               string             `yaml:"remote_trust_file,omitempty" json:"remote_trust_file,omitempty"`
 	Enabled                       bool               `yaml:"enabled" json:"enabled"`

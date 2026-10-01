@@ -1,14 +1,15 @@
 "use strict";
 window.NexusRemoteInspection = (() => {
- function attach(card, peer, base, csrf) {
+ function attach(card, peer, base, csrf, taskControlsEnabled) {
   const controls=document.createElement("div"), info=document.createElement("button"), tasks=document.createElement("button"), next=document.createElement("button"), status=document.createElement("output"), result=document.createElement("pre");
   info.type=tasks.type=next.type="button";info.textContent="Inspect capabilities";tasks.textContent="Inspect caller’s tasks";next.textContent="Next task page";next.hidden=true;
   status.setAttribute("role","status");status.setAttribute("aria-live","polite");
+  const taskControls=document.createElement("div");
   let busy=false,cursor="";
   function lock(value){busy=value;info.disabled=value;tasks.disabled=value;next.disabled=value;}
   async function inspect(view,after="") {
    if(busy)return;
-   lock(true);next.hidden=true;result.textContent="";status.textContent="Checking the trusted instance…";
+   lock(true);taskControls.replaceChildren();next.hidden=true;result.textContent="";status.textContent="Checking the trusted instance…";
    try {
     const response=await fetch(base+"/api/v1/remote-inspection",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,instance:peer.id,view,after})});
     if(!response.ok)throw Error();
@@ -17,6 +18,7 @@ window.NexusRemoteInspection = (() => {
     if(view==="tasks") {
      if(payload.after!==after||!Array.isArray(payload.tasks)||payload.tasks.length>100||typeof payload.has_more!=="boolean"||typeof payload.next!=="string")throw Error();
      cursor=payload.next;next.hidden=!payload.has_more;
+     if(taskControlsEnabled) payload.tasks.forEach(task=>window.NexusRemoteTaskControls.attach(taskControls,peer,task,base,csrf));
      status.textContent="Caller-owned task page checked at "+value.observed_at+". Refresh starts from the first page; this is a live traversal.";
     } else {
      if(typeof payload.available!=="boolean")throw Error();
@@ -27,7 +29,7 @@ window.NexusRemoteInspection = (() => {
    finally{lock(false);}
   }
   info.addEventListener("click",()=>inspect("info"));tasks.addEventListener("click",()=>inspect("tasks"));next.addEventListener("click",()=>inspect("tasks",cursor));
-  controls.append(info,tasks,next);card.append(controls,status,result);
+  controls.append(info,tasks,next);card.append(controls,status,result,taskControls);
  }
  return {attach};
 })();

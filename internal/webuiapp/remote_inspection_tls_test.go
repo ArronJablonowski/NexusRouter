@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/remote"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
@@ -37,10 +38,10 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	}
 	roots := x509.NewCertPool()
 	roots.AddCert(cert)
-	var calls atomic.Int32
+	var calls, cancellations atomic.Int32
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.Method != "GET" || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
+		if (r.Method != "GET" && !(r.Method == "POST" && r.URL.Path == "/v1/remote/tasks/request-existing-0001/cancel")) || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
 			http.Error(w, "denied", 403)
 			return
 		}
@@ -51,6 +52,11 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 			json.NewEncoder(w).Encode(remote.Info{Version: 1, Instance: "node-a", Available: true})
 		case "/v1/remote/tasks":
 			json.NewEncoder(w).Encode(remote.TaskPage{Version: 1, Instance: "node-a", After: r.Header.Get("X-Nexus-After-Request"), Next: "request-existing-0001", Tasks: []remote.TaskSummary{{RequestID: "request-existing-0001", State: "running", TaskIDs: []string{"task-1"}}}})
+		case "/v1/remote/tasks/request-existing-0001":
+			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-a", State: "running"})
+		case "/v1/remote/tasks/request-existing-0001/cancel":
+			cancellations.Add(1)
+			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-a", State: "running", CancelRequested: true})
 		default:
 			http.Error(w, "not found", 404)
 		}
@@ -95,12 +101,42 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatal("missing authenticated calls")
 	}
+	h.remoteTaskController = h.remoteInspector.(*remote.Client)
+	control := func(action string, want int) {
+		t.Helper()
+		body := `{"version":1,"instance":"node-a","request_id":"request-existing-0001","action":"` + action + `"`
+		if action == "cancel" {
+			body += `,"expected_submission_id":"submission-a"`
+		}
+		body += `}`
+		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-task-control", body)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("control: %d want %d: %s", w.Code, want, w.Body.String())
+		}
+	}
+	control("status", 200)
+	control("cancel", 503)
+	if calls.Load() != 4 || cancellations.Load() != 0 {
+		t.Fatal("inspection scope permitted cancellation")
+	}
+	previous := registry.Digest()
+	registry.Peers[0].Operations = append(registry.Peers[0].Operations, "cancel")
+	if err = trust.Replace(registry, previous); err != nil {
+		t.Fatal(err)
+	}
+	control("cancel", 200)
+	if calls.Load() != 6 || cancellations.Load() != 1 {
+		t.Fatal("wrong control calls", calls.Load(), cancellations.Load())
+	}
 	if _, err = trust.Revoke("node-a", registry.Digest()); err != nil {
 		t.Fatal(err)
 	}
 	inspect("info", 503)
 	inspect("tasks", 503)
-	if calls.Load() != 2 {
+	control("cancel", 503)
+	if calls.Load() != 6 || cancellations.Load() != 1 {
 		t.Fatal("revoked peer contacted")
 	}
 }

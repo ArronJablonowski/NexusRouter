@@ -1090,3 +1090,27 @@ asset digest updated; full check/push queued after the running preceding gate.
 No live credentials/service configured. Guided discovery/onboarding, browser
 remote task controls, physical two-host and cross-platform qualification remain
 incomplete, as does real-model remote accuracy qualification.
+
+### DAR-133 — browser remote task controls (2026-10-01)
+
+Added separately opt-in remote_task_controls, requiring existing remote client
+credentials. Each inspected task page can load current status/successful output
+and request cancellation only after current active submission inspection and
+explicit user confirmation. Browser BFF re-reads original request, checks expected
+submission ID and active state, and calls cancellation once. Same session/CSRF,
+fixed credentials, bounded input/context, separate control slots, fresh peer
+scope/revocation and destination ownership remain authoritative. No task dispatch,
+automatic retry or inferred cancellation success. Uncertain response clears the
+cancel capability until explicit status reload; terminal tasks cannot be canceled
+from this UI. Status is manual rather than event streaming.
+
+Verification: webuiapp race package passed 4.180s; config 4.555s; webui 9.236s.
+Tests cover authority/invalid IDs, changed submission/terminal rejection,
+projection without configuration digest, explicit-only control, uncertain-response
+no replay, and completed result text. Real mutual-TLS browser-client fixture
+initially denied cancellation because the peer had only info/inspect scope.
+Preserved that rejection as a regression, then explicitly added cancel scope to
+verify one authorized call and fresh revocation preventing further calls. Reviewed embedded assets retain
+CSP/resource restrictions. Full repository check/push will follow the unchanged
+running gate; no live deployment. Guided onboarding, browser dispatch/event
+streaming, physical two-host/cross-platform and real-model qualification remain.

@@ -133,3 +133,21 @@ func TestWebUIRemoteInspectionCredentialsAreExplicit(t *testing.T) {
 		t.Fatal("relative credentials")
 	}
 }
+
+func TestWebUIRemoteTaskControlRequiresExplicitClient(t *testing.T) {
+	s := Defaults()
+	s.WebUI.Enabled = true
+	s.WebUI.RemoteTaskControls = true
+	if s.Validate() == nil {
+		t.Fatal("controls without client")
+	}
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert.pem", KeyFile: "/private/key.pem", CAFile: "/private/ca.pem"}
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.WebUI.Enabled = false
+	if s.Validate() == nil {
+		t.Fatal("disabled UI retains control")
+	}
+}
