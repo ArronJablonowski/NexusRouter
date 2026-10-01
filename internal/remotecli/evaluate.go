@@ -16,8 +16,12 @@ import (
 )
 
 func evaluateOperation(ctx context.Context, client *remote.Client, operation, routes, root, key, configFile, reviewer string, maxCost float64, input io.Reader) (remote.RemoteEvaluationStatus, error) {
+	return evaluateOperationWithWait(ctx, client, operation, routes, root, key, configFile, reviewer, maxCost, input, 0)
+}
+
+func evaluateOperationWithWait(ctx context.Context, client *remote.Client, operation, routes, root, key, configFile, reviewer string, maxCost float64, input io.Reader, wait time.Duration) (remote.RemoteEvaluationStatus, error) {
 	var zero remote.RemoteEvaluationStatus
-	if configFile == "" || reviewer == "" || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) || input == nil {
+	if wait < 0 || wait > 24*time.Hour || configFile == "" || reviewer == "" || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) || input == nil {
 		return zero, remote.ErrInvalid
 	}
 	body, err := io.ReadAll(io.LimitReader(input, remote.MaxBody+1))
@@ -66,5 +70,9 @@ func evaluateOperation(ctx context.Context, client *remote.Client, operation, ro
 		return zero, remote.ErrUnavailable
 	}
 	defer closeCoordinator()
-	return client.EvaluateRecordedOutcome(ctx, store, root, key, task, remote.RemoteEvaluator{Evaluator: evaluator, Local: local, Timeout: time.Minute})
+	policy := remote.RemoteEvaluator{Evaluator: evaluator, Local: local, Timeout: time.Minute}
+	if wait > 0 {
+		return client.WatchRecordedEvaluation(ctx, store, root, key, task, policy, wait, 15*time.Second)
+	}
+	return client.EvaluateRecordedOutcome(ctx, store, root, key, task, policy)
 }

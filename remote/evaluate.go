@@ -25,7 +25,7 @@ type RemoteEvaluator struct {
 type RemoteEvaluationStatus struct {
 	Version       int            `json:"version"`
 	ReceiptSHA256 string         `json:"receipt_sha256"`
-	Status        string         `json:"status"` // not_started, started (possibly interrupted), failed, completed
+	Status        string         `json:"status"` // waiting, task_failed/canceled, not_started, started, failed, completed
 	ReviewApplied bool           `json:"review_applied"`
 	Review        *OutcomeReview `json:"review,omitempty"`
 }

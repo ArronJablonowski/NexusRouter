@@ -949,3 +949,26 @@ fixture permissions without changing production policy. Full remote/CLI race
 suites passed (20.464s / 2.006s), targeted vet, source format/size and diff checks
 passed. Full repository validation and push remain queued. Discovery/pairing UI,
 physical two-system qualification and other recorded DAR-133 gaps remain open.
+
+### DAR-132 / DAR-133 — bounded remote completion/review watcher
+
+Added `Client.WatchRecordedEvaluation` plus `nexus remote watch-evaluate` and
+`auto-watch-evaluate`. A host or supervised process can wait for an explicitly
+selected saved request, checking fresh authentication and immutable route intent,
+then automatically review successful canonical output through the durable
+one-attempt protocol. CLI polling is 15 seconds with an explicit positive total
+wait/review deadline capped at 24 hours. Failed/canceled tasks return distinct
+ungraded statuses; unknown state, identity change, revocation or transport errors
+stop observation. No discovery, task retry/cancellation, missing-result reclaim
+or automatic evaluator retry is introduced. Restarts preserve replay protection
+only with the same request, routes, evidence root and evaluator policy.
+
+Race tests exercise queued-to-running-to-success, repeated watcher calls with
+one evaluator invocation and one original dispatch, failed/canceled/unknown
+states, changed intent, revoked trust and deadline exhaustion with no quality
+writes. Actual main CLI process tests also cover both watch command spellings
+reconciling prior durable results without provider replay. Full remote/CLI race
+suites passed (22.989s / 1.971s); targeted vet, source format/size and diff passed.
+Full repository check and conditional push are queued. This is per-request
+supervised review, not whole-fleet automatic enrollment, service installation or
+review UI; those and physical two-host/real-model qualification remain open.

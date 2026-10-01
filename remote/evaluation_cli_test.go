@@ -80,6 +80,9 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	for range 2 {
 		run(args, input, true)
 	}
+	watchArgs := append(append([]string{}, args...), "--review-wait", "1m")
+	watchArgs[1] = "watch-evaluate"
+	run(watchArgs, input, true)
 	if rank := remoteRank(t, root, v); calls.Load() != 1 || backend.submits.Load() != 1 || rank.AdvisorySamples != 1 || rank.ConfirmedSamples != 0 {
 		t.Fatal(calls.Load(), backend.submits.Load(), rank)
 	}
@@ -111,6 +114,9 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	for range 2 {
 		run(args, input, true)
 	}
+	watchArgs = append(append([]string{}, args...), "--review-wait", "1m")
+	watchArgs[1] = "auto-watch-evaluate"
+	run(watchArgs, input, true)
 	if rank := remoteRank(t, root, automatic); calls.Load() != 2 || backend.submits.Load() != 2 || rank.AdvisorySamples != 1 || rank.ConfirmedSamples != 0 {
 		t.Fatal(calls.Load(), backend.submits.Load(), rank)
 	}

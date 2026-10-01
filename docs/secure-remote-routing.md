@@ -938,3 +938,30 @@ an existing attempt. The stored descriptor binds these settings, and changing
 them produces a conflict rather than another evaluator call. These explicit
 commands apply automated advisory evidence; they do not claim objective proof
 of correctness or trigger another original-task execution.
+
+### Waiting for remote completion and review
+
+`nexus remote watch-evaluate` accepts the same original Task JSON and flags as
+`evaluate`, plus a required `--review-wait 1h` (positive, at most 24 hours).
+`auto-watch-evaluate` takes the original AutomaticRequest JSON instead. The
+process checks the saved caller/destination binding and freshly authenticated
+status every 15 seconds while the task is queued or running, then authenticates
+canonical completion and applies the same durable one-attempt review protocol.
+The wait budget includes evaluation/reconciliation; expiration during an admitted
+review does not grant permission to repeat that uncertain evaluator call.
+
+These are bounded foreground processes that an operator can supervise in the
+background. They do not install a service or automatically enroll unrelated
+requests. Stop signals cancel observation/evaluation without canceling the
+original remote task. Reuse the same route, request, evidence root and evaluator
+policy on restart. The Go host equivalent is `Client.WatchRecordedEvaluation`,
+with an explicit deadline and poll interval between one second and one minute.
+
+A task ending failed or canceled emits `task_failed` or `task_canceled` with no
+review. An expired wait emits `waiting` plus an error, not a quality rejection.
+Unknown state, changed identity, revoked access or transport failure stops the
+watcher for investigation; it never redispatches, selects another destination,
+reclaims a missing evaluator result or silently retries a failed provider call.
+Successful evaluation remains automated advisory evidence. Whole-fleet automatic
+enrollment, background service installation and a review UI are not provided by
+these per-request watch commands.

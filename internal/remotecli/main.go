@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -49,6 +49,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	evidence := flags.String("evidence", "", "private destination-separated outcome evidence root (reconcile/review)")
 	reviewFile := flags.String("review", "", "absolute owner-private saved outcome review JSON (review)")
 	reviewerID := flags.String("reviewer", "", "configured evaluator model ID (evaluate/auto-evaluate)")
+	reviewWait := flags.Duration("review-wait", 0, "explicit total wait/review deadline for watch-evaluate (maximum 24h)")
 	reviewMaxCost := flags.Float64("review-max-cost", -1, "explicit evaluator cost ceiling")
 	modelID := flags.String("model", "", "configured model ID (harness-identity)")
 	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
@@ -140,11 +141,21 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 		return serve(ctx, *instance, *listen, *journal, *configFile, registry, credentials)
 	}
 	client := remote.Client{Trust: registry, Credentials: credentials}
-	if operation == "evaluate" || operation == "auto-evaluate" {
+	if operation == "evaluate" || operation == "auto-evaluate" || operation == "watch-evaluate" || operation == "auto-watch-evaluate" {
+		watching := operation == "watch-evaluate" || operation == "auto-watch-evaluate"
+		if watching && *reviewWait <= 0 || !watching && *reviewWait != 0 {
+			return remote.ErrInvalid
+		}
+		if operation == "watch-evaluate" {
+			operation = "evaluate"
+		}
+		if operation == "auto-watch-evaluate" {
+			operation = "auto-evaluate"
+		}
 		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
 			return remote.ErrInvalid
 		}
-		result, e := evaluateOperation(ctx, &client, operation, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, input)
+		result, e := evaluateOperationWithWait(ctx, &client, operation, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, input, *reviewWait)
 		if result.Version != 0 {
 			if err := json.NewEncoder(output).Encode(result); err != nil {
 				return err
