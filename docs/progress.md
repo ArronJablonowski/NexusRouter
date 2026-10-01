@@ -906,3 +906,23 @@ provider output, not real-model grading accuracy or physical two-host validation
 Full repository gate/push is pending behind the active earlier validation job.
 Background review scheduling, review UI, physical two-system qualification and
 production accuracy comparison remain incomplete. No running service changed.
+
+### DAR-132 / DAR-133 — shipped evaluator CLI process qualification
+
+Added a test building the actual `cmd/nexus` entry point and launching separate
+CLI processes against a real loopback mTLS remote server, private saved route /
+trust / credential files, a YAML evaluator config and a synthetic Ollama reviewer.
+Both `remote evaluate` and `remote auto-evaluate` return completed/applied status
+on the initial invocation and on a new-process retry, with only one evaluator
+request per receipt. The tests independently inspect advisory-only learning and
+original dispatch counts. A changed automatic prompt is rejected without another
+provider request or dispatch. This closes the prior main-CLI integration gap;
+it does not qualify real evaluator accuracy or a physical second system.
+
+The initial automatic fixture reused the already-reviewed canonical execution
+from the direct test and correctly encountered a current-head conflict before
+reviewer dispatch. The final test uses a fresh destination fixture to exercise
+both independent CLI paths without weakening the execution/head invariant.
+Focused race qualification passed (3.073s package), as did targeted vet, source
+format/size and diff checks. Full make check and conditional normal push remain
+queued behind the running earlier gate; no deployed service was changed.
