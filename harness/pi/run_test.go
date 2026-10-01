@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -59,7 +60,7 @@ func TestNativePiIsolatedRPC(t *testing.T) {
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer provider.Close()
-	cfg := Config{ModelRevision: "fixture-v1", Prices: &Prices{}, Executable: executable, ExecutableSHA256: hex.EncodeToString(digest[:]), Provider: "nexus-test", Model: "nexus-fixture", BaseURL: provider.URL + "/v1", APIKey: "fixture-only", ContextTokens: 16384, MaxOutputTokens: 1024, Timeout: 15 * time.Second, Admit: func(context.Context) (func(), error) { return func() { released.Add(1) }, nil }}
+	cfg := Config{Transport: http.DefaultTransport, TransportPolicySHA256: strings.Repeat("c", 64), ModelRevision: "fixture-v1", Prices: &Prices{}, Executable: executable, ExecutableSHA256: hex.EncodeToString(digest[:]), Provider: "nexus-test", Model: "nexus-fixture", BaseURL: provider.URL + "/v1", APIKey: "fixture-only", ContextTokens: 16384, MaxOutputTokens: 1024, Timeout: 15 * time.Second, Admit: func(context.Context) (func(), error) { return func() { released.Add(1) }, nil }}
 	journal, e := telemetry.Open(context.Background(), filepath.Join(t.TempDir(), "native.db"))
 	if e != nil {
 		t.Fatal(e)
@@ -116,7 +117,7 @@ func TestNativePiCancellation(t *testing.T) {
 		}
 	}))
 	defer provider.Close()
-	cfg := Config{ModelRevision: "fixture-v1", Prices: &Prices{}, Executable: executable, ExecutableSHA256: hex.EncodeToString(digest[:]), Provider: "nexus-test", Model: "nexus-fixture", BaseURL: provider.URL + "/v1", APIKey: "fixture-only", ContextTokens: 16384, MaxOutputTokens: 1024, Timeout: 15 * time.Second, Admit: func(context.Context) (func(), error) { return func() { released.Add(1) }, nil }}
+	cfg := Config{Transport: http.DefaultTransport, TransportPolicySHA256: strings.Repeat("c", 64), ModelRevision: "fixture-v1", Prices: &Prices{}, Executable: executable, ExecutableSHA256: hex.EncodeToString(digest[:]), Provider: "nexus-test", Model: "nexus-fixture", BaseURL: provider.URL + "/v1", APIKey: "fixture-only", ContextTokens: 16384, MaxOutputTokens: 1024, Timeout: 15 * time.Second, Admit: func(context.Context) (func(), error) { return func() { released.Add(1) }, nil }}
 	result, err := Run(ctx, cfg, "Return an answer.")
 	if err == nil || result.Text != "" || calls.Load() != 1 || released.Load() != 1 {
 		t.Fatal("cancellation returned success, retried, or leaked reservation", result, err, calls.Load(), released.Load())

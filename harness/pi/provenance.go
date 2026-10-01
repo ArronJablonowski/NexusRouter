@@ -9,7 +9,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/harness"
 )
 
-const AdapterVersion = "pi-rpc-text-v1"
+const AdapterVersion = "pi-rpc-text-v2"
 
 // Identity binds the actual protocol-checked provider/model to the admitted
 // configuration. ModelRevision is a trusted host attestation of the deployed
@@ -20,12 +20,12 @@ func (c Config) Identity() (harness.Identity, error) {
 		return harness.Identity{}, ErrProtocol
 	}
 	effective := struct {
-		Version                          int
-		Artifact, Endpoint, SystemPrompt string
-		Context, Output                  int
-		DeadlineNanos                    int64
-		Prices                           Prices
-	}{1, c.ExecutableSHA256, c.BaseURL, systemPrompt, c.ContextTokens, c.MaxOutputTokens, int64(c.Timeout), *c.Prices}
+		Version                                           int
+		Artifact, Endpoint, SystemPrompt, TransportPolicy string
+		Context, Output                                   int
+		DeadlineNanos                                     int64
+		Prices                                            Prices
+	}{1, c.ExecutableSHA256, c.BaseURL, systemPrompt, c.TransportPolicySHA256, c.ContextTokens, c.MaxOutputTokens, int64(c.Timeout), *c.Prices}
 	body, err := json.Marshal(effective)
 	if err != nil {
 		return harness.Identity{}, ErrProtocol

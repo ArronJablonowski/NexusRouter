@@ -2,13 +2,14 @@ package pi
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 )
 
 func identityConfig() Config {
-	return Config{Prices: &Prices{Input: 1, Output: 2}, Executable: "/test/pi", ExecutableSHA256: strings.Repeat("a", 64), Provider: "fixture", Model: "model", ModelRevision: "weights-v1", BaseURL: "http://127.0.0.1/v1", APIKey: "secret-one", ContextTokens: 16384, MaxOutputTokens: 1024, Timeout: time.Minute, Admit: func(context.Context) (func(), error) { return func() {}, nil }}
+	return Config{Transport: http.DefaultTransport, TransportPolicySHA256: strings.Repeat("c", 64), Prices: &Prices{Input: 1, Output: 2}, Executable: "/test/pi", ExecutableSHA256: strings.Repeat("a", 64), Provider: "fixture", Model: "model", ModelRevision: "weights-v1", BaseURL: "http://127.0.0.1/v1", APIKey: "secret-one", ContextTokens: 16384, MaxOutputTokens: 1024, Timeout: time.Minute, Admit: func(context.Context) (func(), error) { return func() {}, nil }}
 }
 func TestEffectiveIdentityIsolation(t *testing.T) {
 	cfg := identityConfig()
@@ -22,13 +23,14 @@ func TestEffectiveIdentityIsolation(t *testing.T) {
 		t.Fatal("credential rotation changed learning identity", err)
 	}
 	changes := map[string]func(*Config){
-		"model revision": func(c *Config) { c.ModelRevision = "weights-v2" },
-		"artifact":       func(c *Config) { c.ExecutableSHA256 = strings.Repeat("b", 64) },
-		"endpoint":       func(c *Config) { c.BaseURL = "http://127.0.0.2/v1" },
-		"context":        func(c *Config) { c.ContextTokens = 32768 },
-		"output":         func(c *Config) { c.MaxOutputTokens = 2048 },
-		"deadline":       func(c *Config) { c.Timeout = 2 * time.Minute },
-		"prices":         func(c *Config) { c.Prices.Output = 3 },
+		"model revision":   func(c *Config) { c.ModelRevision = "weights-v2" },
+		"artifact":         func(c *Config) { c.ExecutableSHA256 = strings.Repeat("b", 64) },
+		"transport policy": func(c *Config) { c.TransportPolicySHA256 = strings.Repeat("d", 64) },
+		"endpoint":         func(c *Config) { c.BaseURL = "http://127.0.0.2/v1" },
+		"context":          func(c *Config) { c.ContextTokens = 32768 },
+		"output":           func(c *Config) { c.MaxOutputTokens = 2048 },
+		"deadline":         func(c *Config) { c.Timeout = 2 * time.Minute },
+		"prices":           func(c *Config) { c.Prices.Output = 3 },
 	}
 	for name, change := range changes {
 		t.Run(name, func(t *testing.T) {

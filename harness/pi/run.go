@@ -8,10 +8,12 @@ import (
 	"encoding/json"
 	"io"
 	"math"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -32,6 +34,9 @@ type Prices struct {
 }
 type Progress struct{ Kind, Text string }
 type Config struct {
+	// Transport is the host policy-enforcing transport, never a default fallback.
+	Transport                                                      http.RoundTripper
+	TransportPolicySHA256                                          string
 	ModelRevision                                                  string
 	Prices                                                         *Prices
 	OnProgress                                                     func(context.Context, Progress) error
@@ -42,8 +47,14 @@ type Config struct {
 }
 
 func (c Config) validate() error {
-	if c.Prices == nil {
+	if c.Transport == nil || c.Prices == nil {
 		return ErrProtocol
+	}
+	switch reflect.ValueOf(c.Transport).Kind() {
+	case reflect.Pointer, reflect.Func, reflect.Map, reflect.Slice, reflect.Chan, reflect.Interface:
+		if reflect.ValueOf(c.Transport).IsNil() {
+			return ErrProtocol
+		}
 	}
 	for _, price := range []float64{c.Prices.Input, c.Prices.Output, c.Prices.CacheRead, c.Prices.CacheWrite} {
 		if price < 0 || math.IsNaN(price) || math.IsInf(price, 0) {
@@ -52,7 +63,11 @@ func (c Config) validate() error {
 	}
 	u, e := url.Parse(c.BaseURL)
 	pin, e2 := hex.DecodeString(c.ExecutableSHA256)
-	if !filepath.IsAbs(c.Executable) || e2 != nil || len(pin) != 32 || strings.ToLower(c.ExecutableSHA256) != c.ExecutableSHA256 || c.ModelRevision == "" || c.Provider == "" || c.Model == "" || len(c.Provider) > 256 || len(c.Model) > 256 || e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || c.APIKey == "" || c.ContextTokens < 8192 || c.ContextTokens > 1<<24 || c.MaxOutputTokens < 1 || c.MaxOutputTokens > 65536 || c.Timeout <= 0 || c.Timeout > 15*time.Minute || c.Admit == nil {
+	policyPin, policyErr := hex.DecodeString(c.TransportPolicySHA256)
+	if policyErr != nil || len(policyPin) != 32 || strings.ToLower(c.TransportPolicySHA256) != c.TransportPolicySHA256 {
+		return ErrProtocol
+	}
+	if !filepath.IsAbs(c.Executable) || e2 != nil || len(pin) != 32 || strings.ToLower(c.ExecutableSHA256) != c.ExecutableSHA256 || c.ModelRevision == "" || c.Provider == "" || c.Model == "" || len(c.Provider) > 256 || len(c.Model) > 256 || e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || c.ContextTokens < 8192 || c.ContextTokens > 1<<24 || c.MaxOutputTokens < 1 || c.MaxOutputTokens > 65536 || c.Timeout <= 0 || c.Timeout > 15*time.Minute || c.Admit == nil {
 		return ErrProtocol
 	}
 	return nil
@@ -109,8 +124,13 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if version.Run() != nil || strings.TrimSpace(string(versionOutput.data)) != SupportedVersion {
 		return Result{}, ErrProtocol
 	}
-	models := map[string]any{"providers": map[string]any{c.Provider: map[string]any{"baseUrl": c.BaseURL, "api": "openai-completions", "models": []any{map[string]any{"id": c.Model, "name": c.Model, "reasoning": false, "input": []string{"text"}, "contextWindow": c.ContextTokens, "maxTokens": c.MaxOutputTokens, "cost": *c.Prices}}}}}
-	auth := map[string]any{c.Provider: map[string]string{"type": "api_key", "key": c.APIKey}}
+	gatewayURL, gatewayKey, closeGateway, gatewayErr := startGateway(ctx, c)
+	if gatewayErr != nil {
+		return Result{}, gatewayErr
+	}
+	defer closeGateway()
+	models := map[string]any{"providers": map[string]any{c.Provider: map[string]any{"baseUrl": gatewayURL, "api": "openai-completions", "models": []any{map[string]any{"id": c.Model, "name": c.Model, "reasoning": false, "input": []string{"text"}, "contextWindow": c.ContextTokens, "maxTokens": c.MaxOutputTokens, "cost": *c.Prices}}}}}
+	auth := map[string]any{c.Provider: map[string]string{"type": "api_key", "key": gatewayKey}}
 	settings := map[string]any{"compaction": map[string]bool{"enabled": false}, "retry": map[string]any{"enabled": false, "provider": map[string]int{"maxRetries": 0}}, "defaultTools": []string{}, "quietStartup": true}
 	for name, value := range map[string]any{"models.json": models, "auth.json": auth, "settings.json": settings} {
 		body, e := json.Marshal(value)
@@ -162,7 +182,7 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if e != nil {
 		return Result{}, e
 	}
-	protocol.expectURL = c.BaseURL
+	protocol.expectURL = gatewayURL
 	protocol.expectContext = c.ContextTokens
 	protocol.expectOutput = c.MaxOutputTokens
 	scanner := bufio.NewScanner(output)

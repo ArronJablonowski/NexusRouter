@@ -190,3 +190,32 @@ Still outstanding: normal SDK/API/CLI route selection and registration, shared
 process/cost admission wiring, durable progress and usage accounting, recovery
 of interrupted host ownership, tool-enabled harness authority and other adapters.
 The embedding API is not a deployed replacement for those host responsibilities.
+
+## Policy transport for native Pi
+
+Adapter `pi-rpc-text-v2` requires an explicit host `http.RoundTripper` and
+`TransportPolicySHA256`. The host must derive that digest from its effective
+network/privacy policy. Both the policy identity and true upstream endpoint bind
+the learning identity; a temporary gateway address does not.
+
+Pi connects only to a temporary IPv4 loopback gateway using a random child token.
+The gateway forwards one authorized streaming completion through the supplied
+policy transport, substituting the provider credential only upstream. Providers
+without authentication receive no invented credential. There is no default-
+transport or direct-endpoint fallback, and redirects are not followed. The host
+transport remains trusted code and must enforce endpoint/DNS/locality policy and
+honor cancellation; the gateway is not a process sandbox.
+
+The gateway checks the exact path, token, model, output ceiling and text-only
+message contract, rejects tool/media operations, duplicate top-level keys,
+unknown controls and provider-side storage requests, and bounds request/response
+sizes. Nested JSON is normalized before forwarding to avoid parser disagreement.
+A second valid request cannot issue another inference. Child headers and raw
+upstream error bodies are not relayed. Shutdown cancels and joins active upstream
+work before the Pi runner releases its admission reservation.
+
+Installed native Pi streaming/cancellation and durable task/learning composition
+pass with this gateway. Dedicated tests prove denied-transport no-fallback,
+credential separation, one-dispatch semantics, redirect refusal, request-policy
+rejection and cancellation/join. Normal SDK registration and admission wiring
+remain required before this is offered as a configured production route.

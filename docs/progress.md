@@ -9619,3 +9619,16 @@ and subsequent output-view cancellation regressions passing. Targeted vet and
 source checks passed; SDK/application/storage test packages compile. Full
 repository validation remains queued before push. Production SDK registration/selection, process/cost wiring,
 progress/usage accounting and tool authority remain open.
+
+## Native harness policy-transport prerequisite — DAR-132 (2026-10-01)
+
+SDK tracing identified that giving Pi a provider URL directly would bypass the
+host policy transport. Added the v2 Pi loopback gateway: explicit host transport
+and policy digest, opaque child token separate from upstream credentials, one
+streaming request, exact model/output/text-only controls, bounded payloads and no
+redirect or direct fallback. Gateway cleanup cancels and joins upstream work
+before reservation release. Native Pi race qualification, durable task/learning
+composition, gateway adversarial tests, targeted vet and source checks pass.
+The new checkpoint is isolated from all running/queued validation checkouts.
+Public SDK/CLI/API routing and shared admission/accounting integration remain open;
+no live service or provider deployment was changed.
