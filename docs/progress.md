@@ -991,3 +991,27 @@ Targeted vet, source format/size and diff checks passed. This qualifies actual
 SSH lifecycle on one Mac with synthetic evaluator output, not physical two-host,
 network partition, cross-platform or model-quality behavior. Full repository
 gate/normal push remain queued with the preceding implementation checkpoints.
+
+### DAR-132 / DAR-133 — combined remote dispatch and review workflow
+
+Added `nexus remote dispatch-evaluate` and `auto-dispatch-evaluate` so submitting
+a request can enroll its successful output for bounded automatic content review
+without a second CLI command. Reviewer configuration/privacy/declared-cost policy
+is checked before original dispatch; actual evaluator resources/credentials are
+admitted only after canonical completion. Automatic routing uses the existing
+accuracy-first discovery/default policy with exploration disabled. The original
+request key, route/choice and durable evaluation attempt remain authoritative on
+restart; no alternate destination or second evaluator invocation is introduced.
+Output separates dispatch, optional saved choice and evaluation, preserving a
+useful phase even if review fails after successful submission. Failed/canceled
+original tasks remain ungraded and observer exit does not cancel them.
+
+Extended actual cmd/nexus subprocess qualification to begin with a fresh direct
+request and a freshly discovered automatic route, then repeat combined commands
+and standalone review/watch commands. Original dispatch/evaluator counts remain
+one per new request; bad reviewer policy fails before dispatch; changed automatic
+intent is rejected. Native SSH-enabled full remote/CLI race suites passed
+(40.826s / 1.766s); targeted vet, source format/size and diff checks passed.
+Synthetic provider/loopback evidence does not establish real-model accuracy or
+physical two-host behavior. Full repository gate/push queued. Global enrollment
+of other clients' tasks, installed background service and review UI remain open.

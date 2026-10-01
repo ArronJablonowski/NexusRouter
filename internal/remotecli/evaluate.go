@@ -53,26 +53,33 @@ func evaluateOperationWithWait(ctx context.Context, client *remote.Client, opera
 			return zero, err
 		}
 	}
-	cfg, err := config.Load(config.Options{ProjectFile: configFile})
+	policy, closeCoordinator, err := configuredReviewPolicy(ctx, configFile, reviewer, maxCost, task.Private)
 	if err != nil {
-		return zero, remote.ErrInvalid
-	}
-	service, err := app.NewService(cfg, os.Getenv)
-	if err != nil {
-		return zero, remote.ErrInvalid
-	}
-	evaluator, local, err := service.ConfiguredEvaluator(reviewer, maxCost, task.Private)
-	if err != nil {
-		return zero, remote.ErrDenied
-	}
-	closeCoordinator, err := app.InstallHostResourceCoordinator(ctx, service, "remote-review-"+rand.Text())
-	if err != nil {
-		return zero, remote.ErrUnavailable
+		return zero, err
 	}
 	defer closeCoordinator()
-	policy := remote.RemoteEvaluator{Evaluator: evaluator, Local: local, Timeout: time.Minute}
 	if wait > 0 {
 		return client.WatchRecordedEvaluation(ctx, store, root, key, task, policy, wait, 15*time.Second)
 	}
 	return client.EvaluateRecordedOutcome(ctx, store, root, key, task, policy)
+}
+
+func configuredReviewPolicy(ctx context.Context, configFile, reviewer string, maxCost float64, private bool) (remote.RemoteEvaluator, func() error, error) {
+	cfg, err := config.Load(config.Options{ProjectFile: configFile})
+	if err != nil {
+		return remote.RemoteEvaluator{}, nil, remote.ErrInvalid
+	}
+	service, err := app.NewService(cfg, os.Getenv)
+	if err != nil {
+		return remote.RemoteEvaluator{}, nil, remote.ErrInvalid
+	}
+	evaluator, local, err := service.ConfiguredEvaluator(reviewer, maxCost, private)
+	if err != nil {
+		return remote.RemoteEvaluator{}, nil, remote.ErrDenied
+	}
+	closeCoordinator, err := app.InstallHostResourceCoordinator(ctx, service, "remote-review-"+rand.Text())
+	if err != nil {
+		return remote.RemoteEvaluator{}, nil, remote.ErrUnavailable
+	}
+	return remote.RemoteEvaluator{Evaluator: evaluator, Local: local, Timeout: time.Minute}, closeCoordinator, nil
 }

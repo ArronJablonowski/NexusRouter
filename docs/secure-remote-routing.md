@@ -965,3 +965,31 @@ reclaims a missing evaluator result or silently retries a failed provider call.
 Successful evaluation remains automated advisory evidence. Whole-fleet automatic
 enrollment, background service installation and a review UI are not provided by
 these per-request watch commands.
+
+### Submit and review in one workflow
+
+`nexus remote dispatch-evaluate` combines recorded direct dispatch with the
+completion/review watcher. Supply the original Task on stdin, `--instance`,
+trust/TLS flags, `--routes`, `--evidence`, `--request`, evaluator `--config`,
+`--reviewer`, `--review-max-cost`, and a positive `--review-wait` budget.
+`auto-dispatch-evaluate` takes an AutomaticRequest, omits `--instance`, and uses
+the same default accuracy-first discovery/selection policy as `auto-dispatch`.
+Explicit exploration remains disabled in these CLI commands.
+
+Reviewer configuration, privacy and declared cost policy are validated before
+original work is submitted. Actual evaluator resource admission and credential
+resolution occur after successful canonical completion; a later evaluator failure
+does not undo the original task. No remote task is implicitly canceled when the
+caller exits or its review deadline expires.
+
+The JSON result separates `dispatch`, optional saved `choice`, and `evaluation`.
+`phase=finished` means the workflow returned a terminal observation; inspect the
+evaluation status/verdict to distinguish accepted output, advisory rejection,
+abstention and a failed/canceled original task. `dispatch_failed_or_unknown`
+requires inspecting the saved request rather than inventing a new key. A
+`review_pending` error can occur after successful dispatch; restarting the same
+command with the exact original request/policy and private stores preserves both
+submission and evaluator replay protection. Automatic retries use the saved
+choice without fresh discovery. There is no hidden fallback or automatic retry
+of uncertain evaluator inference. These opt-in combined commands enroll their
+own request for review, not every task submitted by another client.

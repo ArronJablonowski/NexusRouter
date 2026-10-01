@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -141,6 +141,16 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 		return serve(ctx, *instance, *listen, *journal, *configFile, registry, credentials)
 	}
 	client := remote.Client{Trust: registry, Credentials: credentials}
+	if operation == "dispatch-evaluate" || operation == "auto-dispatch-evaluate" {
+		if *modelID != "" || *harnessID != "" || *contextTokens != 0 {
+			return remote.ErrInvalid
+		}
+		result, e := dispatchReviewOperation(ctx, &client, operation == "auto-dispatch-evaluate", *instance, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, *reviewWait, input)
+		if err := json.NewEncoder(output).Encode(result); err != nil {
+			return err
+		}
+		return e
+	}
 	if operation == "evaluate" || operation == "auto-evaluate" || operation == "watch-evaluate" || operation == "auto-watch-evaluate" {
 		watching := operation == "watch-evaluate" || operation == "auto-watch-evaluate"
 		if watching && *reviewWait <= 0 || !watching && *reviewWait != 0 {

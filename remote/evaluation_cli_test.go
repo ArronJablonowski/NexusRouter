@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,6 +42,7 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 		}
 	}
 	f, routes, key, task, v, _, backend := reviewFixture(t)
+	key = "combined-cli-review-01"
 	useTransport(f)
 	var calls atomic.Int32
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -85,10 +87,36 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 			return RemoteEvaluationStatus{}
 		}
 		var result RemoteEvaluationStatus
+		if strings.Contains(args[1], "dispatch-evaluate") {
+			var flow struct {
+				Phase      string                  `json:"phase"`
+				Evaluation *RemoteEvaluationStatus `json:"evaluation"`
+			}
+			if e := json.Unmarshal(output, &flow); e != nil || flow.Phase != "finished" || flow.Evaluation == nil {
+				t.Fatal(string(output), e)
+			}
+			result = *flow.Evaluation
+			output, _ = json.Marshal(result)
+		}
 		if err = json.Unmarshal(output, &result); err != nil || result.Status != "completed" || !result.ReviewApplied {
 			t.Fatal(string(output), err)
 		}
 		return result
+	}
+	flowArgs := append(append([]string{}, args...), "--instance", "node-a", "--review-wait", "1m")
+	flowArgs[1] = "dispatch-evaluate"
+	badArgs := append([]string{}, flowArgs...)
+	for i := range badArgs {
+		if badArgs[i] == "--reviewer" {
+			badArgs[i+1] = "missing"
+		}
+	}
+	run(badArgs, input, false)
+	if backend.submits.Load() != 1 || calls.Load() != 0 {
+		t.Fatal("reviewer preflight dispatched work")
+	}
+	for range 2 {
+		run(flowArgs, input, true)
 	}
 	for range 2 {
 		run(args, input, true)
@@ -96,7 +124,7 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	watchArgs := append(append([]string{}, args...), "--review-wait", "1m")
 	watchArgs[1] = "watch-evaluate"
 	run(watchArgs, input, true)
-	if rank := remoteRank(t, root, v); calls.Load() != 1 || backend.submits.Load() != 1 || rank.AdvisorySamples != 1 || rank.ConfirmedSamples != 0 {
+	if rank := remoteRank(t, root, v); calls.Load() != 1 || backend.submits.Load() != 2 || rank.AdvisorySamples != 1 || rank.ConfirmedSamples != 0 {
 		t.Fatal(calls.Load(), backend.submits.Load(), rank)
 	}
 	// Resolve the immutable automatic choice through the same main CLI, without
@@ -106,18 +134,10 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	// head merely because a different request key points to it.
 	f, routes, _, task, _, _, backend = reviewFixture(t)
 	useTransport(f)
-	f.server.backend = rankingBackend{backend, *task.ExpectedHarnessIdentity}
+	f.server.backend = cliDiscoveryBackend{rankingBackend{backend, *task.ExpectedHarnessIdentity}, task}
 	args = []string{"remote", "auto-evaluate", "--trust", f.clientTrust, "--cert", f.client.Credentials.CertificateFile, "--key", f.client.Credentials.KeyFile, "--ca", f.client.Credentials.CAFile, "--routes", routes.directory, "--evidence", root, "--request", key, "--config", configPath, "--reviewer", "reviewer", "--review-max-cost", "0"}
 	request := AutomaticRequest{Version: 1, Prompt: task.Prompt, Routing: harness.Request{Version: 1, Task: harness.TaskClass{Domain: task.Domain, Profile: task.Profile, Difficulty: task.HarnessDifficulty}, Mode: "local_only", LocalRequired: true, ContextTokens: int64(task.ContextTokens)}}
 	autoKey := "automatic-cli-eval-01"
-	candidate := DestinationCandidate{Destination: "node-a", ModelID: task.ModelID, HarnessID: task.HarnessID, Candidate: harness.Candidate{Identity: *task.ExpectedHarnessIdentity, Local: true, Available: true, Authorized: true, Compatible: true, CredentialAvailable: true, CapacityAvailable: true, ContextTokens: 8192}}
-	if _, _, err = f.client.DispatchAutomatic(context.Background(), routes, root, autoKey, request, harness.DefaultPolicy(), []DestinationCandidate{candidate}, 0); err != nil {
-		t.Fatal(err)
-	}
-	automatic, err := f.client.AutomaticOutcome(context.Background(), routes, autoKey, request)
-	if err != nil {
-		t.Fatal(err)
-	}
 	args[1] = "auto-evaluate"
 	for i := range args {
 		if args[i] == key {
@@ -125,6 +145,16 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 		}
 	}
 	input, _ = json.Marshal(request)
+	flowArgs = append(append([]string{}, args...), "--review-wait", "1m")
+	flowArgs[1] = "auto-dispatch-evaluate"
+	for range 2 {
+		run(flowArgs, input, true)
+	}
+	automatic, err := f.client.AutomaticOutcome(context.Background(), routes, autoKey, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for range 2 {
 		run(args, input, true)
 	}
@@ -140,4 +170,16 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	if calls.Load() != 2 || backend.submits.Load() != 2 {
 		t.Fatal("changed request invoked work", calls.Load(), backend.submits.Load())
 	}
+}
+
+// Supply actual identity/readiness/capacity through the production discovery
+// protocol while retaining immutable synthetic canonical execution evidence.
+type cliDiscoveryBackend struct {
+	rankingBackend
+	task Task
+}
+
+func (b cliDiscoveryBackend) Catalogue(context.Context, []string, bool, []string) (Info, error) {
+	zero := 0.0
+	return Info{Version: 1, Available: true, Models: []Model{{ID: b.task.ModelID, Provider: b.identity.Provider, Model: b.identity.Model, Local: true, ContextTokens: 32768, EstimatedCost: &zero}}, Harnesses: []Harness{{ID: b.task.HarnessID, ModelID: b.task.ModelID, Kind: b.identity.Harness, ModelRevision: b.identity.ModelRevision}}}, nil
 }
