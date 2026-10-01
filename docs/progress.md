@@ -10476,3 +10476,28 @@ branch/resume storage regressions (38.782s), targeted vet and source/diff checks
 These controlled fixture labels do not establish real model accuracy. Full gate
 remains queued before push. Tools, held-out comparisons, automatic difficulty
 assessment and broader crash/network/platform qualification remain open.
+
+### 2026-10-01 — DAR-133 native SSH interruption qualification
+
+Added real SDK/dispatcher qualification through installed OpenSSH and an isolated
+loopback sshd. The test cuts the destination TLS socket inside the SSH tunnel
+after durable dispatch intake and separately after queued cancellation, before
+response delivery. It independently verifies the first persisted submission before
+retry, reuses the original request identity, recovers the same submission, and
+verifies cancellation state/retry. Results, event history and running cancellation
+also travel through SSH. Provider counts prove one completed execution, one
+separately canceled running execution, and no execution for the canceled queued
+request. No duplicate intake or model execution is accepted.
+
+The initial combined run exposed a test-lifetime bug: a per-test cleanup removed
+the process-wide ownership guard before a second dispatcher started. The isolated
+SSH case passed; a package TestMain now keeps a dedicated private owner directory
+for the complete test process. No production ownership behavior was changed.
+
+NEXUS_REMOTE_SSH_NATIVE=1 go test -race ./remote ./cmd/nexus-remote passed
+(remote 20.707s; command has no test files). Targeted vet and source/diff checks
+passed. This checkpoint is on codex/harness-sdk, which already includes the
+previous validated SSH implementation; its full gate/push remains queued. No
+live SSH account, service or credentials changed. Physical two-host, packet-loss/
+partition, wider-platform, discovery and automatic destination selection remain
+open; loopback socket-loss coverage is not a claim of full remote qualification.

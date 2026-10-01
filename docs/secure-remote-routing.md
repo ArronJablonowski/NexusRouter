@@ -261,3 +261,17 @@ separate-machine, network interruption and cross-platform qualification remain.
 
 OpenSSH behavior reference: [ssh(1)](https://man.openbsd.org/ssh.1) and
 [ssh_config(5)](https://man.openbsd.org/ssh_config).
+
+### Interrupted SSH responses
+
+Native loopback qualification also covers a real destination TLS socket cut
+inside the OpenSSH tunnel after dispatch intake commits but before response
+headers arrive. The fixture independently checks the persisted submission ID
+and queued state, then retries the original key/payload and receives that same
+submission. A second cut after queued cancellation commits is recovered through
+status and an idempotent cancellation retry. The real SDK dispatcher then proves
+result/event delivery and running cancellation over SSH: one successful fixture
+execution, one separately canceled running execution, and zero execution for the
+queued canceled task. These are controlled transport failures using disposable
+sshd keys on one Mac, not physical two-host, packet-loss/partition or cross-platform
+qualification. Run with `NEXUS_REMOTE_SSH_NATIVE=1 go test -race ./remote`.

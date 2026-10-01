@@ -28,13 +28,18 @@ func (fixtureProfiler) Measure(context.Context) (resources.Measurement, error) {
 }
 
 func TestRemoteSDKDispatchResultEventsAndQueuedCancellation(t *testing.T) {
-	owners, e := os.MkdirTemp("", "nexus-owners-")
-	if e != nil {
-		t.Fatal(e)
+	remoteSDKLifecycle(t, false)
+}
+
+func TestRemoteSDKSSHInterruptedResponse(t *testing.T) {
+	if os.Getenv("NEXUS_REMOTE_SSH_NATIVE") != "1" {
+		t.Skip("requires native SSH qualification")
 	}
-	t.Cleanup(func() { os.RemoveAll(owners) })
-	t.Setenv("DARWIN_PROCESS_OWNER_DIR", owners)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	remoteSDKLifecycle(t, true)
+}
+
+func remoteSDKLifecycle(t *testing.T, interruptedSSH bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	var calls atomic.Int32
 	blocked := make(chan struct{})
@@ -84,13 +89,52 @@ func TestRemoteSDKDispatchResultEventsAndQueuedCancellation(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	var dropped, droppedCancel atomic.Bool
+	if interruptedSSH {
+		original := hs.Handler
+		hs.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "POST" && r.URL.Path == "/v1/remote/tasks/request-sdk-00001" && dropped.CompareAndSwap(false, true) {
+				original.ServeHTTP(&disconnectResponse{ResponseWriter: w}, r)
+				return
+			}
+			if r.Method == "POST" && r.URL.Path == "/v1/remote/tasks/request-cancel-001/cancel" && droppedCancel.CompareAndSwap(false, true) {
+				original.ServeHTTP(&disconnectResponse{ResponseWriter: w}, r)
+				return
+			}
+			original.ServeHTTP(w, r)
+		})
+	}
 	go hs.ServeTLS(ln, "", "")
 	defer hs.Close()
 	peer := f.serverPeer
 	peer.Endpoint = "https://" + ln.Addr().String()
+	if interruptedSSH {
+		sshConfig := nativeSSHServer(t)
+		peer.Transport = "ssh"
+		peer.SSH = &sshConfig
+	}
 	writeRegistry(t, f.clientTrust, peer)
 	request := "request-sdk-00001"
 	first, e := f.client.Dispatch(ctx, "node-a", request, testTask())
+	if interruptedSSH {
+		if e == nil || !dropped.Load() {
+			t.Fatal("connection loss not observed", first, e)
+		}
+		committed, lookupErr := f.journal.lookup(ctx, "node-b", request)
+		if lookupErr != nil || committed == "" {
+			t.Fatal("network cut preceded durable binding", committed, lookupErr)
+		}
+		queued, lookupErr := sdkClient.SubmissionStatus(ctx, committed)
+		if lookupErr != nil || queued.State != "queued" || calls.Load() != 0 {
+			t.Fatal("durable intake missing", queued, lookupErr)
+		}
+		// Intake committed before the network cut. Reuse the original key/payload.
+		// The recovered response must name that already committed submission.
+		first, e = f.client.Dispatch(ctx, "node-a", request, testTask())
+		if first.ID != committed {
+			t.Fatal("retry created another submission", first, committed, e)
+		}
+	}
 	if e != nil || first.State != "queued" {
 		t.Fatal(first, e)
 	}
@@ -103,6 +147,17 @@ func TestRemoteSDKDispatchResultEventsAndQueuedCancellation(t *testing.T) {
 		t.Fatal(e)
 	}
 	stopped, e = f.client.Cancel(ctx, "node-a", "request-cancel-001")
+	if interruptedSSH {
+		if e == nil || !droppedCancel.Load() {
+			t.Fatal("cancellation response not interrupted", stopped, e)
+		}
+		status, statusErr := f.client.Status(ctx, "node-a", "request-cancel-001")
+		if statusErr != nil || status.State != "canceled" || !status.CancelRequested {
+			t.Fatal("lost cancellation commit", status, statusErr)
+		}
+		stopped, e = f.client.Cancel(ctx, "node-a", "request-cancel-001")
+	}
+
 	if e != nil || stopped.State != "canceled" {
 		t.Fatal(stopped, e)
 	}
