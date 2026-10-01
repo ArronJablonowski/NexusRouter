@@ -24,6 +24,7 @@ var ErrAdmission = app.ErrAdmission
 var ErrHarnessUnsupported = app.ErrHarnessUnsupported
 
 type NativeHarness = app.NativeHarness
+type NativeHarnessPrices = app.NativeHarnessPrices
 
 var ErrEventDelivery = app.ErrEventDelivery
 

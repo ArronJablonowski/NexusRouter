@@ -18,6 +18,10 @@ import (
 
 var ErrHarnessUnsupported = errors.New("native harness request or configured capability is unsupported")
 
+// NativeHarnessPrices is shared across registered native adapters.
+// The alias preserves compatibility with earlier Pi registrations.
+type NativeHarnessPrices = pi.Prices
+
 // NativeHarness registers one operator-pinned model/harness pair. ModelRevision
 // and OverheadRAMBytes must be verified host metadata, not model self-reports.
 // Registration grants no task authority; ordinary admission still applies.
@@ -25,7 +29,7 @@ type NativeHarness struct {
 	ID, ModelID, Kind, Executable, ExecutableSHA256, ModelRevision string
 	MaxOutputTokens                                                int
 	OverheadRAMBytes                                               uint64
-	Prices                                                         *pi.Prices
+	Prices                                                         *NativeHarnessPrices
 }
 
 // ConfigureNativeHarnesses is constructor-only; call before exposing Service.
@@ -44,7 +48,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		}
 		prices := *entry.Prices
 		entry.Prices = &prices
-		if !reservationLabel(entry.ID, 128) || entry.ID == "auto" || entry.Kind != "pi" || entry.OverheadRAMBytes == 0 {
+		if !reservationLabel(entry.ID, 128) || entry.ID == "auto" || (entry.Kind != "pi" && entry.Kind != "openclaw") || entry.OverheadRAMBytes == 0 {
 			return ErrAdmission
 		}
 		if _, exists := entries[entry.ID]; exists {
@@ -65,7 +69,10 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		if model.ID == "" || (provider.Kind != "openai_compatible" && provider.Kind != "ollama") {
 			return ErrHarnessUnsupported
 		}
-		c := nativePiConfig(entry, provider, model, model.WorkingContextTokens(), digest, "", deniedNativeTransport{}, nil)
+		c, e := nativeConfig(entry, provider, model, model.WorkingContextTokens(), digest, "", deniedNativeTransport{}, nil)
+		if e != nil {
+			return e
+		}
 		if _, e := c.Identity(); e != nil {
 			return ErrAdmission
 		}
@@ -157,7 +164,10 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	if tokens == 0 {
 		tokens = m.WorkingContextTokens()
 	}
-	c := nativePiConfig(*r.nativeHarness, p, m, tokens, digest, key, tr, messages)
+	c, err := nativeConfig(*r.nativeHarness, p, m, tokens, digest, key, tr, messages)
+	if err != nil {
+		return result, err
+	}
 	identity, err := c.Identity()
 	if err != nil {
 		return result, ErrAdmission
@@ -176,12 +186,12 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 		if e != nil || estimate+c.MaxOutputTokens > tokens {
 			return runtime.HarnessOutput{}, runtime.ErrContextOverflow
 		}
-		native, e := pi.Run(run, c, "Execute the host-supplied task context.")
+		native, e := c.Run(run, "Execute the host-supplied task context.")
 		instructions := responseInstructions(r)
 		if e == nil && redact(instructions, secrets) == instructions && len(responsecontract.Infer(instructions).Validate(redact(native.Text, secrets))) > 0 {
 			e = runtime.ErrInvalidOutput
 		}
-		return runtime.HarnessOutput{Actual: native.Identity, Text: native.Text}, e
+		return native, e
 	}})
 	result.Text = text
 	result.HarnessSelection = r.nativeSelection

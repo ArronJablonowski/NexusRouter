@@ -221,12 +221,14 @@ rejection and cancellation/join. Normal SDK registration and admission wiring
 remain required before this is offered as a configured production route.
 
 
-## Explicit native Pi through SDK v1
+## Explicit native harnesses through SDK v1
 
 `ConfigOptions.NativeHarnesses` registers operator-pinned model/harness pairs.
-Each `sdk.NativeHarness` needs a unique `ID`, configured `ModelID`, `Kind: "pi"`,
+Each `sdk.NativeHarness` needs a unique `ID`, configured `ModelID`, `Kind: "pi"`
+or `Kind: "openclaw"`,
 absolute `Executable`, `ExecutableSHA256`, trusted `ModelRevision`, positive
-`MaxOutputTokens` and `OverheadRAMBytes`, and an explicit `*pi.Prices`. Prices
+`MaxOutputTokens` and `OverheadRAMBytes`, and an explicit `*sdk.NativeHarnessPrices` (the earlier `*pi.Prices` remains
+compatible). Prices
 and registrations are copied during construction. Zero prices must be an
 intentional operator assertion, not a substitute for unknown cloud pricing.
 
@@ -343,10 +345,10 @@ ReadEvents and canonical outcome reconciliation validate those bindings. Reviews
 written through the SDK affect later selection immediately, including after SDK
 restart; unreviewed outputs never acquire a success vote automatically.
 
-Current registered adapters are Pi text-only routes, with native Ollama or
+Current registered adapters are Pi and OpenClaw text-only routes, with native Ollama or
 OpenAI-compatible providers. This is selection among the registered eligible
 pairs, not a claim of the globally best model/harness or a comparative ranking
-against unimplemented Hermes/OpenClaw/Goose/OpenHands adapters. Additional adapters, tools, queued registration authority,
+against unimplemented Hermes/Goose/OpenHands adapters. Additional adapters, tools, queued registration authority,
 CLI/API configuration, durable usage/cost accounting and held-out qualification
 remain required for the full feature.
 
@@ -389,3 +391,31 @@ rather than silent supersession. Ledger failures report `failed`; retry audit
 reconciliation, not Run. Automatic reviews never claim human or deterministic
 provenance. Human/deterministic feedback continues through the explicitly trusted
 review API when the host has independently established that evaluation method.
+
+
+## Native OpenClaw through SDK v1
+
+Register `Kind: "openclaw"` for the pinned OpenClaw 2026.9.7 installation. The
+same explicit and automatic SDK requests, provider-policy transport, context
+assembly, fixed harness memory reservation, output contracts, redacting journal,
+canonical evidence reconciliation and advisory review apply. Different harnesses
+may register the same model: their separate version/config identities retain
+separate task results. A fresh automatic selection uses current review heads;
+changing a review does not rerun its original inference.
+
+The adapter runs isolated `agent exec`, disables tools/plugins/skills and automatic
+updates, and independently verifies the provider response before accepting the
+native output. Both OpenAI-compatible and Ollama protocols are supported. Context
+and output caps are explicit. A successful OpenClaw envelope alone is insufficient:
+the runner also requires exact model identity, normal provider termination, clean
+stream completion, process exit and output binding. No usage normalized by the
+harness is represented as measured SDK accounting.
+
+OpenClaw process ownership is currently implemented for macOS/Linux only. Its
+launcher is pinned by SHA/version; Node and installed modules are trusted host
+dependencies, not an attested sandbox. Unsupported platforms, tool-bearing runs,
+queue submission and continuation are rejected. Registrations are constructor
+options and do not alter the user's live Gateway or configuration. Native tests
+use disposable configuration and fixture providers; they do not establish a
+real-world accuracy ranking. Hermes, Goose and OpenHands integration, tool support,
+queue/CLI/API registration and held-out comparative qualification remain open.

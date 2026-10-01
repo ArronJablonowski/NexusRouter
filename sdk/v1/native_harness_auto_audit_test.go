@@ -21,6 +21,18 @@ func TestSDKNativeAutomaticAuditFeedsAdvisoryEvidence(t *testing.T) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("requires installed Pi qualification")
 	}
+	nativeAutomaticAudit(t, "pi")
+}
+
+func TestSDKOpenClawAutomaticAuditFeedsAdvisoryEvidence(t *testing.T) {
+	if os.Getenv("NEXUS_OPENCLAW_NATIVE") != "1" {
+		t.Skip("requires installed OpenClaw")
+	}
+	nativeAutomaticAudit(t, "openclaw")
+}
+
+func nativeAutomaticAudit(t *testing.T, kind string) {
+	registration := nativeRegistration(t, kind)
 	for _, verdict := range []string{"accept", "reject", "abstain", "failure"} {
 		t.Run(verdict, func(t *testing.T) {
 			var calls atomic.Int32
@@ -49,6 +61,8 @@ func TestSDKNativeAutomaticAuditFeedsAdvisoryEvidence(t *testing.T) {
 				}
 			}
 			client, _ := nativeSDKProviderClient(t, server.URL, 64<<20, false, "ollama", func(cfg *config.Settings, options *sdk.ConfigOptions) {
+				cfg.Providers[0].RequestTimeout = "30s"
+				options.NativeHarnesses = []sdk.NativeHarness{registration}
 				cfg.Evaluation.Judge = true
 				cfg.Evaluation.AutoReviewModel = "reviewer"
 				reviewer := cfg.Models[0]
@@ -58,8 +72,8 @@ func TestSDKNativeAutomaticAuditFeedsAdvisoryEvidence(t *testing.T) {
 				options.Evaluator = evaluator
 				options.HarnessEvidence = ledger
 			})
-			result, err := client.Run(context.Background(), sdk.Request{Version: 1, HarnessID: "pi-fixture", ModelID: "chat", Prompt: "Write an answer.", Domain: "writing"})
-			if err != nil || result.Text != "candidate answer" || result.HarnessOutcome == nil || calls.Load() != 1 || evaluator.calls.Load() != 1 {
+			result, err := client.Run(context.Background(), sdk.Request{Version: 1, HarnessID: registration.ID, ModelID: "chat", Prompt: "Write an answer.", Domain: "writing"})
+			if err != nil || result.Text != "candidate answer" || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.Harness != kind || calls.Load() != 1 || evaluator.calls.Load() != 1 {
 				t.Fatal("candidate rerun or review corrupted execution", result, err)
 			}
 			if verdict == "failure" {

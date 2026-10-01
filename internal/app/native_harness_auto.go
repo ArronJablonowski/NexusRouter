@@ -56,7 +56,10 @@ func (s *Service) runNativeAuto(ctx context.Context, r Request) (Result, error) 
 				provider = p
 			}
 		}
-		c := nativePiConfig(entry, provider, model, r.ContextTokens, digest, "", deniedNativeTransport{}, nil)
+		c, e := nativeConfig(entry, provider, model, r.ContextTokens, digest, "", deniedNativeTransport{}, nil)
+		if e != nil {
+			return Result{}, e
+		}
 		identity, e := c.Identity()
 		if e != nil {
 			return Result{}, ErrAdmission

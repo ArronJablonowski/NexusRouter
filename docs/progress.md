@@ -9874,3 +9874,33 @@ Targeted vet/source gate passed. Full make check is queued before push. No live
 router configuration or real provider inference was used. SDK registration/joint
 selection, public queue/CLI/API behavior, tool-bearing execution, wider platform
 qualification and held-out model/harness quality qualification remain incomplete.
+
+## OpenClaw SDK routing and joint learning — DAR-132 (2026-10-01)
+
+SDK NativeHarness registration now accepts explicit Pi and OpenClaw kinds. A
+closed adapter registry supplies both selection identity and execution; unknown
+kinds do not fall back to another harness or direct provider inference. OpenClaw
+uses the existing context/privacy/secret/resource-admission, response-contract,
+redacting journal, result streaming, evidence and advisory-review paths. Added a
+shared sdk.NativeHarnessPrices alias while preserving earlier Pi registrations.
+
+Native SDK tests verify OpenClaw host messages, provider credential placement,
+resource profiling, streamed final output, actual identity, canonical events and
+ledger reconciliation. A same-model/two-harness fixture gives each pair separate
+controlled review evidence: auto selects OpenClaw, then selects Pi after current
+review heads are reversed. Exactly four inference requests occur: two original
+runs and two selected runs. Reviewing the originals never repeats them. This
+proves selection behavior, not a real quality ranking of these harnesses.
+
+OpenClaw automatic evaluator tests cover accept/reject/abstain/failure and replay.
+Advisory evidence remains automated_ai with its limited weight, zero confirmed
+samples, and no quality weight for failure/abstention. Reconciliation never calls
+the model or evaluator again. Original Pi paths remain covered.
+
+Verification: new SDK OpenClaw/same-model pair tests passed (19.278s); combined
+native SDK regression race suite passed (52.753s); Pi/OpenClaw automatic-review
+and canonical evidence/restart race tests passed (39.492s). Targeted vet, source
+format/size gate and diff checks passed. Full make check remains queued before
+push. No live router/agent configuration or real model calls changed. Hermes,
+Goose, OpenHands, tool-bearing runs, queue/CLI/API registration, measured usage
+accounting, broader platform support and held-out qualification remain open.

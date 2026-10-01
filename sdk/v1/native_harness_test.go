@@ -31,15 +31,6 @@ func nativeSDKClient(t *testing.T, endpoint string, overhead uint64, tools bool)
 }
 func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, tools bool, providerKind string, configure ...func(*config.Settings, *sdk.ConfigOptions)) (*sdk.Client, *atomic.Int32) {
 	t.Helper()
-	executable, e := exec.LookPath("pi")
-	if e != nil {
-		t.Fatal(e)
-	}
-	body, e := os.ReadFile(executable)
-	if e != nil {
-		t.Fatal(e)
-	}
-	pin := sha256.Sum256(body)
 	cfg := config.Defaults()
 	cfg.Mode = "local_only"
 	cfg.Tools.Enabled = tools
@@ -53,7 +44,7 @@ func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, too
 	for _, change := range configure {
 		change(&cfg, &extra)
 	}
-	body, e = yaml.Marshal(cfg)
+	body, e := yaml.Marshal(cfg)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -70,11 +61,28 @@ func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, too
 	}, ResourceProfiler: sdkFixtureProfiler(func(context.Context) (resources.Measurement, error) {
 		profiled.Add(1)
 		return sdkGoodMeasurement(), nil
-	}), NativeHarnesses: []sdk.NativeHarness{{ID: "pi-fixture", ModelID: "chat", Kind: "pi", Executable: executable, ExecutableSHA256: hex.EncodeToString(pin[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, Prices: &pi.Prices{}, OverheadRAMBytes: overhead}}})
+	}), NativeHarnesses: nativeFixtureRegistrations(t, extra.NativeHarnesses, overhead)})
 	if e != nil {
 		t.Fatal(e)
 	}
 	return client, profiled
+}
+func nativeFixtureRegistrations(t *testing.T, overrides []sdk.NativeHarness, overhead uint64) []sdk.NativeHarness {
+	t.Helper()
+	if len(overrides) > 0 {
+		return overrides
+	}
+	executable, e := exec.LookPath("pi")
+	if e != nil {
+		t.Fatal(e)
+	}
+	body, e := os.ReadFile(executable)
+	if e != nil {
+		t.Fatal(e)
+	}
+	hash := sha256.Sum256(body)
+	pin := hex.EncodeToString(hash[:])
+	return []sdk.NativeHarness{{ID: "pi-fixture", ModelID: "chat", Kind: "pi", Executable: executable, ExecutableSHA256: pin, ModelRevision: "fixture-v1", MaxOutputTokens: 1024, Prices: &pi.Prices{}, OverheadRAMBytes: overhead}}
 }
 func TestSDKNativePiUsesAdmissionContextAndDurableEvents(t *testing.T) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
