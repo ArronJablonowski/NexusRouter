@@ -15,6 +15,7 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	Harnesses []Harness
 	Client    *sdk.Client
 	Models    []Model
 	Available func(context.Context) bool
@@ -27,7 +28,11 @@ func (b *SDKBackend) Info(ctx context.Context) (Info, error) {
 	if b == nil || b.Client == nil {
 		return Info{}, ErrUnavailable
 	}
-	return b.info(ctx, b.Models)
+	out, err := b.info(ctx, b.Models)
+	if err == nil {
+		out.Harnesses = filterHarnesses(b.Harnesses, out.Models, nil, true)
+	}
+	return out, err
 }
 
 // InfoFor scopes discovery before provider traffic, so an info-only caller
@@ -96,6 +101,17 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	if b == nil || b.Client == nil || t.Validate() != nil {
 		return submissions.Status{}, ErrInvalid
 	}
+	if t.HarnessID != "" {
+		found := false
+		for _, h := range b.Harnesses {
+			if h.ID == t.HarnessID && h.ModelID == t.ModelID {
+				found = true
+			}
+		}
+		if !found {
+			return submissions.Status{}, ErrDenied
+		}
+	}
 	eligible := false
 	for _, m := range b.Models {
 		if m.ID == t.ModelID && (!t.Private || m.Local) && m.ContextTokens >= t.ContextTokens && m.EstimatedCost != nil && !math.IsNaN(*m.EstimatedCost) && !math.IsInf(*m.EstimatedCost, 0) && *m.EstimatedCost >= 0 && *m.EstimatedCost <= t.MaxCost {
@@ -105,7 +121,7 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	if !eligible {
 		return submissions.Status{}, ErrDenied
 	}
-	return b.Client.Submit(ctx, key, sdk.Request{Version: 1, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
+	return b.Client.Submit(ctx, key, sdk.Request{Version: 1, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
 }
 func (b *SDKBackend) Status(ctx context.Context, id string) (submissions.Status, error) {
 	return b.Client.SubmissionStatus(ctx, id)

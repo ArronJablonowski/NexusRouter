@@ -145,6 +145,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if op == "info" {
 		var info Info
 		if scoped, ok := s.backend.(interface {
+			InfoForHarnesses(context.Context, []string, bool, []string) (Info, error)
+		}); ok {
+			info, err = scoped.InfoForHarnesses(ctx, slices.Clone(peer.Models), peer.AllowCloudInference, slices.Clone(peer.Harnesses))
+		} else if scoped, ok := s.backend.(interface {
 			InfoFor(context.Context, []string, bool) (Info, error)
 		}); ok {
 			info, err = scoped.InfoFor(ctx, slices.Clone(peer.Models), peer.AllowCloudInference)
@@ -161,6 +165,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			info.Models = filtered
+			info.Harnesses = filterHarnesses(info.Harnesses, filtered, peer.Harnesses, false)
 			result = info
 		}
 	} else if op == "dispatch" {

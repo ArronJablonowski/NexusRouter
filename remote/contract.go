@@ -28,18 +28,34 @@ var ErrUnavailable = errors.New("remote operation unavailable; delivery may be u
 // Task deliberately excludes continuation, arbitrary messages, paths and tool
 // authority. The destination's configured runtime retains all admission rules.
 type Task struct {
-	Version       int     `json:"version"`
-	ModelID       string  `json:"model_id"`
-	Prompt        string  `json:"prompt"`
-	Domain        string  `json:"domain"`
-	Profile       string  `json:"profile"`
-	ContextTokens int     `json:"context_tokens"`
-	MaxCost       float64 `json:"max_cost"`
+	HarnessID         string  `json:"harness_id,omitempty"`
+	HarnessDifficulty string  `json:"harness_difficulty,omitempty"`
+	Version           int     `json:"version"`
+	ModelID           string  `json:"model_id"`
+	Prompt            string  `json:"prompt"`
+	Domain            string  `json:"domain"`
+	Profile           string  `json:"profile"`
+	ContextTokens     int     `json:"context_tokens"`
+	MaxCost           float64 `json:"max_cost"`
 	// Private means both explicitly paired private transport and local inference.
 	Private bool `json:"private"`
 }
 
 func (t Task) Validate() error {
+	if t.HarnessID == "" {
+		if t.HarnessDifficulty != "" {
+			return ErrInvalid
+		}
+	} else {
+		if !name(t.HarnessID) || t.HarnessID == "auto" {
+			return ErrInvalid
+		}
+		switch t.HarnessDifficulty {
+		case "easy", "medium", "hard", "unknown":
+		default:
+			return ErrInvalid
+		}
+	}
 	if t.Version != Version || !name(t.ModelID) || len(t.Prompt) == 0 || len(t.Prompt) > MaxBody/2 || !utf8.ValidString(t.Prompt) || !name(t.Domain) || !name(t.Profile) || t.ContextTokens < 1 || t.ContextTokens > 1<<24 || math.IsNaN(t.MaxCost) || math.IsInf(t.MaxCost, 0) || t.MaxCost < 0 {
 		return ErrInvalid
 	}
@@ -71,6 +87,7 @@ type Model struct {
 	Local         bool     `json:"local"`
 }
 type Info struct {
+	Harnesses []Harness            `json:"harnesses,omitempty"`
 	Resources *ResourceObservation `json:"resources,omitempty"`
 	Version   int                  `json:"version"`
 	Instance  string               `json:"instance"`

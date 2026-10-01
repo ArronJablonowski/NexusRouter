@@ -22,6 +22,7 @@ import (
 // Two pins permit explicit overlap during rotation. Removing a peer or pin
 // takes effect on the next request, including an existing server connection.
 type Peer struct {
+	Harnesses           []string `json:"harnesses,omitempty"`
 	Transport           string   `json:"transport,omitempty"`
 	SSH                 *SSH     `json:"ssh,omitempty"`
 	ID                  string   `json:"id"`
@@ -86,6 +87,16 @@ func (f TrustFile) Read() (Registry, error) {
 	return out, nil
 }
 func (p Peer) Validate() error {
+	if len(p.Harnesses) > 256 {
+		return ErrInvalid
+	}
+	seenHarnesses := map[string]bool{}
+	for _, h := range p.Harnesses {
+		if !name(h) || h == "auto" || seenHarnesses[h] {
+			return ErrInvalid
+		}
+		seenHarnesses[h] = true
+	}
 	switch p.Transport {
 	case "", "https":
 		if p.SSH != nil {
@@ -170,7 +181,7 @@ func (r Registry) authenticate(c *x509.Certificate) (Peer, error) {
 }
 func (p Peer) permits(op string) bool { return slices.Contains(p.Operations, op) }
 func (p Peer) permitsTask(t Task) bool {
-	if t.Validate() != nil || !p.permits("dispatch") || !slices.Contains(p.Models, t.ModelID) || t.MaxCost > p.MaxCost || t.ContextTokens > p.MaxContextTokens {
+	if (t.HarnessID != "" && !slices.Contains(p.Harnesses, t.HarnessID)) || t.Validate() != nil || !p.permits("dispatch") || !slices.Contains(p.Models, t.ModelID) || t.MaxCost > p.MaxCost || t.ContextTokens > p.MaxContextTokens {
 		return false
 	}
 	if !t.Private && !p.AllowCloudInference {

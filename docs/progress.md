@@ -11266,3 +11266,32 @@ diff checks. Full repository validation and push are queued behind the preceding
 remote-observation checkpoint; no full-gate pass is claimed for this change.
 Physical two-host qualification, device discovery/pairing UI, automatic remote
 accuracy-first selection and operational policy remain incomplete.
+
+### DAR-133 — explicitly scoped remote external harness dispatch
+
+Remote requests can now name a configured external harness registration and
+explicit task difficulty. Both caller and destination peer registries require an
+additional harness allowlist; existing model permissions do not grant external
+harness access. The backend rejects a registration bound to another model and
+passes the exact harness/difficulty into the ordinary durable SDK submission.
+Optional JSON fields preserve old native request hashes. Automatic remote
+selection remains unsupported rather than falling back or bypassing peer scope.
+
+Scoped discovery exposes permitted registration metadata without executable,
+source or credential paths. The remote host now opens the configured evidence
+store and attaches it to SDK and dispatcher before serving; external registrations
+require that evidence directory. The integration test initially caught missing
+ledger attachment; this is fixed. Native requests use the supported 8192-token
+fixture budget after the 4096-token native fixture was denied before execution.
+No production admission constraint was weakened.
+
+Installed Pi over actual isolated OpenSSH plus pinned mTLS and a local synthetic
+provider passes durable intake, lost-response recovery, exact duplicate handling,
+result/events with actual Pi/model revision/hard difficulty, evidence recording,
+and queued/running cancellation. It is a protocol fixture, not real-model quality
+or a physical two-host claim. Scope, registration/model mismatch, legacy digest,
+invalid auto/difficulty and disclosure tests also pass. The complete remote/CLI
+race suite with native Pi and SSH enabled passed (31.083s/1.725s); targeted vet,
+source formatting/size and diff checks passed. Full repository check/push is
+queued after the task-inventory checkpoint. Other four harnesses inherit the
+shared SDK path but are not claimed remotely qualified by this Pi fixture.

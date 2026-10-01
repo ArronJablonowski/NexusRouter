@@ -139,6 +139,42 @@ original persisted request key and exact payload. Listing never submits work.
 Prompts, result text, configuration digests and other callers' requests are not
 returned. Use `status` and `events` for an individual owned request's details.
 
+## Explicit external harness dispatch
+
+An operator may configure the same pinned `native_harnesses` registrations used
+by the local SDK/CLI in the destination runtime configuration. The remote host
+requires `native_harness_evidence_dir` when registrations are present and owns
+that ledger handle until HTTP handling and the dispatcher stop. Successful
+outputs record actual execution identity; they do not receive quality credit
+without bound evaluation through the existing host review path.
+
+Both peer registries must explicitly include permitted registration IDs in the
+optional `harnesses` array, in addition to the allowed `models`. Omitting this
+array grants no external harness access. For example, a peer can authorize
+`"harnesses":["pi-local"]` alongside `"models":["local-chat"]`. Dispatch JSON
+then adds `"harness_id":"pi-local"` and
+`"harness_difficulty":"hard"` (easy/medium/hard/unknown are supported). These
+fields participate in the durable request digest; changing a harness or difficulty
+requires a different intended request. Omitted fields preserve existing native
+request serialization and retry identity.
+
+`info.harnesses` lists only registrations authorized for that caller and attached
+to its visible models. It reports ID, model ID, kind, model revision and configured
+host-tool mode, without executable/source paths or credentials. This is a
+configuration claim, not a live executable or tool capability attestation.
+The destination rechecks registration identity, executable pins, local resource
+reservation including harness overhead, privacy, context and tool policy through
+the ordinary SDK dispatcher. Unknown registrations and wrong model/harness pairs
+are rejected; no substitution to native completion or another harness occurs.
+Automatic cross-instance model/harness selection remains unfinished and `auto`
+is rejected in this explicit protocol.
+
+The native integration fixture qualifies installed Pi through actual OpenSSH,
+pinned mTLS and the durable SDK queue with a local synthetic provider. It covers
+lost-response recovery, duplicate suppression, returned identity/difficulty,
+results/events, and queued/running cancellation. This is not a real-model quality
+measurement or physical two-host qualification of all five harnesses.
+
 ## Protocol and durability
 
 | Method and path | Scope | Result |

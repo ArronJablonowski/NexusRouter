@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/remote"
@@ -128,7 +129,18 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	if err != nil {
 		return err
 	}
-	client, err := sdk.New(sdk.ConfigOptions{ProjectFile: configFile, LookupSecret: os.Getenv})
+	var ledger *harness.EvidenceStore
+	if len(cfg.NativeHarnesses) > 0 && cfg.NativeHarnessEvidenceDir == "" {
+		return remote.ErrInvalid
+	}
+	if cfg.NativeHarnessEvidenceDir != "" {
+		ledger, err = harness.OpenEvidenceStore(cfg.NativeHarnessEvidenceDir)
+		if err != nil {
+			return err
+		}
+		defer ledger.Close()
+	}
+	client, err := sdk.New(sdk.ConfigOptions{ProjectFile: configFile, LookupSecret: os.Getenv, HarnessEvidence: ledger})
 	if err != nil {
 		return err
 	}
@@ -136,6 +148,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	if err != nil {
 		return err
 	}
+	service.ConfigureHarnessEvidence(ledger)
 	journal, err := remote.OpenJournal(journalDir, instance)
 	if err != nil {
 		return err
@@ -144,6 +157,9 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	backend := &remote.SDKBackend{Client: client, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
+	}
+	for _, h := range cfg.NativeHarnesses {
+		backend.Harnesses = append(backend.Harnesses, remote.Harness{ID: h.ID, ModelID: h.ModelID, Kind: h.Kind, ModelRevision: h.ModelRevision, NativeTools: h.NativeTools})
 	}
 	server, err := remote.NewServer(instance, trust, journal, backend)
 	if err != nil {
