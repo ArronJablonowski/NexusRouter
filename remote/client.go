@@ -81,7 +81,7 @@ func (c *Client) callPinned(ctx context.Context, destination, op, method, path s
 	if task != nil && !p.permitsTask(*task) {
 		return ErrDenied
 	}
-	if path == "/v1/remote/harness-identity" {
+	if path == "/v1/remote/harness-identity" || path == "/v1/remote/harness-capacity" {
 		n, e := strconv.Atoi(headers["X-Nexus-Context"])
 		if e != nil || !p.permitsIdentity(HarnessIdentityRequest{headers["X-Nexus-Model"], headers["X-Nexus-Harness"], n}) {
 			return ErrDenied

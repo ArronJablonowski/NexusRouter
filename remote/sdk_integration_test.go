@@ -75,6 +75,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	cfg.Mode = "local_only"
 	cfg.Hardware.AutoProfile = false
 	cfg.Workers.Max = 1
+	cfg.Hardware.Concurrent = "1"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "tasks.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
 	zero := 0.0
@@ -135,15 +136,17 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	if e != nil {
 		t.Fatal(e)
 	}
+	service, e := app.NewServiceWithProfiler(cfg, nil, fixtureProfiler{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	service.ConfigureHarnessEvidence(ledger)
 	f := setup(t)
 	f.http.Close()
 	backend := &SDKBackend{Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Provider: "local", Model: "fixture", Local: true, ContextTokens: cfg.Models[0].ContextTokens}}}
 	if native {
-		preview, e := app.NewService(cfg, nil)
-		if e != nil {
-			t.Fatal(e)
-		}
-		backend.Identify = preview.NativeHarnessIdentity
+		backend.Identify = service.NativeHarnessIdentity
+		backend.PlanHarness = service.NativeHarnessCapacity
 		backend.Harnesses = []Harness{{ID: task.HarnessID, ModelID: "chat", Kind: cfg.NativeHarnesses[0].Kind, ModelRevision: "fixture-v1"}}
 		authorized := f.clientPeer
 		authorized.Harnesses = []string{task.HarnessID}
@@ -271,11 +274,6 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	if e != nil || stopped.State != "canceled" {
 		t.Fatal(stopped, e)
 	}
-	service, e := app.NewServiceWithProfiler(cfg, nil, fixtureProfiler{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	service.ConfigureHarnessEvidence(ledger)
 	dispatcher, e := app.StartDispatcher(ctx, service)
 	if e != nil {
 		t.Fatal(e)
@@ -361,6 +359,12 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	case <-blocked:
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
+	}
+	if native {
+		measured, err := f.client.HarnessCapacity(ctx, "node-a", HarnessIdentityRequest{task.ModelID, task.HarnessID, task.ContextTokens})
+		if err != nil || measured.Capacity.Action != resources.CapacityWait {
+			t.Fatal("remote plan missed dispatcher's live reservation", measured, err)
+		}
 	}
 	running, e = f.client.Cancel(ctx, "node-a", "request-running-01")
 	if e != nil || !running.CancelRequested {

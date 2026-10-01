@@ -11480,3 +11480,18 @@ installed Pi plus native SSH/SDK integration passed in the remote/CLI race suite
 (34.281s / 1.628s). Pre-route-binding crash recovery passed (1.582s); vet, source
 formatting and diff checks passed. Full repository validation/push remains queued. Host candidate admission
 collection, evaluator scheduling, UI and physical two-host qualification remain.
+
+### DAR-133 measured remote harness capacity
+
+Added scoped `harness-capacity` CLI/HTTP/Go observations and same-dispatcher-service
+capacity planning using context-scaled model memory plus fixed harness overhead.
+Cloud harnesses still account for their local process. Two-second bounded planning
+reads live reservations without allocating resources or running a provider.
+Automatic ranking now requires the measured admit result; caller flags cannot
+bypass wait/unknown capacity. Native SDK/OpenSSH tests use the same planner and
+worker service and verify its running reservation is visible. Remote/CLI race
+suite passed (34.887s / cached); context/overhead/cloud and inconsistency tests
+passed (1.962s / 1.485s). Final SSH capacity/ranking tests passed 2.322s;
+vet/source/diff passed. Combined full repository validation and push remain queued.
+Capability/credential observation, evaluation scheduling, UI and physical two-host
+qualification remain open.

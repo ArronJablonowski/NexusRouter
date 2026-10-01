@@ -50,6 +50,12 @@ func testRemoteRanking(t *testing.T, ssh bool) {
 	if err != nil || got.ModelID != task.ModelID || got.HarnessID != task.HarnessID || got.Selection.Primary.Ranked.AdvisorySamples != 1 || got.Selection.Primary.Ranked.ConfirmedSamples != 0 || got.CallerFingerprint != v.receipt.Route.CallerFingerprint {
 		t.Fatal(got, err)
 	}
+	f.server.backend = waitingRankingBackend{rankingBackend{b, v.receipt.Execution.Actual}}
+	denied, capacityErr := f.client.RankRecordedCandidates(ctx, root, req, harness.DefaultPolicy(), []DestinationCandidate{candidate}, 0)
+	if !errors.Is(capacityErr, harness.ErrNoRoute) || len(denied.Selection.Excluded) != 1 {
+		t.Fatal("caller flag bypassed measured capacity", denied, capacityErr)
+	}
+	f.server.backend = rankingBackend{b, v.receipt.Execution.Actual}
 	// A new task difficulty cannot borrow reviewed samples from another class.
 	req.Task.Difficulty = "hard"
 	got, err = f.client.RankRecordedCandidates(ctx, root, req, harness.DefaultPolicy(), []DestinationCandidate{candidate}, 0)

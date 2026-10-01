@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 // DestinationCandidate is supplied by a trusted embedding host after capability,
@@ -66,12 +67,13 @@ func (c *Client) RankRecordedCandidates(ctx context.Context, root string, reques
 			candidate.Authorized = false
 		}
 		if candidate.Authorized {
-			preview, e := c.HarnessIdentity(ctx, proposal.Destination, HarnessIdentityRequest{proposal.ModelID, proposal.HarnessID, int(request.ContextTokens)})
+			preview, e := c.HarnessCapacity(ctx, proposal.Destination, HarnessIdentityRequest{proposal.ModelID, proposal.HarnessID, int(request.ContextTokens)})
 			if e != nil {
 				candidate.Available = false
 			} else if preview.Identity != candidate.Identity {
 				candidate.Compatible = false
 			}
+			candidate.CapacityAvailable = candidate.CapacityAvailable && e == nil && preview.Capacity.Action == resources.CapacityAdmit
 		}
 		scoped = append(scoped, harness.ScopedCandidate{Scope: proposal.Destination, Candidate: candidate})
 	}

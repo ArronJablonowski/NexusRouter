@@ -620,3 +620,32 @@ cross-platform filesystem qualification remain outstanding. This Go entry point
 connects the ranker to durable submission; it does not implement automatic
 capability/capacity collection, background evaluation scheduling, pairing UI or
 CLI input from untrusted candidate claims. Those integration requirements remain.
+
+## Measured harness capacity
+
+`nexus-remote harness-capacity --model MODEL --harness REGISTRATION --context
+TOKENS` uses the normal destination/trust/certificate flags over HTTPS or SSH.
+The Go method is `Client.HarnessCapacity`; the endpoint is
+`GET /v1/remote/harness-capacity` with the identity-preview headers. Both paired
+registries enforce model/harness/context scope, and the destination applies cloud
+permission before measurement. It shares the bounded info allowance and audit.
+
+The response binds instance, request, exact configured identity, resource need
+and a fresh capacity result. The host derives context-adjusted model RAM/VRAM
+plus fixed harness overhead using its ordinary reservation calculation. A cloud
+model contributes only its local harness process overhead. The capacity planner
+uses the same dispatcher Service, profiler, hard limits and live in-process
+reservations. It performs no reservation, provider construction, secret lookup,
+inference, model load/unload or runtime-store write. The SDK backend limits the
+observation to two seconds. Invalid, stale or internally inconsistent results
+fail closed; a valid pressure result reports wait rather than admission.
+
+`RankRecordedCandidates` now requires this capacity observation as well as exact
+identity. Its prior host-supplied capacity flag remains a veto, but a true flag
+cannot override a measured wait or unavailable observation. Older/custom backends
+without the new capacity method are excluded from automatic ranking; explicit
+dispatch retains ordinary destination admission. This is an advisory snapshot,
+not a reservation or proof of executable/model capability, provider credentials,
+or all other processes' future usage. Shared process admission and all normal
+execution checks still apply when dispatch actually runs. Native capability and
+credential collection, evaluation scheduling and UI integration remain open.

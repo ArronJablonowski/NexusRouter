@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
@@ -16,11 +17,12 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
-	Identify  func(string, string, int) (harness.Identity, error)
-	Harnesses []Harness
-	Client    *sdk.Client
-	Models    []Model
-	Available func(context.Context) bool
+	PlanHarness func(context.Context, string, string, int) (harness.Identity, resources.Need, resources.CapacityResult, error)
+	Identify    func(string, string, int) (harness.Identity, error)
+	Harnesses   []Harness
+	Client      *sdk.Client
+	Models      []Model
+	Available   func(context.Context) bool
 	// Observe receives only the permitted model catalogue when called by Server.
 	// It may attach advisory observations, not change configured capabilities.
 	Observe func(context.Context, []Model) ([]ModelObservation, *ResourceObservation, error)
