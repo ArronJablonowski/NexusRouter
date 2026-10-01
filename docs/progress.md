@@ -10661,3 +10661,25 @@ will run its cumulative make check before backup. Native tools remain disabled i
 user-facing adapters until the pinned multi-turn gateway and isolated Pi extension
 are integrated and qualified. Other adapter tool paths, real task accuracy and
 physical second-host SSH qualification remain open.
+
+### 2026-10-01 — DAR-132 verified native tool proposal streams
+
+Added a separate native agent response verifier to the existing provider gateway
+boundary. It accepts complete pinned-model text or function-tool turns only after
+a valid terminal, DONE and clean EOF. Tool deltas retain contiguous indices and
+stable IDs/names, with up to 128 calls and 64 KiB argument objects per call.
+Fragmented arguments are assembled and checked for duplicate keys at every depth;
+large integer spellings remain exact. Changed identities, malformed objects,
+unsupported finish reasons, missing framing and late read failures release no
+text, calls, usage or stream. Canonical wire keys prevent Go/JavaScript case-fold
+interpretation differences. Existing text-only gateway paths still reject tools.
+
+Race checks passed for gateway parsing/security regressions and Pi (1.491s and
+1.441s), including fragmented calls, large numeric arguments, call-count bounds,
+measured usage, canonical forwarding, malformed identity/arguments and legacy
+tool refusal. Targeted vet/source/diff checks passed. This is the response parser
+for the upcoming multi-turn gateway; it neither executes nor authorizes a tool.
+Host-owned context assembly, scoped tool registration, isolated Pi extension and
+real native integration remain required before enabling user-facing native tools.
+The clean SDK recovery checkpoint is running its full gate in its unchanged
+checkout; this separate branch will validate and push after that gate finishes.

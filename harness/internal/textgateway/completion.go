@@ -16,6 +16,7 @@ const MaxRecordBytes = 1 << 20
 const maxStreamBytes = 16 << 20
 
 type Completion struct {
+	Calls []providers.ToolCall
 	// Usage is present only when the completed upstream stream reports both counts.
 	Usage  *providers.Usage
 	Text   string
@@ -26,6 +27,17 @@ type Completion struct {
 // HTTP status or a harness envelope alone cannot establish completion. Only the
 // canonicalized verified stream may be released to the native process.
 func verifyCompletion(reader io.Reader, model string) (Completion, error) {
+	return verifyStream(reader, model, false)
+}
+
+// VerifyAgentCompletion admits text or tool proposals only after the entire
+// pinned-model stream has a valid terminal, DONE marker and EOF. It does not
+// authorize or execute tools; the host must commit and scope each proposal.
+func VerifyAgentCompletion(reader io.Reader, model string) (Completion, error) {
+	return verifyStream(reader, model, true)
+}
+
+func verifyStream(reader io.Reader, model string, allowTools bool) (Completion, error) {
 	bad := func() (Completion, error) { return Completion{}, ErrProjection }
 	if !identifier(model) {
 		return bad()
@@ -36,6 +48,8 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 	var event, text, wire bytes.Buffer
 	finished, done, usageSeen := false, false, false
 	streamID := ""
+	var tools streamedTools
+	var calls []providers.ToolCall
 	var measured *providers.Usage
 	records := 0
 	dispatch := func() bool {
@@ -56,7 +70,7 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 			return true
 		}
 		records++
-		if records > 10000 || !utf8.Valid(data) || !uniqueJSON(data) {
+		if records > 10000 || !utf8.Valid(data) || !uniqueJSON(data) || (allowTools && !agentChunkFields(data)) {
 			return false
 		}
 		var chunk struct {
@@ -104,6 +118,10 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 					if json.Unmarshal(raw, &role) != nil || role != "assistant" {
 						return false
 					}
+				case "tool_calls":
+					if !allowTools || !tools.append(raw) {
+						return false
+					}
 				case "content":
 					if string(raw) == "null" {
 						continue
@@ -118,7 +136,16 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 				}
 			}
 			if choice.FinishReason != nil {
-				if *choice.FinishReason != "stop" {
+				if len(tools) > 0 {
+					if *choice.FinishReason != "tool_calls" {
+						return false
+					}
+					var err error
+					calls, err = tools.complete()
+					if err != nil {
+						return false
+					}
+				} else if *choice.FinishReason != "stop" {
 					return false
 				}
 				finished = true
@@ -161,10 +188,10 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 		event.Write(data)
 		event.WriteByte('\n')
 	}
-	if scanner.Err() != nil || limited.N <= 0 || event.Len() != 0 || !done || !finished || strings.TrimSpace(text.String()) == "" {
+	if scanner.Err() != nil || limited.N <= 0 || event.Len() != 0 || !done || !finished || (strings.TrimSpace(text.String()) == "" && len(calls) == 0) {
 		return bad()
 	}
-	return Completion{Text: text.String(), Stream: wire.Bytes(), Usage: measured}, nil
+	return Completion{Text: text.String(), Stream: wire.Bytes(), Usage: measured, Calls: calls}, nil
 }
 
 func validUsage(body []byte) bool { return measuredUsage(body) != nil }
