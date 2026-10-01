@@ -17,6 +17,7 @@ import (
 // HarnessAttribution binds the host-admitted route to one native harness run.
 // This is execution provenance, never an evaluation or permission grant.
 type HarnessAttribution struct {
+	Protocol  string             `json:",omitempty"`
 	Selection *harness.Selection `json:",omitempty"`
 	Identity  harness.Identity
 	Task      harness.TaskClass
@@ -50,7 +51,7 @@ type HarnessRequest struct {
 // No success/quality feedback is synthesized here. A trusted ingestor can replay
 // the committed terminal outcome into the evidence ledger without new inference.
 func RunHarness(ctx context.Context, j Journal, r HarnessRequest) (harness.Execution, string, error) {
-	if ctx == nil || j == nil || r.Execute == nil || r.TaskID == "" || r.SessionID == "" || r.Attribution.Identity.Validate() != nil || r.Attribution.Task.Validate() != nil || r.ContextTokens < 1 || r.MaxOutputBytes < 1 || r.MaxOutputBytes > 4<<20 {
+	if ctx == nil || j == nil || r.Execute == nil || r.Attribution.Protocol != "" || r.TaskID == "" || r.SessionID == "" || r.Attribution.Identity.Validate() != nil || r.Attribution.Task.Validate() != nil || r.ContextTokens < 1 || r.MaxOutputBytes < 1 || r.MaxOutputBytes > 4<<20 {
 		return harness.Execution{}, "", ErrInvalidRun
 	}
 	if err := ctx.Err(); err != nil {

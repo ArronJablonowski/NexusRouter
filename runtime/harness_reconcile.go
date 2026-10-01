@@ -42,7 +42,7 @@ func ValidateHarnessOutcome(events []Event, taskID string) (harness.Execution, e
 		return harness.Execution{}, ErrProtocol
 	}
 	first, last := events[0], events[1]
-	if first.Validate() != nil || last.Validate() != nil || first.Kind != TaskStarted || last.Kind != TaskCompleted || first.Sequence != 1 || last.Sequence != 2 || first.ID == last.ID || first.TaskID != taskID || last.TaskID != taskID || first.SessionID != last.SessionID || first.CorrelationID != taskID || last.CorrelationID != taskID || last.Time.Before(first.Time) || first.Data.Harness == nil || last.Data.HarnessOutcome == nil {
+	if first.Validate() != nil || last.Validate() != nil || first.Kind != TaskStarted || last.Kind != TaskCompleted || first.Sequence != 1 || last.Sequence != 2 || first.ID == last.ID || first.TaskID != taskID || last.TaskID != taskID || first.SessionID != last.SessionID || first.CorrelationID != taskID || last.CorrelationID != taskID || last.Time.Before(first.Time) || first.Data.Harness == nil || first.Data.Harness.Protocol != "" || last.Data.HarnessOutcome == nil {
 		return harness.Execution{}, ErrProtocol
 	}
 	outcome := *last.Data.HarnessOutcome

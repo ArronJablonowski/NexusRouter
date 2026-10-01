@@ -112,6 +112,9 @@ type Data struct {
 
 func (e Event) Validate() error {
 	if a := e.Data.Harness; a != nil {
+		if a.Protocol != "" && a.Protocol != HarnessAgentProtocol {
+			return errors.New("invalid harness protocol")
+		}
 		if a.Selection != nil && (a.Selection.Validate() != nil || a.Selection.Primary.Identity != a.Identity || a.Selection.Task != a.Task || a.Selection.AsOf.After(e.Time)) {
 			return errors.New("invalid harness selection")
 		}

@@ -203,6 +203,9 @@ func routedUsage(ctx context.Context, tx *sql.Tx, task, provider, model string) 
 		return nil, accounting.ErrUsage
 	}
 	if start.Data.Harness != nil {
+		if start.Data.Harness.Protocol == runtime.HarnessAgentProtocol {
+			return harnessAgentUsage(ctx, tx, start, provider, model)
+		}
 		return harnessTerminalUsage(ctx, tx, start, provider, model)
 	}
 	rows, err := tx.QueryContext(ctx, "SELECT body FROM events WHERE task_id=? AND json_extract(body,'$.kind') IN('turn.started','turn.completed') ORDER BY sequence", task)

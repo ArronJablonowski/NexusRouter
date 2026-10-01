@@ -10571,3 +10571,38 @@ Targeted vet, source and diff checks passed. Native tools remain disabled pendin
 provider-proposal, durable journal/recovery and adapter integration. This closes
 an identified bridge semantic gap; it is not a claim of completed tool-enabled
 harness routing. Full branch validation/push is queued behind the prior live gate.
+
+### 2026-10-01 — DAR-132 durable native agent/tool runtime
+
+Added RunHarnessAgent and the explicit native-tools-v1 journal protocol. Trusted
+host callbacks commit real provider turn starts/completions, verify the actual
+pinned combination, and receive host-generated execution identities only after
+a complete tool proposal commits. HarnessAgentSession.Invoke accepts only the
+next exact committed proposal, commits ToolStarted before the scoped permission
+executor and ToolCompleted before releasing redacted results. Canonical arguments,
+turn/call budgets, cancellation inheritance, EndToolUse, recoverable effect-free
+argument failures, unknown effects and panic containment follow runtime rules.
+Ambiguous append failures remain sticky even if an adapter swallows the error;
+no later append, result or replay is allowed. Reusing a task fails before dispatch.
+
+The first real-store tests exposed the legacy native accounting projector's
+intentional two-event restriction. Added a distinct full transcript validator and
+telemetry path for native-tools-v1 instead of relaxing that restriction. Usage is
+summed once from verified provider turns; absent/incomplete measurements remain
+unknown, measured zero remains zero, and the task terminal carries no second
+aggregate. The validator rejects altered identities, tool pairing, effects,
+provider attribution, extra aggregate usage and final-text mismatch. Legacy
+outcome ingestion continues rejecting this new format pending its own integration.
+
+Race tests passed: runtime harness regressions and new bridge-to-real-store,
+ambiguous pre/post-commit injection, forged/stale proposals, cancellation, panic,
+EndToolUse and recoverable failures (54.037s); existing telemetry harness tests
+(11.165s); explicit native unknown/zero/unfinished usage cases (5.716s). Targeted
+vet, source formatting/size and diff checks passed. Initial failing tests were
+resolved by the versioned accounting implementation, not weakened assertions.
+
+No SDK/CLI/API native adapter enables this runner yet. Remaining integration:
+pinned multi-turn provider gateway and isolated Pi extension, native host recovery,
+new-format outcome/audit ingestion, then other adapters and real task qualification.
+Native tools remain disabled until those boundaries are connected and verified.
+Full branch gate/push remains queued behind the prior live Pi validation job.
