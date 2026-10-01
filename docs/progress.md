@@ -10741,3 +10741,30 @@ and UTF-8 framing. All harness race tests passed (gateway 18.133s), plus targete
 vet, source and diff checks. These are fixture-provider results; installed Pi
 extension/RPC and live native provider qualification remain before enabling
 user-facing native tools. Full branch gate/push queues behind SDK validation.
+
+### 2026-10-01 — DAR-132 installed Pi host-tool extension qualification
+
+Added an embedded per-run extension renderer for Pi 0.99.2. It exposes only
+host-supplied model-only, sequential tools; the bridge receives only call IDs,
+never child arguments. Unknown/nested calls are blocked. Responses are bounded,
+validated and sanitized; recoverable failure is represented as isError, and
+EndToolUse clears the active tool set while allowing the final provider answer.
+The module requires private per-run storage, a concrete loopback endpoint and a
+separate bridge credential. It implements no filesystem, shell or network tool.
+
+Actual installed Pi + runtime/SQLite/gateway qualification passed under race
+(6.707s) for normal, recoverable-failure and EndToolUse cases: each used exactly
+two fixture-provider turns and one scoped host tool, with journal-before-effect
+ordering and a validated completed outcome. Initial qualification exposed launch
+requirements: Pi loads .js/.ts extensions, and --no-tools disables custom tools;
+the verified launch uses a private .js module, --no-builtin-tools, an explicit
+--tools allowlist, and --no-extensions plus the explicit module. Installed docs
+and extension API confirmed model-only exposure and sequential execution.
+
+Node contract and renderer tests passed (1.521s), covering call-ID-only delivery,
+unknown/nested call blocking, failure status, EndToolUse and sanitized bridge
+errors. Targeted vet/source/diff checks passed. The actual CLI tests use isolated
+fixture providers and temporary state; they do not establish real-model accuracy.
+Production runner/provenance and multi-turn RPC validation still need integration
+before user-facing native tools can be enabled. Full branch validation/push queues
+behind the unchanged SDK checkpoint.
