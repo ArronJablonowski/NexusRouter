@@ -10865,3 +10865,32 @@ installed Pi; targeted vet, source and diff checks passed. No real-model benchma
 or deployed daemon was used. CLI process qualification, API operator-approval
 workflow qualification, other harness tool adapters and held-out quality evidence
 remain open. Full repository gate/push remains queued behind the live SDK gate.
+
+### 2026-10-01 — DAR-132 compiled CLI qualification and release-gate repair
+
+Built cmd/nexus and qualified its actual subprocess configuration-loading path
+with installed Pi, production resource measurement and private home/owner state.
+Plain output and JSON events/results retain rooted tool execution, secret redaction,
+canonical Pi identity and measured 30-input/6-output usage. Configured create without
+an approval adapter returns admission_denied before any inference or task database,
+and creates no file. CLI qualification passed under the race test driver (4.081s);
+the subprocess is a normal compiled CLI. No actual model inference or deployment.
+
+The still-running older SDK full gate reported two releasepack failures. Reproduced
+the cause: full go-list JSON reached 1,074,708 bytes and exceeded the existing 1 MiB
+bounded command output. Commit dbdb477 requests only the complete set of fields
+used by package/graph/module/license validation in both notice derivation paths.
+It does not increase output limits, weaken validation or omit dependency nodes.
+
+An actual-Go comparison independently proves the projected closure equals the full
+reference: 319 packages, 14 legal modules, identical graph and legal evidence.
+Comparison passed under race (7.434s); repository derivation passed (11.008s), and
+freeze/verify from a clean committed clone passed (98.020s). Targeted vet/source/diff
+checks passed. The old checkout remains untouched while its full gate finishes.
+The corrected branch will receive a full gate; its supervisor accepts the older
+failure only if the terminal log contains exactly the two reviewed license tests
+and only releasepack failed. Any additional failure requires investigation.
+
+Remaining DAR-132 scope includes API operator-approval workflow qualification,
+other harness native tools and held-out real-model accuracy evidence. No full-gate
+pass or push is claimed for the corrected checkpoint yet.

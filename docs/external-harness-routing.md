@@ -774,3 +774,10 @@ successful completion marker or final answer. Unauthenticated requests cannot
 dispatch. Clients cannot enable `native_tools` in chat or native task payloads:
 that remains an operator registration setting. These checks do not establish CLI
 process qualification or browser/operator approval workflow qualification.
+
+Compiled CLI qualification builds `cmd/nexus` and runs installed Pi with a private
+CLI home and process-owner directory. Both plain output and `--json` preserve
+rooted reads, redaction, verified per-turn usage and the durable tool journal.
+The test uses the production host resource profiler and requires measurable local
+capacity. A CLI invocation without a reviewer/presenter refuses configured writes
+at admission, before inference or task storage; it does not implicitly approve them.
