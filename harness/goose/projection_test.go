@@ -18,7 +18,7 @@ func TestProjection(t *testing.T) {
 		{"unknown-usage", message + `{"type":"complete","total_tokens":null}` + "\n", true},
 		{"banner", "Goose ready\n" + message + complete, false},
 		{"missing-complete", message, false},
-		{"duplicate-message", message + message + complete, false},
+		{"distinct-message", message + strings.Replace(message, `"id":"fixture"`, `"id":"other"`, 1) + complete, false},
 		{"duplicate-complete", message + complete + complete, false},
 		{"wrong-model", strings.Replace(message, "requestedModel\":\"fixture", "requestedModel\":\"other", 1) + complete, false},
 		{"wrong-provider", strings.Replace(message, "openai", "other", 1) + complete, false},

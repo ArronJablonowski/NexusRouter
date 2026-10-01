@@ -1,0 +1,1 @@
+[{"role":"assistant","content":"","tool_calls":[{"id":"nexus-ollama-764Z3KJMF3W4TWGNVRZXNQEHOC-0","name":"nexus_lookup","arguments":{"path":"fixture"}}]},{"role":"tool","content":"host result","tool_call_id":"nexus-ollama-764Z3KJMF3W4TWGNVRZXNQEHOC-0"},{"role":"assistant","content":"answer"}]

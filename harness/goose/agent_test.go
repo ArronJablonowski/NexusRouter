@@ -40,7 +40,7 @@ func TestNativeGooseAgentTask(t *testing.T) {
 		t.Skip("requires installed Goose")
 	}
 	executable := "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
-	for _, mode := range []string{"normal", "multi", "recoverable", "end", "denied", "wrong_model", "cancel", "cancel_tool", "turn_limit", "ollama"} {
+	for _, mode := range []string{"normal", "multi", "recoverable", "end", "denied", "wrong_model", "cancel", "cancel_tool", "turn_limit", "ollama", "ollama_fragments"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 			defer cancel()
@@ -55,7 +55,7 @@ func TestNativeGooseAgentTask(t *testing.T) {
 			}
 			c.Timeout = 20 * time.Second
 			c.MaxOutputTokens = 1024
-			if mode == "ollama" {
+			if strings.HasPrefix(mode, "ollama") {
 				c.UpstreamProtocol = "ollama"
 			}
 			var calls, effects, released atomic.Int32
@@ -96,12 +96,21 @@ func TestNativeGooseAgentTask(t *testing.T) {
 					records[0] = "data: " + string(raw)
 					body = strings.Join(records, "\n\n")
 				}
-				if mode == "ollama" {
+				if strings.HasPrefix(mode, "ollama") {
 					contentType = "application/x-ndjson"
 					body = `{"model":"test-model","message":{"role":"assistant","content":"answer"},"done":true,"done_reason":"stop","prompt_eval_count":20,"eval_count":4}` + "\n"
 					if n == 1 {
 						body = `{"model":"test-model","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"nexus_lookup","arguments":{"path":"fixture"}}}]},"done":true,"done_reason":"stop","prompt_eval_count":20,"eval_count":4}` + "\n"
 					}
+				}
+				if mode == "ollama_fragments" && n == 2 {
+					terminal := body
+					body = ""
+					for _, ch := range "answer" {
+						b, _ := json.Marshal(map[string]any{"model": "test-model", "message": map[string]any{"role": "assistant", "content": string(ch)}, "done": false})
+						body += string(b) + "\n"
+					}
+					body += strings.Replace(terminal, `"content":"answer"`, `"content":""`, 1)
 				}
 				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{contentType}}, Body: io.NopCloser(strings.NewReader(body))}, nil
 			})

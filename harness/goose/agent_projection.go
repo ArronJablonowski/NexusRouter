@@ -38,6 +38,11 @@ func parseAgentProjection(body []byte, exit int, model string, transcript []prov
 	if exit != 0 || len(body) == 0 || len(body) > MaxStreamBytes || body[len(body)-1] != '\n' || !utf8.Valid(body) || len(transcript) == 0 {
 		return bad()
 	}
+	var joinErr error
+	body, joinErr = joinAssistantFragments(body)
+	if joinErr != nil {
+		return bad()
+	}
 	scan := bufio.NewScanner(bytes.NewReader(body))
 	scan.Buffer(make([]byte, 4096), MaxRecordBytes)
 	index := 0

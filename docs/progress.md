@@ -11198,3 +11198,26 @@ The queued validation was stopped before it started; the preceding frozen gate
 remains untouched. Queue the corrected commit for full make check before push.
 Real-provider success and joint held-out accuracy qualification remain open;
 no completed inference was replayed and no deployment occurred.
+
+### DAR-132 native Goose streamed fragments — 2026-10-01
+
+The first real Goose/Devstral case completed two provider turns and a canonical
+file read, then failed native projection reconciliation. Its failed task remains
+infrastructure evidence with zero quality feedback, despite the provider's final
+text matching the expected answer. The serial qualification coordinator stopped.
+
+Offline replay with installed Goose reproduced a coverage gap: native stream-json
+emits adjacent text deltas with one message ID. Single-record fixture responses
+had concealed it. Join only adjacent assistant records with matching IDs and
+envelopes (native timestamps may tick); preserve every content fragment, then
+validate the full result against the host transcript. Changed metadata, altered
+text, extra message IDs and duplicate completion remain rejected. Repeated text
+is retained rather than deduplicated, so canonical comparison detects duplicates.
+Both text-only and native-tool projections accept the documented stream shape.
+
+The offline native regression failed before correction. Captured synthetic native
+stream/transcript fixtures and malformed-fragment checks now pass. Installed
+Goose full race suite passed (46.553s), with new token-fragment native mode;
+targeted vet, formatting/size and diff checks passed. No new model inference was
+used for diagnosis. Full corrected-commit gate and push are queued after the
+preceding frozen validation; no deployment or real-provider retry is claimed.
