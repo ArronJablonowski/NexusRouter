@@ -533,8 +533,7 @@ text is released after durable completion; this is not incremental native token
 streaming. An unsupported selection returns an admission error (HTTP 422 for a
 non-streaming request, an SSE error frame without `[DONE]` after streaming headers).
 Malformed IDs and unknown registration fields fail before dispatch. This does
-not enable queued `/v1/tasks` harness execution. The chat request schema still
-lacks the task-class and routing constraints required for automatic pair selection.
+not enable queued `/v1/tasks` harness execution. Automatic pair selection uses the routing constraints described below.
 
 ## Operator evidence store
 
@@ -555,3 +554,36 @@ SDK embedders continue to supply and own `Options.HarnessEvidence` explicitly;
 the operator path setting is opened by CLI/daemon entry points only. Redacted
 configuration hides the evidence directory and registered executable/source paths
 without mutating running configuration. No live store is migrated automatically.
+
+## Automatic chat routing constraints
+
+The chat API accepts a `routing` object for task-class and admission constraints.
+For automatic harness selection, use both `model: auto` and `harness_id: auto`,
+with an explicit domain, profile and context allocation of at least 8192 tokens:
+
+```json
+{
+  "model": "auto",
+  "harness_id": "auto",
+  "messages": [{"role": "user", "content": "Write a concise release note."}],
+  "routing": {
+    "domain": "writing",
+    "profile": "release-notes-v1",
+    "context_tokens": 32768,
+    "capabilities": ["chat"],
+    "local_required": true,
+    "max_cost": 0.10
+  }
+}
+```
+
+The same metadata can label explicit-pair executions for later evaluation.
+Omitted max_cost remains zero; it does not mean unlimited spending. Context is
+bounded to 1 through 16777216 tokens, with the stricter automatic-harness minimum
+above. Duplicate/unknown fields, invalid labels, repeated capabilities, null
+constraints and invalid numeric values fail before dispatch. Operator policy,
+registration pins, resource admission and current reviewed evidence still decide
+whether execution is permitted. An empty evidence store is not a quality signal.
+Both JSON and SSE paths forward these constraints. The OpenAI-compatible `model`
+response field retains the requested routing alias; canonical task records retain
+the actual pair. The API does not accept evidence-store paths or review verdicts.

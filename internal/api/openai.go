@@ -105,7 +105,7 @@ func decodeChatRequest(body []byte) (app.Request, chatStreamOptions, error) {
 	bad := errors.New("unsupported or invalid chat request")
 	req := app.Request{}
 	stream := chatStreamOptions{}
-	fields, err := chatObject(body, "model", "messages", "stream", "stream_options", "harness_id")
+	fields, err := chatObject(body, "model", "messages", "stream", "stream_options", "harness_id", "routing")
 	if err != nil || chatString(fields["model"], &req.ModelID) != nil || strings.TrimSpace(req.ModelID) == "" || len(req.ModelID) > 256 {
 		return req, stream, bad
 	}
@@ -113,6 +113,14 @@ func decodeChatRequest(body []byte) (app.Request, chatStreamOptions, error) {
 		if chatString(raw, &req.HarnessID) != nil || req.HarnessID == "" || len(req.HarnessID) > 128 || strings.TrimSpace(req.HarnessID) != req.HarnessID || strings.ContainsFunc(req.HarnessID, unicode.IsControl) {
 			return req, stream, bad
 		}
+	}
+	if raw, ok := fields["routing"]; ok {
+		if decodeChatRouting(raw, &req) != nil {
+			return req, stream, bad
+		}
+	}
+	if req.HarnessID == "auto" && (req.ModelID != "auto" || req.Domain == "" || req.Profile == "" || req.ContextTokens < 8192) {
+		return req, stream, bad
 	}
 	if raw, ok := fields["stream"]; ok {
 		if string(raw) != "true" && string(raw) != "false" {

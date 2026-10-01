@@ -10307,3 +10307,22 @@ Targeted vet, source formatting/size and diff checks passed. Full gate remains
 queued before push. No live configuration, evidence store or model inference was
 changed. Queue authority, tool workflows, broad-platform and held-out accuracy
 qualification remain open.
+
+## Automatic chat model/harness constraints — DAR-132 (2026-10-01)
+
+The authenticated chat API now accepts a bounded routing object carrying domain,
+profile, context_tokens, capabilities, local_required and max_cost. Automatic
+harness requests require model=auto, harness_id=auto and an explicit task class
+and sufficient context. Explicit runs can use the same labels for evidence.
+Unknown/duplicate fields, executable/evidence-path injection and malformed
+constraints fail before dispatch. Existing operator policy and reviewed-pair
+selection remain authoritative; the API cannot write quality evidence.
+
+Full API race suite passed (89.241s), including JSON/SSE constraint forwarding,
+invalid metadata rejection and a real service/evidence-store cold-start refusal.
+Targeted vet, formatting/source-size and diff checks passed. Fixture tests prove
+request/authority plumbing, not comparative quality of real harnesses. The model
+response field remains the requested alias; canonical records retain the actual
+pair. No live inference/configuration changed. Full repository gate remains
+queued before push. Queue authority, tool workflows and held-out quality/platform
+qualification remain outstanding.
