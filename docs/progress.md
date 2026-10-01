@@ -9753,3 +9753,29 @@ Still open: other native harnesses, authorized tools, durable native queue
 registration, CLI/API configuration, full usage/cost reporting, explicit model
 and harness quality qualification, and physical remote-system qualification.
 DAR-132 and the overall Linear objective remain In Progress.
+
+## OpenClaw exec projection boundary — DAR-132 (2026-10-01)
+
+Inspected installed OpenClaw 2026.9.7 `agent exec` documentation and implementation.
+Added `harness/openclaw` parsing for its bounded, one-turn text projection: exact
+provider/model, nonempty session, normal process exit, consistent visible text,
+no error/media/tool/bridge/code-mode activity, valid reported numeric fields, and
+no duplicate or case-aliased JSON keys. The returned Projection deliberately is
+not a canonical execution, quality verdict, or measured usage record.
+
+A test runs the installed package's pure projection function without starting an
+agent, reading operator configuration or calling a model. It confirms that a
+normal completion and `stopReason: length` yield identical successful envelopes.
+Therefore stdout plus exit zero cannot prove normal provider completion. The
+future runner must bind independently verified gateway completion before durable
+acceptance; it must also isolate config/auth/plugins/tools, pin the executable,
+enforce admission and context, and confirm cancellation/cleanup. `--isolated`
+alone selects exec defaults that include coding tools, and `--config` cannot be
+combined with `--auth-env-only`; neither is an adequate isolation recipe alone.
+No OpenClaw SDK registration or live gateway/configuration was enabled.
+
+Verification: `NEXUS_OPENCLAW_PROJECTION=1 go test -race ./harness/openclaw` passed
+(1.374s), including installed projection compatibility and failure cases. Native
+process isolation, policy gateway integration, SDK routing and held-out quality
+qualification remain outstanding. This boundary is preparatory adapter work,
+not completed OpenClaw support. Full repository validation is queued separately.
