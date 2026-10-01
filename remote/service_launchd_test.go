@@ -22,7 +22,7 @@ import (
 
 // Explicit opt-in: registers only a unique disposable user agent, serving the
 // production remote host on loopback with test certificates and isolated state.
-// No production service, real provider, multicast or inference is involved.
+// Multicast requires an explicit interface; no production service or inference is involved.
 func TestNativeLaunchdRemoteHostLifecycle(t *testing.T) {
 	if runtime.GOOS != "darwin" || os.Getenv("NEXUS_REMOTE_LAUNCHD") != "1" {
 		t.Skip("requires explicit native launchd fixture qualification")
@@ -75,7 +75,7 @@ func TestNativeLaunchdRemoteHostLifecycle(t *testing.T) {
 	ca := newCA(t)
 	serverCreds, serverPin := ca.leaf(t, "node-a")
 	clientCreds, clientPin := ca.leaf(t, "node-b")
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", net.JoinHostPort(serviceFixtureAddress(t), "0"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,6 +93,11 @@ func TestNativeLaunchdRemoteHostLifecycle(t *testing.T) {
 	writeRegistry(t, clientTrust, destination)
 	client := &Client{Trust: TrustFile(clientTrust), Credentials: clientCreds}
 	spec := ServiceTemplateSpec{Platform: "launchd", Executable: binary, WorkingDirectory: dir, OwnerDirectory: filepath.Join(dir, "owners"), Instance: instance, Listen: address, Config: configPath, Journal: filepath.Join(dir, "journal"), Trust: serverTrust, Certificate: serverCreds.CertificateFile, Key: serverCreds.KeyFile, CA: serverCreds.CAFile}
+	if iface := os.Getenv("NEXUS_REMOTE_SERVICE_INTERFACE"); iface != "" {
+		spec.AdvertiseInterface = iface
+		spec.AdvertiseName = "node-a"
+		spec.AdvertiseSSHPort = 22
+	}
 	body, err = RenderServiceTemplate(spec)
 	if err != nil {
 		t.Fatal(err)
@@ -142,10 +147,12 @@ func TestNativeLaunchdRemoteHostLifecycle(t *testing.T) {
 		return ""
 	}
 	first := ready("")
+	serviceFixtureDiscovery(t, ctx, spec, serverPin, true)
 	if out, err := command("kill", "SIGKILL", target); err != nil {
 		t.Fatalf("fixture crash %v: %s", err, out)
 	}
 	second := ready(first)
+	serviceFixtureDiscovery(t, ctx, spec, serverPin, true)
 	if second == first {
 		t.Fatal("host did not restart")
 	}
@@ -167,6 +174,7 @@ func TestNativeLaunchdRemoteHostLifecycle(t *testing.T) {
 	if _, err := client.Info(probe, instance); err == nil {
 		t.Fatal("remote host still reachable after bootout")
 	}
+	serviceFixtureDiscovery(t, ctx, spec, serverPin, false)
 	if posts.Load() != 0 {
 		t.Fatal("unexpected inference", posts.Load())
 	}

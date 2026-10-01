@@ -1887,3 +1887,31 @@ effects, other harness crash handling, or power-loss recovery. Source, vet and
 diff checks pass. Full combined check/normal push will follow the existing
 running frozen gate. Evidence: reporting
 outputs/spark-pi-qualification/physical-pi-crash.log. DAR-133 remains In Progress.
+
+## 2026-10-01 — Mac permission retest and portable OpenClaw qualification
+
+After the user enabled Nexus local-network access, the disposable freshly built
+Mac launchd advertisement still failed independent Spark discovery (9.12s;
+Mac race package 9.690s). The fixture cleans up its own agent. Permission alone
+has not yet qualified this service path: macOS tracks executable identity through
+code signing, and a new test build may differ from the permitted executable.
+No production discovery workaround or privacy bypass was introduced. The native
+launchd test now supports explicit interface selection and an optional independent
+strict-key SSH observer that verifies its CLI digest before each scan. Claims must
+remain unverified; startup/restart presence and stop absence are checked.
+Evidence: reporting outputs/launchd-discovery-investigation-20261001/permission-retest.json.
+
+OpenClaw native tests now resolve the executable from PATH or an explicit absolute
+NEXUS_OPENCLAW_EXECUTABLE instead of assuming Homebrew. On Spark, isolated official
+OpenClaw 2026.9.7 with Node 26.10.0 passed native OpenAI-compatible and Ollama fixture
+paths (9.38s combined), plus cancellation/provider join (5.43s). Official archive
+SHA and npm package integrity were verified; existing installations are unchanged.
+Linux tests were not race-instrumented and used synthetic providers, not real-model
+quality tests. Evidence: reporting outputs/spark-openclaw-qualification/{manifest.json,native-test.log}.
+Full repository validation and normal push remain queued behind the frozen gate;
+DAR-133 remains In Progress, including Mac service discovery and broader harness
+physical qualification.
+
+Validation for this checkpoint: remote race suite passed 25.923s; OpenClaw race
+suite passed 1.974s; targeted go vet and git diff --check passed. Optional physical
+Mac discovery qualification remains failing as recorded above.

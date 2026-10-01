@@ -40,7 +40,7 @@ func serviceFixtureDiscovery(t *testing.T, ctx context.Context, spec ServiceTemp
 		return
 	}
 	found := false
-	candidates, err := DiscoverUnpaired(ctx, spec.AdvertiseInterface, 2*time.Second)
+	candidates, err := serviceDiscoveryCandidates(ctx, spec.AdvertiseInterface)
 	if present && err == nil {
 		for attempt := 0; attempt < 2; attempt++ {
 			seen := false
@@ -53,7 +53,7 @@ func serviceFixtureDiscovery(t *testing.T, ctx context.Context, spec ServiceTemp
 				break
 			}
 			time.Sleep(300 * time.Millisecond)
-			candidates, err = DiscoverUnpaired(ctx, spec.AdvertiseInterface, 2*time.Second)
+			candidates, err = serviceDiscoveryCandidates(ctx, spec.AdvertiseInterface)
 			if err != nil {
 				break
 			}

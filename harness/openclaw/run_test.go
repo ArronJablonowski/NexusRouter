@@ -91,7 +91,7 @@ func TestNativeRunner(t *testing.T) {
 	}
 	for _, protocol := range []string{"openai_compatible", "ollama"} {
 		t.Run(protocol, func(t *testing.T) {
-			c := runnerFixture(t, "/opt/homebrew/bin/openclaw")
+			c := runnerFixture(t, nativeExecutable(t))
 			c.UpstreamProtocol = protocol
 			var calls, admitted, released atomic.Int32
 			c.Admit = func(context.Context) (func(), error) { admitted.Add(1); return func() { released.Add(1) }, nil }
@@ -136,7 +136,7 @@ func TestNativeRunnerCancellationJoinsProvider(t *testing.T) {
 	if os.Getenv("NEXUS_OPENCLAW_NATIVE") != "1" {
 		t.Skip("installed native cancellation qualification is opt-in")
 	}
-	c := runnerFixture(t, "/opt/homebrew/bin/openclaw")
+	c := runnerFixture(t, nativeExecutable(t))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	entered, joined := make(chan struct{}), make(chan struct{})

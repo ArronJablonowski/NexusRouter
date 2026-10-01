@@ -133,7 +133,7 @@ func runNativeFixture(t *testing.T, protocol string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := exec.CommandContext(ctx, "/opt/homebrew/bin/openclaw", "agent", "exec", "--config", path, "--cwd", dir, "--model", "nexus-fixture/test-model", "--thinking", "off", "--code-mode", "direct", "--message-file", "-", "--timeout", "30", "--json")
+	command := exec.CommandContext(ctx, nativeExecutable(t), "agent", "exec", "--config", path, "--cwd", dir, "--model", "nexus-fixture/test-model", "--thinking", "off", "--code-mode", "direct", "--message-file", "-", "--timeout", "30", "--json")
 	command.Env = env
 	command.Dir = dir
 	command.Stdin = strings.NewReader("Return fixture answer.")

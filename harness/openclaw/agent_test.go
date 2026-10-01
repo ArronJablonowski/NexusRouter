@@ -158,7 +158,7 @@ func TestNativeOpenClawAgentTask(t *testing.T) {
 
 func agentRunnerFixture(t *testing.T) Config {
 	t.Helper()
-	executable := "/opt/homebrew/bin/openclaw"
+	executable := nativeExecutable(t)
 	artifact, e := os.ReadFile(executable)
 	if e != nil {
 		t.Fatal(e)
