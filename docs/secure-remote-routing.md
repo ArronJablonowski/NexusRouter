@@ -1287,3 +1287,22 @@ and archival requires separate explicit administration. Automatic enrollment
 from browser/daemon dispatch, continuous service installation, queue-management
 UI and real second-host qualification remain separate work. These commands
 neither create a service nor reconfigure a running daemon.
+
+For durable enrollment before submission, `auto-dispatch-review-job` takes the
+original `AutomaticRequest` on stdin and the same queue/reviewer/deadline flags.
+It saves that exact request, caller identity, storage scope and reviewer policy
+before discovery, selection or inference. The queue's worker lock remains held
+through dispatch; a worker cannot race a half-submitted request. The command
+returns `review_queued` only after confirmed dispatch. An unconfirmed dispatch
+keeps its saved intent and reports `dispatch_failed_or_unknown`; inspect the
+original request, never start another key to work around uncertainty.
+
+A later `run-review-jobs` resolves the immutable automatic choice and original
+caller before reading completion. It never selects a destination, repairs a
+missing binding, submits a task or retries execution. A job without a published
+choice stays pending until its deadline; merely restoring an available peer is
+not permission for the review worker to dispatch. Completed/attention jobs do
+not authorize another combined dispatch. Exact request/deadline/policy retries
+cannot overwrite the private intent. Browser and daemon automatic enrollment
+remain separate integrations; this command provides an explicit operator-owned
+workflow without installing or enabling a service.

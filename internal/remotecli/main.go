@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote enqueue-review|enqueue-auto-review|run-review-jobs|review-job-status|dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|recorded-status|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote auto-dispatch-review-job|enqueue-review|enqueue-auto-review|run-review-jobs|review-job-status|dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|recorded-status|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -157,7 +157,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 		return serve(ctx, *instance, *listen, *journal, *configFile, registry, credentials)
 	}
 	client := remote.Client{Trust: registry, Credentials: credentials}
-	if operation == "enqueue-review" || operation == "enqueue-auto-review" || operation == "run-review-jobs" {
+	if operation == "enqueue-review" || operation == "enqueue-auto-review" || operation == "run-review-jobs" || operation == "auto-dispatch-review-job" {
 		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
 			return remote.ErrInvalid
 		}
@@ -176,7 +176,17 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 			if de != nil {
 				return remote.ErrInvalid
 			}
-			result, e = enqueueReviewOperation(ctx, &client, operation == "enqueue-auto-review", *reviewQueue, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, deadline, input)
+			if operation == "auto-dispatch-review-job" {
+				result, e = dispatchQueuedReviewOperation(ctx, &client, *reviewQueue, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, deadline, input)
+			} else {
+				result, e = enqueueReviewOperation(ctx, &client, operation == "enqueue-auto-review", *reviewQueue, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, deadline, input)
+			}
+		}
+		if operation == "auto-dispatch-review-job" {
+			if encodeErr := json.NewEncoder(output).Encode(result); encodeErr != nil {
+				return encodeErr
+			}
+			return e
 		}
 		if e != nil {
 			return e

@@ -98,3 +98,41 @@ func runReviewQueueOperation(ctx context.Context, client *remote.Client, queue, 
 		}
 	}
 }
+
+func dispatchQueuedReviewOperation(ctx context.Context, client *remote.Client, queue, routes, root, key, config, reviewer string, cost float64, deadline time.Time, input io.Reader) (dispatchReviewResult, error) {
+	result := dispatchReviewResult{Version: 1, Phase: "not_dispatched"}
+	if client == nil || config == "" || reviewer == "" || cost < 0 || math.IsNaN(cost) || math.IsInf(cost, 0) || !deadline.After(time.Now()) || deadline.After(time.Now().Add(24*time.Hour)) {
+		return result, remote.ErrInvalid
+	}
+	var request remote.AutomaticRequest
+	if err := readTrustInput(input, &request); err != nil {
+		return result, err
+	}
+	if request.Version != 1 || request.Routing.AllowExploration {
+		return result, remote.ErrInvalid
+	}
+	policy, closeCoordinator, err := configuredReviewPolicy(ctx, config, reviewer, cost, request.Routing.LocalRequired)
+	if err != nil {
+		return result, err
+	}
+	defer closeCoordinator()
+	store, err := remote.OpenRouteStore(routes)
+	if err != nil {
+		return result, err
+	}
+	q, err := remote.OpenReviewQueue(queue)
+	if err != nil {
+		return result, err
+	}
+	var choice remote.AutomaticChoice
+	result.Dispatch, choice, err = client.DispatchQueuedAutomaticReview(ctx, q, store, root, key, request, policy, deadline)
+	if choice.Version != 0 {
+		result.Choice = &choice
+	}
+	if err != nil {
+		result.Phase = "dispatch_failed_or_unknown"
+		return result, err
+	}
+	result.Phase = "review_queued"
+	return result, nil
+}

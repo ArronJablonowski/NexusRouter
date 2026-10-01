@@ -15,7 +15,7 @@ import (
 func TestReviewQueueCLIInvalidRequestsAreInert(t *testing.T) {
 	ctx := context.Background()
 	root := filepath.Join(t.TempDir(), "absent")
-	for _, operation := range []string{"enqueue-review", "enqueue-auto-review", "run-review-jobs", "review-job-status"} {
+	for _, operation := range []string{"auto-dispatch-review-job", "enqueue-review", "enqueue-auto-review", "run-review-jobs", "review-job-status"} {
 		if err := Run(ctx, []string{operation, "--review-queue", root}, strings.NewReader("{}"), &bytes.Buffer{}, &bytes.Buffer{}); err == nil {
 			t.Fatal(operation)
 		}

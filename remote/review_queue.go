@@ -18,6 +18,7 @@ import (
 type ReviewQueue struct{ directory string }
 type queuedReview struct {
 	Version   int                            `json:"version"`
+	Automatic *queuedAutomaticReview         `json:"automatic,omitempty"`
 	Binding   RouteBinding                   `json:"binding"`
 	Task      Task                           `json:"task"`
 	Routes    string                         `json:"routes"`
@@ -77,13 +78,13 @@ func (q *ReviewQueue) read(key string) (queuedReview, error) {
 	if err != nil {
 		return job, err
 	}
-	if json.Unmarshal(body, &job) != nil || job.Version != 1 || job.Binding.RequestID != key || !job.Binding.valid() || job.Task.Validate() != nil || job.Binding.TaskSHA256 != hash(job.Task) || job.Task.ExpectedHarnessIdentity == nil || job.Deadline.IsZero() {
+	if json.Unmarshal(body, &job) != nil || job.key() != key || !job.valid() {
 		return queuedReview{}, ErrInvalid
 	}
 	return job, nil
 }
 func (q *ReviewQueue) status(job queuedReview) (ReviewJobStatus, error) {
-	state := ReviewJobStatus{Version: 1, RequestID: job.Binding.RequestID, JobSHA256: hash(job), Status: "pending"}
+	state := ReviewJobStatus{Version: 1, RequestID: job.key(), JobSHA256: hash(job), Status: "pending"}
 	body, err := readPrivateDocument(q.path(state.RequestID, ".result.json"), 4096, false)
 	if errors.Is(err, os.ErrNotExist) {
 		return state, nil
@@ -203,10 +204,10 @@ func (c *Client) ProcessReviewJobs(ctx context.Context, q *ReviewQueue, routes *
 			return results, e
 		}
 		var candidate queuedReview
-		if json.Unmarshal(body, &candidate) != nil || entry.Name() != hash(candidate.Binding.RequestID)+".job.json" {
+		if json.Unmarshal(body, &candidate) != nil || entry.Name() != hash(candidate.key())+".job.json" {
 			return results, ErrInvalid
 		}
-		job, e := q.read(candidate.Binding.RequestID)
+		job, e := q.read(candidate.key())
 		if e != nil {
 			return results, e
 		}
@@ -218,38 +219,8 @@ func (c *Client) ProcessReviewJobs(ctx context.Context, q *ReviewQueue, routes *
 			results = append(results, state)
 			continue
 		}
-		// Configuration changes cannot silently review the saved job under new
-		// caller, route, storage scope or evaluator provenance.
-		state.Status = "attention"
-		binding, e := routes.Lookup(job.Binding.RequestID)
-		if e == nil && binding == job.Binding && routes.directory == job.Routes && root == job.Evidence {
-			if !time.Now().Before(job.Deadline) {
-				state.Status = "expired"
-			} else {
-				configured, pe := policy(job.Task.Private)
-				descriptor, de := evaluation.DescribeEvaluator(configured.Evaluator)
-				if pe == nil && de == nil && hash(descriptor) == hash(job.Evaluator) && configured.Local == job.Local && configured.Timeout == job.Timeout {
-					current, se := c.InspectRecorded(ctx, routes, job.Binding.RequestID)
-					if se == nil {
-						switch current.Status.State {
-						case "queued", "running":
-							state.Status = "pending"
-						case "failed", "canceled":
-							state.Status = "task_" + current.Status.State
-						case "succeeded":
-							limit := min(configured.Timeout, time.Until(job.Deadline))
-							reviewCtx, cancel := context.WithTimeout(ctx, limit)
-							evaluated, ee := c.EvaluateRecordedOutcome(reviewCtx, routes, root, job.Binding.RequestID, job.Task, configured)
-							cancel()
-							if ee == nil && evaluated.Status == "completed" {
-								state.Status = "completed"
-								state.ReviewApplied = evaluated.ReviewApplied
-							}
-						}
-					}
-				}
-			}
-		}
+		state = c.processReviewJob(ctx, routes, root, policy, job, state)
+
 		// Shutdown does not invent a terminal result. If evaluation already began,
 		// its own immutable admission/result remains authoritative on restart.
 		if err = ctx.Err(); err != nil {

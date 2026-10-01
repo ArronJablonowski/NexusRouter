@@ -1380,3 +1380,23 @@ process lock release after SIGKILL. CLI invalid-input checks are inert. Executio
 and evaluator content remain synthetic; automatic daemon/browser enrollment and
 physical-host qualification are not claimed. Full repository gate/push is queued
 behind the unchanged Settings check after focused qualification.
+
+## 2026-10-01 — automatic dispatch persists review intent first
+
+Added auto-dispatch-review-job and DispatchQueuedAutomaticReview. They persist
+original automatic requirements, caller identity, storage scope, reviewer policy
+and absolute deadline before discovery or submission, under the review-worker
+lock. Workers resolve the original choice without discovery or dispatch. Missing
+choice stays pending to expiry; conflicting intent, caller or policy cannot
+silently select new work. Terminal supervision cannot authorize another combined
+dispatch. Lost dispatch responses preserve the review job and use read-only
+canonical completion for later evaluation.
+
+Integration fixture cuts the TLS response after committed dispatch and proves
+one evaluator invocation, no repeat selection or submission, and intent on disk
+before discovery while the worker is fenced. Unbound intent remains non-executing
+after peer availability returns; unsafe queue storage stops dispatch. These are
+synthetic output/evaluator fixtures through production mTLS/protocol/storage,
+not physical-host qualification. Browser/daemon enrollment remains next; the
+explicit combined CLI and existing queue worker form the current usable workflow.
+Full repository gate/push remains queued after the active Settings gate.
