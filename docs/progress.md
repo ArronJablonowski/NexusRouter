@@ -11466,3 +11466,17 @@ ordinary-score parity, exploration, read-only/WAL and remote binding tests passe
 native SSH-enabled race suites passed: harness 1.583s, remote 33.782s, CLI
 1.705s. Vet, source formatting and diff checks passed. Combined full repository
 validation and normal branch backup remain queued behind the live earlier gate.
+
+### DAR-133 durable automatic remote dispatch
+
+Added `AutomaticRequest`, immutable `AutomaticChoice` and `DispatchAutomatic`.
+New requests rank then persist destination/caller/intent/exact identity and selected
+score provenance before route binding and network dispatch. Retries reconstruct
+the saved task without reranking; two concurrent node proposals share one winner.
+Lost responses, changed candidates, admission errors and policy changes never
+trigger alternate dispatch. Corrupt/manual/changed-intent/changed-caller bindings
+fail closed. Deterministic two-endpoint race and recovery tests passed (1.865s);
+installed Pi plus native SSH/SDK integration passed in the remote/CLI race suite
+(34.281s / 1.628s). Pre-route-binding crash recovery passed (1.582s); vet, source
+formatting and diff checks passed. Full repository validation/push remains queued. Host candidate admission
+collection, evaluator scheduling, UI and physical two-host qualification remain.

@@ -23,6 +23,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/resources"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -136,8 +137,13 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	}
 	f := setup(t)
 	f.http.Close()
-	backend := &SDKBackend{Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Local: true, ContextTokens: cfg.Models[0].ContextTokens}}}
+	backend := &SDKBackend{Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Provider: "local", Model: "fixture", Local: true, ContextTokens: cfg.Models[0].ContextTokens}}}
 	if native {
+		preview, e := app.NewService(cfg, nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		backend.Identify = preview.NativeHarnessIdentity
 		backend.Harnesses = []Harness{{ID: task.HarnessID, ModelID: "chat", Kind: cfg.NativeHarnesses[0].Kind, ModelRevision: "fixture-v1"}}
 		authorized := f.clientPeer
 		authorized.Harnesses = []string{task.HarnessID}
@@ -189,7 +195,29 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		t.Fatal(e)
 	}
 	request := "request-sdk-00001"
-	first, e := f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
+	var candidates []DestinationCandidate
+	var automatic AutomaticRequest
+	root := filepath.Join(t.TempDir(), "caller-ranking-evidence")
+	if native {
+		automatic = AutomaticRequest{Version: 1, Prompt: task.Prompt, Routing: harness.Request{Version: 1, Task: harness.TaskClass{Domain: task.Domain, Profile: task.Profile, Difficulty: task.HarnessDifficulty}, Mode: "local_only", LocalRequired: task.Private, ContextTokens: int64(task.ContextTokens), MaxCost: task.MaxCost}}
+		candidates = []DestinationCandidate{{Destination: "node-a", ModelID: task.ModelID, HarnessID: task.HarnessID, Candidate: harness.Candidate{Identity: *task.ExpectedHarnessIdentity, Local: true, Available: true, Authorized: true, Compatible: true, CapacityAvailable: true, CredentialAvailable: true, ContextTokens: int64(task.ContextTokens)}}}
+	}
+	dispatchPrimary := func() (submissions.Status, error) {
+		if !native {
+			return f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
+		}
+		status, choice, err := f.client.DispatchAutomatic(ctx, routeStore, root, request, automatic, harness.DefaultPolicy(), candidates, 0)
+		if choice.Version != 0 {
+			recovered, e := choice.Task(automatic)
+			if e != nil || hash(recovered) != hash(task) {
+				t.Fatal("automatic choice changed SDK payload", e)
+			}
+		}
+		return status, err
+	}
+	first, e := dispatchPrimary()
+	candidates = nil // Restart/recovery must use the persisted choice, not discovery.
+
 	if interruptedSSH {
 		if e == nil || !dropped.Load() {
 			t.Fatal("connection loss not observed", first, e)
@@ -212,7 +240,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		}
 		// Intake committed before the network cut. Reuse the original key/payload.
 		// The recovered response must name that already committed submission.
-		first, e = f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
+		first, e = dispatchPrimary()
 		if first.ID != committed {
 			t.Fatal("retry created another submission", first, committed, e)
 		}
@@ -220,7 +248,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	if e != nil || first.State != "queued" {
 		t.Fatal(first, e)
 	}
-	retry, e := f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
+	retry, e := dispatchPrimary()
 	if e != nil || retry.ID != first.ID {
 		t.Fatal(retry, e)
 	}

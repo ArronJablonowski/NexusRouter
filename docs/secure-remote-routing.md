@@ -584,3 +584,39 @@ identity into the task and persist the destination through `DispatchRecorded`.
 For an already bound request, recover its saved destination rather than ranking
 again. Automatic discovery-to-candidate admission, persisted automatic dispatch,
 UI integration and physical two-host qualification remain unfinished.
+
+## Durable automatic dispatch
+
+Go hosts can submit a new `AutomaticRequest` with `Client.DispatchAutomatic`.
+The request contains the prompt and ordinary `harness.Request` routing constraints;
+the host supplies freshly checked destination candidates, ranking policy and an
+exploration draw. Save the exact request before calling. Remote task privacy is
+`Routing.LocalRequired`, so private tasks must set it explicitly. The destination
+retains its normal admission, executable, context, cost and tool checks.
+
+For a new request key, the client ranks from destination-specific evidence and
+fresh identities, then atomically saves an owner-private `.choice.json` before
+any dispatch. It retains the intent digest, destination, caller fingerprint,
+configured model/harness, exact identity, selected score/counts/reason, exploration
+flag, selection digest and selection timestamp. It stores no prompt. The ordinary
+route binding is then synced before the pinned request is sent. The result
+includes the saved choice even if delivery is uncertain. `RouteStore.AutomaticChoice`
+reads it and `AutomaticChoice.Task(originalRequest)` reconstructs the exact task
+for status reconciliation and content review.
+
+On restart or retry, an existing choice is recovered without ranking or querying
+alternate candidates. Current policy, candidates and draws cannot replace it.
+Changed prompts/constraints or caller certificates conflict; corruption, unsafe
+files and a manually bound request without an automatic choice also fail closed.
+Current paired dispatch permissions and caller credentials are still checked
+before sending. A failed admission or lost response does not trigger fallback.
+Concurrent first callers can propose different nodes, but only the atomically
+published winning choice may dispatch; another intent cannot reuse its key.
+
+A crash after choice publication but before route binding is recoverable using
+the same request. Sync failures are uncertain and preserve files; retry the same
+key and saved intent rather than deleting records. Physical power-loss and
+cross-platform filesystem qualification remain outstanding. This Go entry point
+connects the ranker to durable submission; it does not implement automatic
+capability/capacity collection, background evaluation scheduling, pairing UI or
+CLI input from untrusted candidate claims. Those integration requirements remain.
