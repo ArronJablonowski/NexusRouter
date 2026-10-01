@@ -27,7 +27,7 @@ func physicalHarnessRegistration(t *testing.T) *config.NativeHarness {
 		t.Fatal(e)
 	}
 	var extra any
-	if decoder.Decode(&extra) != io.EOF || (h.Kind != "pi" && h.Kind != "openclaw" && h.Kind != "goose" && h.Kind != "openhands") || h.ModelID != "chat" || h.ModelRevision != "fixture-v1" || h.NativeTools {
+	if decoder.Decode(&extra) != io.EOF || (h.Kind != "pi" && h.Kind != "openclaw" && h.Kind != "goose" && h.Kind != "openhands" && h.Kind != "hermes") || h.ModelID != "chat" || h.ModelRevision != "fixture-v1" || h.NativeTools {
 		t.Fatal("unsupported physical harness fixture")
 	}
 	return &h

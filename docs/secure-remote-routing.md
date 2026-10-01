@@ -1628,13 +1628,14 @@ advisory preview and must match the actual completed harness identity.
 ### Physical external-harness fixtures
 
 The two-host fixture optionally accepts `NEXUS_REMOTE_TEST_HARNESS_FIXTURE`, a
-local JSON file containing one pinned Pi, OpenClaw, Goose or OpenHands registration for destination model
+local JSON file containing one pinned Pi, OpenClaw, Goose, OpenHands or Hermes registration for destination model
 `chat`, revision `fixture-v1`, with native tools disabled. The referenced
 executable must already exist on the destination. `NEXUS_REMOTE_TEST_PATH` may
 supply an explicit absolute-component PATH for its Node runtime; it changes
 only the disposable host environment. No installer runs from this fixture.
 OpenHands uses its required 16384-token context; other fixtures use 8192.
-Python-based OpenHands also requires a host-attested dependency-manifest digest.
+Python-based OpenHands and Hermes also require host-attested dependency-manifest
+digests. Hermes additionally requires an exact clean supported source checkout.
 
 The transport cases use this harness for successful dispatch, response-loss
 recovery and running cancellation over both HTTPS and SSH. Identity is read
@@ -1648,7 +1649,7 @@ cause failure. This qualifies the selected harness in text mode without native t
 external tool side effects or power loss. Synthetic provider call totals must
 remain eight.
 
-On Linux the Goose adapter additionally requests a kernel parent-death SIGKILL
+On Linux the Goose and Hermes adapters additionally request a kernel parent-death SIGKILL
 for its direct child and pins the launching Go thread through process completion.
 This prevents the direct harness from surviving an abrupt host exit. It is not a
 general descendant-tree or external-tool side-effect guarantee; arbitrary tools

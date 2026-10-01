@@ -1988,3 +1988,32 @@ manifest, install report, registration and physical-test.log. Full combined
 validation/normal push queued behind existing live gate. DAR-133 remains In
 Progress; Hermes physical qualification and Mac advertised-service permission
 identity remain open alongside broader acceptance work.
+
+## 2026-10-01 — physical Hermes and Linux parent-death correction
+
+Prepared isolated Spark Hermes supported source663362680b6ffa4fbffeb58f6682564239a1953b
+with Python3.14.7 and frozen upstream uv.lock dependencies. Captured clean source,
+lockfile, interpreter and dependency-manifest hashes; existing Hermes unchanged.
+Initial physical HTTPS/SSH passed, but owned-host SIGKILL left a Hermes child
+running (test35.71s failed); fixture stopped only its owned survivor. Evidence
+preserved. Linux Hermes now requests direct-child parent-death SIGKILL and pins
+the launching Go thread through reaping, matching the demonstrated Goose fix.
+Darwin and ordinary process-group cancellation remain unchanged. Native Linux
+parent-death subprocess regression passed0.02s; no arbitrary descendant guarantee.
+
+Fresh hash-verified corrected host passed physical Mac/Spark HTTPS/SSH lifecycle
+60.37s (Mac race61.918s), eight synthetic provider calls: bound actual identity,
+results/events, cancellation, response-loss deduplication, revoked access and host
+crash reconciliation. Original harness children stopped naturally; interrupted
+lineage failed without replay/fabricated output, saved queued work completed once.
+Independent cleanup found no host fixtures, unchanged clean Hermes source and
+existing OllamaPID2145. Hermes race1.700s, remote race26.634s, formatting/source
+size, vet and diff checks passed. Linux host/regression not race-instrumented.
+
+All five requested harnesses now have physical text-mode lifecycle evidence;
+real-model accuracy, arbitrary native-tool side effects, power loss, Mac service
+advertisement and complete release/deployment remain separate gaps. Evidence:
+reporting outputs/spark-hermes-qualification retains original physical-test.log,
+parent-death-test.log, physical-parent-death-fixed.log and pinned manifest.
+DAR-133 remains In Progress. Full combined gate and normal push queued behind
+existing live frozen validation; no full-gate pass or deployment claimed.

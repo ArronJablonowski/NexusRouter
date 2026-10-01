@@ -9,8 +9,8 @@ import (
 	"syscall"
 )
 
-func processSupported() bool         { return true }
-func configureProcess(cmd *exec.Cmd) { cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} }
+func processSupported() bool { return true }
+
 func killProcessGroup(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
 		return os.ErrProcessDone
