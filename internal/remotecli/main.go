@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote auto-dispatch-review-job|enqueue-review|enqueue-auto-review|run-review-jobs|review-job-status|dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|recorded-status|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote discover|auto-dispatch-review-job|enqueue-review|enqueue-auto-review|run-review-jobs|review-job-status|dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|recorded-status|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -31,6 +31,9 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 		return err
 	}
 	operation := args[0]
+	if operation == "discover" {
+		return discoverUnpaired(ctx, args[1:], output, errorOutput)
+	}
 	flags := flag.NewFlagSet("nexus remote", flag.ContinueOnError)
 	flags.SetOutput(errorOutput)
 	expected := flags.String("expected", "", "current registry digest (absent for pairing), or archive SHA-256 for audit-prune")

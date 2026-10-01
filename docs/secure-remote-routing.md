@@ -1343,7 +1343,7 @@ means no terminal queue receipt yet; `attention` or `expired` requires inspectio
 A `completed` receipt is not a current quality verdict. This control never
 evaluates, dispatches, retries or returns prompt/output/paths.
 
-### Unpaired discovery record contract (transport integration pending)
+### Unpaired discovery record contract
 
 The DNS-SD record format follows the PTR/SRV/TXT separation described in
 [RFC 6763](https://www.rfc-editor.org/rfc/rfc6763). The proposed service type is
@@ -1360,6 +1360,30 @@ verification. No models, harnesses, quality scores, tasks, credentials or policy
 grants are advertised. The receiver timestamps observations and caps their
 lifetime at 120 seconds; zero-TTL goodbye records do not become candidates.
 The parser caps TXT strings/count/total bytes before projection and performs no
-network or registry operation. Interface binding, bounded DNS packet collection,
-advertising lifecycle, candidate conflicts and Settings integration remain to
-be implemented. This contract alone does not discover devices on the network.
+network or registry operation. The explicit IPv4 browse below binds the interface and bounds packet collection
+and conflicts; advertising lifecycle and Settings integration remain open. This contract alone does not discover devices on the network.
+
+### Explicit IPv4 discovery browse
+
+`nexus remote discover --interface en0 --wait 3s` performs one opt-in IPv4
+DNS-SD browse on that named, active multicast interface (use the appropriate
+interface name on Linux). It binds an ephemeral socket to an interface-owned
+private address, sets multicast TTL 255, sends one legacy-unicast-response PTR
+query with a random transaction ID, and closes by the explicit <=10-second
+deadline or cancellation. No trust file, certificate, key or task endpoint is read
+or contacted. No browsing occurs during ordinary startup.
+
+Responses must arrive on the selected interface from UDP 5353 with TTL 255 and
+matching transaction ID. Packets cap at 9000 bytes, 128 records and four questions;
+the browse caps at 256 received packets and 64 distinct instance observations.
+Only complete PTR/SRV/TXT/address bundles in one response are accepted. The
+advertised address must match the private sender; no hostname resolver or
+follow-up endpoint connection is used. Conflicting instance claims are excluded
+for the browse, expired records are dropped, and resource exhaustion fails
+without presenting a partial success. Results remain explicitly unverified.
+
+This first transport supports IPv4 and complete same-packet bundles only;
+fragmented DNS record assembly, IPv6 browsing, owned advertisement lifecycle,
+Settings integration and actual multicast cross-host qualification remain open.
+The packet parser uses golang.org/x/net/dns/dnsmessage v0.56.0; interface controls
+use its ipv4 package. No external mDNS daemon or zeroconf dependency is installed.

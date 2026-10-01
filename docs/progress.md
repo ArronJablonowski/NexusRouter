@@ -1513,3 +1513,26 @@ full remote/CLI race verification follows. No live LAN broadcast performed.
 Complete remote/CLI race suites passed (29.614s / 1.720s). A three-second,
 two-worker fuzz run completed 27,151 executions without failure. Full repository
 validation and normal backup remain queued behind the active Settings gate.
+
+## 2026-10-01 — bounded explicit discovery browse
+
+Added discover --interface NAME --wait DURATION and a private-interface IPv4
+legacy-unicast-response DNS-SD browse. One random-ID PTR query; explicit <=10s
+context/deadline, packet/record/result budgets, interface/source-port/TTL checks,
+source-address agreement, conflict exclusion and expiration. No automatic
+startup, credential use, endpoint probing, pairing or execution. Parser accepts
+complete same-packet bundles only and refuses malformed/oversized/truncated or
+wrong-transaction packets. Partial record assembly, IPv6 browse, advertising and
+UI/real multicast qualification remain open.
+
+Added pinned x/net v0.56.0 for DNS messages and interface controls, with required
+x/text upgrade to v0.38.0; no zeroconf library added. Synthetic DNS tests cover
+valid hints, missing addresses, duplicate SRV, authority injection, TTL zero,
+address spoofing, malformed count/size and request ID mismatch. CLI tests reject
+missing/unbounded interface settings without performing LAN discovery. No live
+broadcast or service configuration changed.
+
+Complete remote/CLI race suites passed (27.358s / 1.686s), targeted vet and
+source/diff checks passed. Three-second two-worker DNS fuzz run completed
+61,007 executions without failure. Full repository validation and normal backup
+remain queued; no actual multicast interoperability result is claimed.
