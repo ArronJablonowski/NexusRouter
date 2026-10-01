@@ -44,16 +44,23 @@ type Settings struct {
 type Daemon struct {
 	Listen string `yaml:"listen" json:"listen"`
 }
+type WebUIRemoteClient struct {
+	CertificateFile string `yaml:"certificate_file" json:"certificate_file"`
+	KeyFile         string `yaml:"key_file" json:"key_file"`
+	CAFile          string `yaml:"ca_file" json:"ca_file"`
+}
+
 type WebUI struct {
-	RemoteTrustFile               string   `yaml:"remote_trust_file,omitempty" json:"remote_trust_file,omitempty"`
-	Enabled                       bool     `yaml:"enabled" json:"enabled"`
-	PathPrefix                    string   `yaml:"path_prefix" json:"path_prefix"`
-	AllowedOrigins                []string `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
-	BrowserSessionTTL             string   `yaml:"browser_session_ttl" json:"browser_session_ttl"`
-	ModelInventoryRefreshInterval string   `yaml:"model_inventory_refresh_interval" json:"model_inventory_refresh_interval"`
-	DefaultModel                  string   `yaml:"default_model,omitempty" json:"default_model,omitempty"`
-	CommanderFallbackModel        string   `yaml:"commander_fallback_model,omitempty" json:"commander_fallback_model,omitempty"`
-	SpecialistsAllowCloud         bool     `yaml:"specialists_allow_cloud" json:"specialists_allow_cloud"`
+	RemoteClient                  *WebUIRemoteClient `yaml:"remote_client,omitempty" json:"remote_client,omitempty"`
+	RemoteTrustFile               string             `yaml:"remote_trust_file,omitempty" json:"remote_trust_file,omitempty"`
+	Enabled                       bool               `yaml:"enabled" json:"enabled"`
+	PathPrefix                    string             `yaml:"path_prefix" json:"path_prefix"`
+	AllowedOrigins                []string           `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
+	BrowserSessionTTL             string             `yaml:"browser_session_ttl" json:"browser_session_ttl"`
+	ModelInventoryRefreshInterval string             `yaml:"model_inventory_refresh_interval" json:"model_inventory_refresh_interval"`
+	DefaultModel                  string             `yaml:"default_model,omitempty" json:"default_model,omitempty"`
+	CommanderFallbackModel        string             `yaml:"commander_fallback_model,omitempty" json:"commander_fallback_model,omitempty"`
+	SpecialistsAllowCloud         bool               `yaml:"specialists_allow_cloud" json:"specialists_allow_cloud"`
 }
 type Workboard struct {
 	Enabled       bool                   `yaml:"enabled" json:"enabled"`

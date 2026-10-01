@@ -112,3 +112,24 @@ func TestWebUIRemoteMembershipOptInPath(t *testing.T) {
 		t.Fatal("disabled UI retains trust authority")
 	}
 }
+
+func TestWebUIRemoteInspectionCredentialsAreExplicit(t *testing.T) {
+	s := Defaults()
+	s.WebUI.Enabled = true
+	s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert.pem", KeyFile: "/private/key.pem", CAFile: "/private/ca.pem"}
+	if s.Validate() == nil {
+		t.Fatal("credentials without trust")
+	}
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.WebUI.RemoteClient.KeyFile = ""
+	if s.Validate() == nil {
+		t.Fatal("partial credentials")
+	}
+	s.WebUI.RemoteClient.KeyFile = "relative.pem"
+	if s.Validate() == nil {
+		t.Fatal("relative credentials")
+	}
+}

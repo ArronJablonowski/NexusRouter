@@ -14,7 +14,7 @@ window.NexusRemoteMembership = (() => {
     title.textContent=peer.id+" · "+(peer.transport||"https")+" · "+peer.endpoint;
     content.textContent=JSON.stringify(peer,null,2); revoke.type="button"; revoke.textContent="Revoke "+peer.id;
     revoke.addEventListener("click",()=>{ if (!busy && window.confirm("Revoke "+peer.id+"? New requests will be denied. Already admitted work is not canceled.")) mutate({action:"revoke",instance:peer.id}); });
-    card.append(title,content,revoke); peers.append(card);
+    card.append(title,content,revoke); if(value.inspection_enabled) window.NexusRemoteInspection.attach(card,peer,base,csrf); peers.append(card);
    });
    message(value.registry.peers.length+" configured peers. Availability has not been checked.");
   }

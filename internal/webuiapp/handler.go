@@ -29,6 +29,7 @@ const (
 var ErrConfiguration = errors.New("invalid browser application configuration")
 
 type Options struct {
+	RemoteInspector RemoteInspector
 	RemoteTrustFile string
 	BasePath        string
 	AllowedHosts    []string
@@ -44,6 +45,7 @@ type Options struct {
 }
 
 type Handler struct {
+	remoteInspector  RemoteInspector
 	remoteTrustFile  string
 	basePath         string
 	hosts            map[string]bool
@@ -94,7 +96,7 @@ func New(options Options) (*Handler, error) {
 	} else {
 		copy(cursorKey[:], options.CursorKey)
 	}
-	handler := &Handler{remoteTrustFile: options.RemoteTrustFile, basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, inspections: options.Inspections, workboards: options.Workboards, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), boardStreamSlots: make(chan struct{}, maxBoardStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey, boardStreamLife: 30 * time.Second}
+	handler := &Handler{remoteInspector: options.RemoteInspector, remoteTrustFile: options.RemoteTrustFile, basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, inspections: options.Inspections, workboards: options.Workboards, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), boardStreamSlots: make(chan struct{}, maxBoardStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey, boardStreamLife: 30 * time.Second}
 	shell, err := contract.NewShellHandler(contract.ShellOptions{BasePath: options.BasePath, HostAllowed: handler.hostAllowed, Authenticated: handler.authenticated})
 	if err != nil {
 		return nil, ErrConfiguration
@@ -129,6 +131,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 	if board := boardEventsID(h.basePath, request.URL.Path); board != "" {
 		h.serveBoardEvents(writer, request, board)
+		return
+	}
+	if h.serveRemoteInspection(writer, request) {
 		return
 	}
 	if h.serveRemoteMembership(writer, request) {

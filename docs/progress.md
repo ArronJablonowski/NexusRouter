@@ -1065,3 +1065,28 @@ Both exact SDK failures passed on this descendant with race detection/count=1
 (6.903s); existing version-seven correction suffices. The preceding gate remains
 failed, not relabeled. Its replacement 3d1a065 full gate is freshly live and is
 not interrupted by this UI work.
+
+### DAR-133 — explicit browser remote inspection (2026-10-01)
+
+Added opt-in fixed remote_client certificate/key/CA paths alongside the existing
+trust registry. Settings can explicitly inspect each HTTPS/SSH peer's live
+capabilities/resources or caller-owned task pages through the normal remote
+client. No automatic network probes, task dispatch, cancellation or retry.
+Session/CSRF, closed bounded requests, ten-second context, operation slots,
+transport pinning/scopes and fresh revocation remain enforced. The configured
+certificate is the caller shared by authorized browser operators; no per-session
+remote identity is implied. Results remain advisory and are cleared on failure.
+
+Verification: webuiapp race package passed 4.162s, config 4.796s, webui 9.142s.
+Includes an actual browser-handler -> remote.Client -> mutual-TLS server fixture
+for capability/task reads and revocation before further contact. Initial fixture
+omitted required X-Nexus-Instance response header; client correctly denied it,
+fixture corrected without weakening validation. Browser behavior tests prove no
+implicit network calls, exact pagination cursor, restart traversal on refresh,
+no retry and stale-result clearing. Authority tests reject missing CSRF,
+foreign-origin, unsupported operations and browser-supplied endpoints; disabled
+configuration cannot probe. Targeted vet/source/diff passed. Reviewed embedded
+asset digest updated; full check/push queued after the running preceding gate.
+No live credentials/service configured. Guided discovery/onboarding, browser
+remote task controls, physical two-host and cross-platform qualification remain
+incomplete, as does real-model remote accuracy qualification.

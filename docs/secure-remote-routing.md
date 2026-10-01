@@ -1025,3 +1025,30 @@ membership authority; there is no separate multi-user administrator role.
 After a conflict or uncertain write, refresh and inspect current membership
 before retrying. Discovery-based onboarding, live remote capability/task views,
 and physical two-host qualification remain separate work.
+
+### Explicit live inspection from Settings
+
+To enable the per-peer inspection buttons, additionally configure all three
+`web_ui.remote_client` paths: `certificate_file`, `key_file`, and `ca_file`.
+They must be absolute normalized paths. The existing private-key permission,
+CA/certificate and pin checks run on every remote call. The same
+`web_ui.remote_trust_file` selects peers and HTTPS/SSH transport. These credentials
+are fixed at startup and are never supplied by browser requests or returned in
+inspection results. Empty or partial credentials do not enable inspection.
+
+An authenticated operator explicitly chooses **Inspect capabilities** or
+**Inspect caller's tasks**. Each request requires same-origin CSRF authority,
+has a ten-second total context deadline, and shares the bounded browser operation
+slots. There is no automatic scanning, polling, inference, dispatch, cancellation
+or retry. Destination `info`/`inspect` scopes and fresh revocation apply through
+the standard remote client. Task pages contain at most 100 request summaries;
+Next preserves the returned cursor and refresh starts a new live traversal.
+The caller is the configured client certificate identity, shared by authorized
+browser operators, not a distinct principal for each browser session.
+
+Results display the caller's check time and the remote observations, including
+model/harness metadata and advisory availability/resources. They do not attest
+model quality, reserve capacity, or grant routing authority. A failed inspection
+clears the prior result and remains unavailable/unknown; it is not a task failure
+or quality rejection. The browser cannot supply a URL, trust file or credentials.
+Physical two-system and cross-platform browser-to-SSH qualification remain open.

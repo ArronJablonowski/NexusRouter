@@ -30,6 +30,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/internal/webuiapp"
+	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/skills"
 	"github.com/ArronJablonowski/NexusRouter/webui"
@@ -281,7 +282,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 		}
 		cursorKey := sha256.Sum256(append([]byte("darwin-browser-stream-v1\x00"), []byte(token)...))
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+		var remoteInspector webuiapp.RemoteInspector
+		if c := s.WebUI.RemoteClient; c != nil {
+			remoteInspector = &remote.Client{Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
+		}
+		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
