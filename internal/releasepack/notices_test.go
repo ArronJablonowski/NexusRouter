@@ -350,6 +350,9 @@ func TestThirdPartyNoticesMatchesCurrentTargetClosure(t *testing.T) {
 				t.Fatal("Go toolchain attribution missing", target, required)
 			}
 		}
+		if target[0] == "linux" && !bytes.Contains(body, []byte("Copyright (c) 2003 Poul-Henning Kamp")) {
+			t.Fatal("compiled libc source attribution missing", target)
+		}
 		notices[target[0]+"/"+target[1]] = body
 	}
 	darwin, linux := notices["darwin/amd64"], notices["linux/amd64"]

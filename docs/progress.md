@@ -2053,3 +2053,25 @@ quality, Linux direct-child crash fixes, and unresolved Mac service advertisemen
 identity. This prepares accurate candidate collateral; no release approval.
 Earlier license evidence remains bound to31e7674 and must be regenerated for a
 new final candidate. Proposed candidate artifacts will remain unapproved.
+
+## 2026-10-01 — DAR-48 compiled-source attribution
+
+Review of candidate dc73f7f found a Poul-Henning Kamp redistribution notice in
+modernc libc's selected Linux Go source missing from root-only notices. Both
+notice construction paths now include target-selected third-party Go source
+comments bearing copyright, redistribution, permission-grant or public-domain
+text. Derived NOTICE-SOURCE entries bind module-relative path, full source hash
+and exact comment bytes; identical repeated comments within a source are retained
+once. Main-module and standard-library handling is unchanged. This is conservative
+source attribution, not a proof of complete legal coverage or linked-symbol use.
+
+Reads use the existing anchored module root, reject unsafe paths/nonregular files,
+bound individual/aggregate source bytes and retain existing notice output limits.
+Tests cover nested source attribution, selected versus other-target files, mutation,
+deterministic deduplication and unsafe paths. Real four-target notices preserve
+the previously omitted attribution; projected versus full Go dependency output
+reconstructs identical evidence. Focused race run passed 22.089s; targeted vet and
+source-format/size gates passed. Initial broad keyword collection exceeded the
+notice bound; final selection plus exact-comment deduplication passes without
+raising it. Previous candidate and license records remain immutable; this source
+requires new candidate/evidence and full validation before normal backup.

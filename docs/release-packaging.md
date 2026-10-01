@@ -407,3 +407,19 @@ Use the recordable [release checklist](release-checklist.md) to bind these gates
 the signing identity, publication authorization and post-publication verification
 to one version and reviewed commit. An incomplete checklist is a blocked release,
 not authority to infer or waive a decision.
+
+### Attribution comments in compiled dependencies
+
+The notices collector supplements module-root legal files with attribution
+comments from third-party Go files selected by `go list` for each release target.
+Derived `NOTICE-SOURCE-<path-sha256>.txt` entries contain the module-relative
+source path, complete source SHA-256 and original matched comment bytes. They are
+derived evidence, not files that can be copied by that name from the module cache.
+Reconstruct them through the same notice collector when checking evidence.
+Repeated identical comments within one source appear once. The collector retains
+comments containing copyright, redistribution, permission-grant or public-domain
+text and keeps the existing bounded notices format. This conservative text
+selection does not establish exhaustive attribution, legal approval or whether
+the linker retained an individual function. Review other source/asset licensing
+references separately. Old root-only evidence must be regenerated for the new
+candidate; do not edit its hashes or treat prior approval as covering new bytes.

@@ -26,6 +26,7 @@ var noticeModuleVersion = regexp.MustCompile(`^v[0-9][0-9A-Za-z.+\-]{0,127}$`)
 
 type listedPackage struct {
 	ImportPath string               `json:"ImportPath"`
+	GoFiles    []string             `json:"GoFiles"`
 	Imports    []string             `json:"Imports"`
 	Module     *listedModule        `json:"Module"`
 	Standard   bool                 `json:"Standard"`
@@ -100,7 +101,7 @@ func targetNoticeClosure(ctx context.Context, source, targetOS, targetArch strin
 	// Omit build/debug metadata while retaining every field used to validate
 	// package completeness, module identity and the full dependency graph.
 	// This keeps expanding release closures within the unchanged output bound.
-	out, err := reconstruction.goOutput(ctx, source, listEnv, "list", "-mod=readonly", "-deps", "-json=ImportPath,Imports,Module,Standard,Incomplete,Error,DepsErrors", "./cmd/nexus")
+	out, err := reconstruction.goOutput(ctx, source, listEnv, "list", "-mod=readonly", "-deps", "-json=ImportPath,Imports,Module,Standard,Incomplete,Error,DepsErrors,GoFiles", "./cmd/nexus")
 	if err != nil {
 		return targetClosure{}, err
 	}
@@ -151,6 +152,7 @@ func targetClosureFromPackages(packages []listedPackage, toolchain noticeModule,
 	allPackages := make(map[string]bool, len(packages))
 	graphPackages := make([]dependencyGraphPackage, 0, len(packages))
 	modules := make(map[string]listedModule)
+	sources := map[string][]string{}
 	mainModulePath := ""
 	for _, pkg := range packages {
 		if !safeNoticeModulePath(pkg.ImportPath) || allPackages[pkg.ImportPath] || pkg.Incomplete || pkg.Error != nil || len(pkg.DepsErrors) != 0 {
@@ -194,6 +196,11 @@ func targetClosureFromPackages(packages []listedPackage, toolchain noticeModule,
 			} else {
 				modules[key] = module
 			}
+			paths, err := packageNoticeSources(pkg)
+			if err != nil {
+				return targetClosure{}, err
+			}
+			sources[key] = append(sources[key], paths...)
 			sourceIdentity = key
 		}
 		graphPackages = append(graphPackages, dependencyGraphPackage{ImportPath: pkg.ImportPath, Source: sourceIdentity, Imports: []string{}})
@@ -225,7 +232,7 @@ func targetClosureFromPackages(packages []listedPackage, toolchain noticeModule,
 	digest := sha256.Sum256(graphBody)
 	closure := targetClosure{PackageCount: len(packages), DependencyGraphSHA256: "sha256:" + hex.EncodeToString(digest[:])}
 	for _, module := range modules {
-		files, err := noticeFilesInModuleCache(moduleCache, module.Dir, nil)
+		files, err := noticeFilesInModuleCache(moduleCache, module.Dir, nil, sources[module.Path+"@"+module.Version]...)
 		if err != nil {
 			return targetClosure{}, err
 		}
@@ -279,12 +286,13 @@ func targetNoticeModules(ctx context.Context, source, targetOS, targetArch strin
 	if err != nil {
 		return nil, err
 	}
-	out, err := command(ctx, source, listEnv, goExecutable, "list", "-mod=readonly", "-deps", "-json=ImportPath,Imports,Module,Standard,Incomplete,Error,DepsErrors", "./cmd/nexus")
+	out, err := command(ctx, source, listEnv, goExecutable, "list", "-mod=readonly", "-deps", "-json=ImportPath,Imports,Module,Standard,Incomplete,Error,DepsErrors,GoFiles", "./cmd/nexus")
 	if err != nil {
 		return nil, err
 	}
 	decoder := json.NewDecoder(strings.NewReader(out))
 	modules := map[string]listedModule{}
+	sources := map[string][]string{}
 	for {
 		var pkg listedPackage
 		decodeErr := decoder.Decode(&pkg)
@@ -309,13 +317,18 @@ func targetNoticeModules(ctx context.Context, source, targetOS, targetArch strin
 			return nil, ErrInvalid
 		}
 		modules[key] = module
+		paths, err := packageNoticeSources(pkg)
+		if err != nil {
+			return nil, err
+		}
+		sources[key] = append(sources[key], paths...)
 	}
 	if len(modules) == 0 {
 		return nil, ErrInvalid
 	}
 	items := make([]noticeModule, 0, len(modules)+1)
 	for _, module := range modules {
-		files, err := noticeFiles(module.Dir)
+		files, err := noticeFiles(module.Dir, sources[module.Path+"@"+module.Version]...)
 		if err != nil {
 			return nil, err
 		}
@@ -331,12 +344,12 @@ func targetNoticeModules(ctx context.Context, source, targetOS, targetArch strin
 	return items, nil
 }
 
-func noticeFiles(dir string) ([]noticeFile, error) {
+func noticeFiles(dir string, sources ...string) ([]noticeFile, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return nil, err
 	}
-	files, readErr := noticeFilesFromRoot(root)
+	files, readErr := noticeFilesFromRoot(root, sources...)
 	closeErr := root.Close()
 	if readErr != nil {
 		return nil, readErr
@@ -350,7 +363,7 @@ func noticeFiles(dir string) ([]noticeFile, error) {
 // noticeFilesInModuleCache opens directory relative to the pinned cache root,
 // reads through that anchored handle, and rejects named-path replacement before
 // returning any bytes. afterOpen is a deterministic test seam only.
-func noticeFilesInModuleCache(moduleCache, directory string, afterOpen func()) ([]noticeFile, error) {
+func noticeFilesInModuleCache(moduleCache, directory string, afterOpen func(), sources ...string) ([]noticeFile, error) {
 	cacheAbsolute, err := filepath.Abs(moduleCache)
 	if err != nil {
 		return nil, ErrInvalid
@@ -401,7 +414,7 @@ func noticeFilesInModuleCache(moduleCache, directory string, afterOpen func()) (
 	if afterOpen != nil {
 		afterOpen()
 	}
-	files, readErr := noticeFilesFromRoot(moduleRoot)
+	files, readErr := noticeFilesFromRoot(moduleRoot, sources...)
 	moduleFinal, moduleFinalErr := moduleRoot.Stat(".")
 	cacheFinal, cacheFinalErr := cacheRoot.Stat(".")
 	cacheNamedFinal, cacheNamedFinalErr := os.Lstat(cacheAbsolute)
@@ -424,7 +437,7 @@ func noticeFilesInModuleCache(moduleCache, directory string, afterOpen func()) (
 	return files, nil
 }
 
-func noticeFilesFromRoot(root *os.Root) ([]noticeFile, error) {
+func noticeFilesFromRoot(root *os.Root, sources ...string) ([]noticeFile, error) {
 	if root == nil {
 		return nil, ErrInvalid
 	}
@@ -477,7 +490,7 @@ func noticeFilesFromRoot(root *os.Root) ([]noticeFile, error) {
 		}
 		files = append(files, noticeFile{Name: name, Body: body})
 	}
-	return files, nil
+	return appendSourceNotices(root, files, sources)
 }
 
 func renderThirdPartyNotices(targetOS, targetArch string, modules []noticeModule) ([]byte, error) {
