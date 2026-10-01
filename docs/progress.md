@@ -9840,3 +9840,37 @@ runner must bind artifact/config/model provenance, normal resource admission,
 bounded stdout/process lifetime, cancellation/cleanup, and the canonical runtime
 journal before SDK registration. Full repository validation is queued at the
 committed checkpoint; DAR-132 remains In Progress.
+
+## OpenClaw admitted native runner and journal — DAR-132 (2026-10-01)
+
+Implemented OpenClaw Run/RunTask using explicit host admission and policy transport,
+pinned launcher SHA/version, trusted model revision, policy/config/pricing identity,
+private configuration and bounded output/deadline. The runner requires normal
+process exit plus exact projection binding to the independently verified upstream
+text. It exports no harness-normalized counts as measured provider usage and never
+turns execution success into a quality verdict. Credentials and temporary paths
+are excluded from the versioned learning identity.
+
+On macOS/Linux, subprocesses own a process group; cancellation kills the group,
+stdout overflow cancels the run, and a leader that exits leaving children cannot
+produce success. Upstream work is canceled/joined before resource release. Other
+platforms reject execution until equivalent process ownership is implemented.
+Automatic update requests and startup Node recovery/install are explicitly disabled.
+The launcher hash does not attest the full module installation: Node and installed
+OpenClaw modules remain trusted host dependencies. This is not an OS sandbox.
+
+RunTask writes normal canonical start/terminal events with actual harness identity
+and supplied host context through the caller's fenced/redacting journal. Native
+fixtures verify durable outcomes and refusal to reuse a task ID before additional
+inference. Failed or canceled execution returns no accepted output; evaluation is
+still a separate bound review.
+
+Verification: final `NEXUS_OPENCLAW_NATIVE=1 NEXUS_OPENCLAW_PROJECTION=1 go test -race
+./harness/openclaw` passed (26.740s), including real installed OpenClaw execution
+through OpenAI-compatible and Ollama fixtures, cancellation/provider joining,
+missing-gateway fake-output refusal, artifact/admission rejection, process-group
+failure handling, output bounds, durable records and duplicate task prevention.
+Targeted vet/source gate passed. Full make check is queued before push. No live
+router configuration or real provider inference was used. SDK registration/joint
+selection, public queue/CLI/API behavior, tool-bearing execution, wider platform
+qualification and held-out model/harness quality qualification remain incomplete.

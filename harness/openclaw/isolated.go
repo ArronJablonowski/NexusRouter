@@ -67,6 +67,6 @@ func isolatedFiles(dir, gatewayURL, gatewayKey, provider, model string, contextT
 	}
 	// Deliberately omit provider keys, auth-store paths, NODE_OPTIONS, proxies,
 	// plugin paths and shell startup environment. Do not alter HOME.
-	env = []string{"PATH=" + os.Getenv("PATH"), "OPENCLAW_HOME=" + dir, "OPENCLAW_STATE_DIR=" + filepath.Join(dir, "state"), "OPENCLAW_AGENT_DIR=" + filepath.Join(dir, "agent"), "OPENCLAW_CONFIG_PATH=" + configPath, "NO_COLOR=1"}
+	env = []string{"PATH=" + os.Getenv("PATH"), "OPENCLAW_HOME=" + dir, "OPENCLAW_STATE_DIR=" + filepath.Join(dir, "state"), "OPENCLAW_AGENT_DIR=" + filepath.Join(dir, "agent"), "OPENCLAW_CONFIG_PATH=" + configPath, "NO_COLOR=1", "OPENCLAW_NO_AUTO_UPDATE=1", "OPENCLAW_NODE_UPDATE_RESPAWNED=1"}
 	return configPath, env, nil
 }
