@@ -9927,3 +9927,33 @@ Focused race tests (including both installed emitter/projector qualifications),
 targeted vet and the source gate passed. Full make check remains queued before
 push. Native Hermes execution and SDK registration remain incomplete; no live
 configuration or real model inference changed.
+
+## Hermes isolated native configuration — DAR-132 (2026-10-01)
+
+Added private per-run Hermes configuration with an explicit loopback-only named
+provider and disposable child token, all toolsets disabled, no fallback models,
+no memory/checkpoints/compression/smart routing, no automatic model-generated
+titles, and plugin/MCP suppression. The child environment excludes inherited
+provider credentials and disables lazy dependency installation. This is trusted
+application configuration, not an OS sandbox or a production execution API.
+
+Native qualification runs the pinned installed Hermes CLI entry point using its
+installed dependency-environment interpreter and a temporary home. The fixture
+observes exactly one streaming model call, the requested model and child token,
+no tools, and a matching final answer. Local metadata probes receive 404 and do
+not dispatch inference. The test verifies source revision and unchanged launcher.
+
+Initial qualification exposed startup maintenance when HERMES_HOME changed:
+Hermes completed dependencies and rewrote two installed launcher interpreter
+paths to the temporary home. Those paths were restored to the existing managed
+Python; the normal launcher reports the pinned version successfully. The final
+recipe disables lazy maintenance and directly uses the installed dependency
+environment, because the ordinary wrapper resolves dependencies under the home.
+Another initial fixture found automatic title generation making a second model
+call; that feature is now disabled. No real model inference was used.
+
+Final native/emitter/parser race suite, targeted vet and source gate passed.
+Full make check remains queued before push. Production gateway verification,
+interpreter/artifact binding, process admission/cleanup, canonical execution and
+SDK registration for Hermes are still required. Configuration tests alone do not
+prove a complete or sandboxed Hermes adapter.
