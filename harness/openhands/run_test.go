@@ -41,10 +41,10 @@ func TestNativeRunner(t *testing.T) {
 				if admitted.Load() != 1 || released.Load() != 0 || calls.Add(1) != 1 {
 					t.Error("reservation or single dispatch violated")
 				}
-				body := completionFixture("test-model")
+				body := strings.Replace(completionFixture("test-model"), `"finish_reason":"stop"}]}`, `"finish_reason":"stop"}],"usage":{"prompt_tokens":17,"completion_tokens":4,"total_tokens":21}}`, 1)
 				contentType := "text/event-stream"
 				if protocol == "ollama" {
-					body = `{"model":"test-model","message":{"role":"assistant","content":"answer"},"done":true,"done_reason":"stop"}` + "\n"
+					body = `{"model":"test-model","message":{"role":"assistant","content":"answer"},"done":true,"done_reason":"stop","prompt_eval_count":17,"eval_count":4}` + "\n"
 					contentType = "application/x-ndjson"
 				}
 				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{contentType}}, Body: io.NopCloser(strings.NewReader(body))}, nil
@@ -67,7 +67,7 @@ func TestNativeRunner(t *testing.T) {
 				t.Fatal("reused task ID executed")
 			}
 			identity, _ := c.Identity()
-			if err != nil || result.Text != "answer" || result.Identity != identity || released.Load() != 1 || calls.Load() != 1 {
+			if err != nil || result.Text != "answer" || result.Usage == nil || result.Usage.InputTokens != 17 || result.Usage.OutputTokens != 4 || result.Identity != identity || released.Load() != 1 || calls.Load() != 1 {
 				t.Fatalf("run=%+v error=%v calls=%d released=%d", result, err, calls.Load(), released.Load())
 			}
 		})

@@ -10157,3 +10157,22 @@ Targeted vet/source/diff checks passed. Full gate remains queued before push.
 All five named harnesses now have initial text-only SDK integration; tool-bearing
 workflows, queue/CLI/API registration, measured usage accounting, cross-platform
 and held-out qualification remain open. No live configuration was changed.
+
+## Upstream measured usage capture — DAR-132 (2026-10-01)
+
+The shared text gateway now preserves provider-reported input/output totals on
+verified completed streams. Missing usage remains nil; explicit measured zero
+remains distinguishable. Normal terminal, DONE and EOF are still required, and
+inconsistent/negative/missing totals are rejected. Returned gateway snapshots
+clone usage so callers cannot mutate retained evidence. Native Ollama count
+translation preserves the same distinction.
+
+OpenClaw, Hermes, Goose and OpenHands runner results expose these upstream counts;
+harness-normalized values are never used. This is not yet SDK accounting: runtime
+journal/SDK propagation, failed/canceled attempt accounting and Pi's separate
+protocol path remain required. No cost/cache breakdown is inferred from totals.
+
+Verification: shared-gateway race tests passed (1.357s), native OpenHands counts
+through both protocols plus existing failure/cancellation tests (14.690s), other
+runner non-native race regressions, targeted vet/source/diff checks passed. Full
+gate queued before push. No live provider request or accounting store changed.

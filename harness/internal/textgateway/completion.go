@@ -8,12 +8,16 @@ import (
 	"io"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 const MaxRecordBytes = 1 << 20
 const maxStreamBytes = 16 << 20
 
 type Completion struct {
+	// Usage is present only when the completed upstream stream reports both counts.
+	Usage  *providers.Usage
 	Text   string
 	Stream []byte
 }
@@ -32,6 +36,7 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 	var event, text, wire bytes.Buffer
 	finished, done, usageSeen := false, false, false
 	streamID := ""
+	var measured *providers.Usage
 	records := 0
 	dispatch := func() bool {
 		if event.Len() == 0 {
@@ -78,6 +83,7 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 				return false
 			}
 			usageSeen = true
+			measured = measuredUsage(chunk.Usage)
 		}
 		if len(chunk.Choices) == 0 {
 			if !finished || !hasUsage {
@@ -158,22 +164,27 @@ func verifyCompletion(reader io.Reader, model string) (Completion, error) {
 	if scanner.Err() != nil || limited.N <= 0 || event.Len() != 0 || !done || !finished || strings.TrimSpace(text.String()) == "" {
 		return bad()
 	}
-	return Completion{Text: text.String(), Stream: wire.Bytes()}, nil
+	return Completion{Text: text.String(), Stream: wire.Bytes(), Usage: measured}, nil
 }
 
-func validUsage(body []byte) bool {
+func validUsage(body []byte) bool { return measuredUsage(body) != nil }
+
+func measuredUsage(body []byte) *providers.Usage {
 	var usage struct {
 		Input  *int64 `json:"prompt_tokens"`
 		Output *int64 `json:"completion_tokens"`
 		Total  *int64 `json:"total_tokens"`
 	}
 	if json.Unmarshal(body, &usage) != nil || usage.Input == nil || usage.Output == nil || usage.Total == nil {
-		return false
+		return nil
 	}
 	for _, n := range []*int64{usage.Input, usage.Output, usage.Total} {
 		if *n < 0 || *n > 1<<40 {
-			return false
+			return nil
 		}
 	}
-	return *usage.Input+*usage.Output == *usage.Total
+	if *usage.Input+*usage.Output != *usage.Total {
+		return nil
+	}
+	return &providers.Usage{InputTokens: *usage.Input, OutputTokens: *usage.Output}
 }

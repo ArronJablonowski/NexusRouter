@@ -43,7 +43,7 @@ func TestCompletionRequiresUnambiguousNormalTerminal(t *testing.T) {
 			if (err == nil) != tc.valid {
 				t.Fatalf("valid=%v err=%v", tc.valid, err)
 			}
-			if !tc.valid && (got.Text != "" || len(got.Stream) != 0) {
+			if !tc.valid && (got.Text != "" || len(got.Stream) != 0 || got.Usage != nil) {
 				t.Fatal("unverified output released")
 			}
 			if tc.valid && got.Text != "answer" {
@@ -95,6 +95,55 @@ func TestGatewayDoesNotReleaseTruncatedCompletion(t *testing.T) {
 		}
 		if good && result.Text != "answer" {
 			t.Fatal("verified text mismatch")
+		}
+	}
+}
+
+func TestMeasuredUsagePresenceAndTerminalBinding(t *testing.T) {
+	for _, tc := range []struct {
+		name, usage string
+		want        bool
+		in, out     int64
+	}{
+		{"absent", "", false, 0, 0},
+		{"zero", `,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}`, true, 0, 0},
+		{"measured", `,"usage":{"prompt_tokens":20,"completion_tokens":3,"total_tokens":23}`, true, 20, 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stream := strings.Replace(completionFixture("model"), `"finish_reason":"stop"}]}`, `"finish_reason":"stop"}]`+tc.usage+`}`, 1)
+			got, err := verifyCompletion(strings.NewReader(stream), "model")
+			if err != nil || (got.Usage != nil) != tc.want {
+				t.Fatal(got, err)
+			}
+			if got.Usage != nil && (got.Usage.InputTokens != tc.in || got.Usage.OutputTokens != tc.out) {
+				t.Fatal("wrong measured counts")
+			}
+			broken := strings.Replace(stream, "data: [DONE]\n\n", "", 1)
+			got, err = verifyCompletion(strings.NewReader(broken), "model")
+			if err == nil || got.Usage != nil {
+				t.Fatal("incomplete stream released usage as completed")
+			}
+		})
+	}
+}
+
+func TestNativeOllamaMeasuredUsage(t *testing.T) {
+	for _, counts := range []string{"", `,"prompt_eval_count":17,"eval_count":4`} {
+		native := `{"model":"model","message":{"role":"assistant","content":"answer"},"done":true,"done_reason":"stop"` + counts + "}\n"
+		stream, err := ollamaCompletion(strings.NewReader(native), "model")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := verifyCompletion(strings.NewReader(string(stream)), "model")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if counts == "" {
+			if got.Usage != nil {
+				t.Fatal("invented counts")
+			}
+		} else if got.Usage == nil || got.Usage.InputTokens != 17 || got.Usage.OutputTokens != 4 {
+			t.Fatal("lost native counts")
 		}
 	}
 }

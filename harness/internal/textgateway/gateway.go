@@ -189,6 +189,10 @@ func Start(ctx context.Context, c Config) (base, key string, verified func() (Co
 			}
 			result := *completion
 			result.Stream = append([]byte(nil), result.Stream...)
+			if result.Usage != nil {
+				usage := *result.Usage
+				result.Usage = &usage
+			}
 			return result, nil
 		}, func() {
 			lifecycle.Lock()

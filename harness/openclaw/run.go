@@ -45,8 +45,10 @@ type Config struct {
 }
 
 // Result is a completed execution, never an automatic quality acceptance.
-// Harness-normalized usage is not exported as measured provider accounting.
+// Only upstream gateway usage is exported; harness-normalized counts are ignored.
 type Result struct {
+	// Usage is measured at the upstream gateway; nil means unreported.
+	Usage    *providers.Usage
 	Text     string
 	Identity harness.Identity
 }
@@ -175,7 +177,7 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if err != nil || projection.Text != strings.TrimRightFunc(completion.Text, jsWhitespace) {
 		return Result{}, ErrProjection
 	}
-	return Result{Text: projection.Text, Identity: identity}, nil
+	return Result{Text: projection.Text, Identity: identity, Usage: completion.Usage}, nil
 }
 
 type boundedOutput struct {
