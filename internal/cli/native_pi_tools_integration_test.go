@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
@@ -26,12 +27,29 @@ import (
 )
 
 // Opt-in machine qualification uses the production resource profiler and installed
-// Pi, with a private CLI home/owner directory and no real model inference.
+// harness, with a private CLI home/owner directory and no real model inference.
 func TestCLINativePiHostTools(t *testing.T) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("requires installed Pi and measurable host capacity")
 	}
+	testCLINativeHostTools(t, "pi", pi.AgentAdapterVersion)
+}
+func TestCLINativeOpenHandsHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_OPENHANDS_PYTHON") == "" {
+		t.Skip("requires installed OpenHands and measurable capacity")
+	}
+	testCLINativeHostTools(t, "openhands", openhands.AgentAdapterVersion)
+}
+func testCLINativeHostTools(t *testing.T, kind, adapter string) {
 	executable, e := exec.LookPath("pi")
+	var runtimeDigest string
+	if kind == "openhands" {
+		executable = os.Getenv("NEXUS_OPENHANDS_PYTHON")
+		var manifest []byte
+		manifest, e = os.ReadFile(os.Getenv("NEXUS_OPENHANDS_MANIFEST"))
+		digest := sha256.Sum256(manifest)
+		runtimeDigest = hex.EncodeToString(digest[:])
+	}
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -90,7 +108,7 @@ func TestCLINativePiHostTools(t *testing.T) {
 			cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL, RequestTimeout: "15s"}}
 			zero := 0.0
 			cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 16384, Capabilities: []string{"chat"}, EstimatedCost: &zero}}
-			cfg.NativeHarnesses = []config.NativeHarness{{ID: "pi-tools", Kind: "pi", NativeTools: true, ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(pin[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
+			cfg.NativeHarnesses = []config.NativeHarness{{ID: "native-tools", Kind: kind, RuntimeSHA256: runtimeDigest, NativeTools: true, ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(pin[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
 			if mode == "deny_create" {
 				cfg.Tools.CreateEnabled = true
 				cfg.Tools.CreateRoot = root
@@ -103,7 +121,7 @@ func TestCLINativePiHostTools(t *testing.T) {
 			if e = os.WriteFile(file, data, 0600); e != nil {
 				t.Fatal(e)
 			}
-			args := []string{"run", "--config", file, "--model", "chat", "--harness", "pi-tools", "--domain", "writing", "--profile", "cli-fixture"}
+			args := []string{"run", "--config", file, "--model", "chat", "--harness", "native-tools", "--domain", "writing", "--profile", "cli-fixture"}
 			if mode != "text" {
 				args = append(args, "--json")
 			}
@@ -179,7 +197,7 @@ func TestCLINativePiHostTools(t *testing.T) {
 				return
 			}
 			usage, e := runtime.ValidateHarnessAgentJournal(events, taskID)
-			if e != nil || last.Kind != runtime.TaskCompleted || last.Data.HarnessOutcome == nil || last.Data.HarnessOutcome.Actual.AdapterVersion != pi.AgentAdapterVersion || calls.Load() != 2 || usage == nil || usage.InputTokens != 30 || usage.OutputTokens != 6 {
+			if e != nil || last.Kind != runtime.TaskCompleted || last.Data.HarnessOutcome == nil || last.Data.HarnessOutcome.Actual.AdapterVersion != adapter || calls.Load() != 2 || usage == nil || usage.InputTokens != 30 || usage.OutputTokens != 6 {
 				t.Fatal("invalid CLI completion", last, usage, e, calls.Load())
 			}
 		})

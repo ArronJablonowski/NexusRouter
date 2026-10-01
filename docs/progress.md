@@ -10957,3 +10957,27 @@ Constructor/identity race checks also passed for both tool modes, including
 extension-scope binding, immutable settings snapshots, refusal to upgrade legacy
 registrations implicitly, and refusal of cloud tool models. Targeted vet, source
 formatting and diff checks passed.
+
+### 2026-10-01 — DAR-132 OpenHands HTTP and compiled CLI qualification
+
+Extended the existing native Pi integration fixtures to installed OpenHands SDK
+1.50.1 with executable and dependency-manifest pins. Real authenticated HTTP
+plain/SSE execution preserves rooted file results, redaction, measured usage and
+actual tool-mode identity. Invalid final JSON and cancellation cannot emit a
+successful outcome. Durable operator decisions are tested while the task holds
+the single execution slot: pending writes do not occur, unauthenticated/forged
+bindings are rejected, repeated approval records one decision/effect, denial
+creates no file, and cancellation rejects late approval.
+
+The compiled CLI runs both harnesses with production resource measurement and
+private home/owner state. Plain and JSON results retain canonical usage/journals;
+configured writes without an approval handler fail before inference or storage.
+Race test drivers passed HTTP/operator cases (41.998s) and compiled CLI cases
+(9.789s). The CLI subprocess is a normal build. Targeted vet/source/diff passed.
+All provider output is controlled fixture data: no real model quality ranking,
+live service change or browser presentation qualification is claimed.
+
+Full repository gate/push remains queued behind the older SDK run. Its telemetry
+child was freshly observed consuming CPU; no restart or frozen-checkout edit was
+performed. Other harness tool adapters and held-out comparative evidence remain
+required for DAR-132.

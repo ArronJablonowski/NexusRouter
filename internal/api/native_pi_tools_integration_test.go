@@ -2,21 +2,19 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -28,15 +26,16 @@ func TestHTTPNativePiHostTools(t *testing.T) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("requires installed Pi qualification")
 	}
-	executable, err := exec.LookPath("pi")
-	if err != nil {
-		t.Fatal(err)
+	testHTTPNativeHostTools(t, "pi", pi.AgentAdapterVersion)
+}
+func TestHTTPNativeOpenHandsHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_OPENHANDS_PYTHON") == "" {
+		t.Skip("requires installed OpenHands")
 	}
-	artifact, err := os.ReadFile(executable)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pin := sha256.Sum256(artifact)
+	testHTTPNativeHostTools(t, "openhands", openhands.AgentAdapterVersion)
+}
+func testHTTPNativeHostTools(t *testing.T, kind, adapter string) {
+	registration := nativeHTTPRegistration(t, kind)
 	for _, mode := range []string{"plain", "stream", "contract", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
@@ -84,7 +83,7 @@ func TestHTTPNativePiHostTools(t *testing.T) {
 			cfg.Security.RedactEnv = append(cfg.Security.RedactEnv, "API_NATIVE_TEST_SECRET")
 			cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL, RequestTimeout: "15s"}}
 			cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 16384, Capabilities: []string{"chat"}}}
-			cfg.NativeHarnesses = []config.NativeHarness{{ID: "pi-tools", NativeTools: true, Kind: "pi", ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(pin[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
+			cfg.NativeHarnesses = []config.NativeHarness{registration}
 			svc, err := app.NewServiceWithProfiler(cfg, func(name string) string {
 				if name == "API_NATIVE_TEST_SECRET" {
 					return token
@@ -117,11 +116,11 @@ func TestHTTPNativePiHostTools(t *testing.T) {
 				prompt = "Return only valid JSON."
 			}
 			stream := mode != "plain"
-			body, _ := json.Marshal(map[string]any{"model": "chat", "harness_id": "pi-tools", "messages": []map[string]string{{"role": "user", "content": prompt}}, "stream": stream, "stream_options": map[string]bool{"include_usage": true}})
+			body, _ := json.Marshal(map[string]any{"model": "chat", "harness_id": "native-tools", "messages": []map[string]string{{"role": "user", "content": prompt}}, "stream": stream, "stream_options": map[string]bool{"include_usage": true}})
 			if !stream {
-				body, _ = json.Marshal(map[string]any{"model": "chat", "harness_id": "pi-tools", "messages": []map[string]string{{"role": "user", "content": prompt}}})
+				body, _ = json.Marshal(map[string]any{"model": "chat", "harness_id": "native-tools", "messages": []map[string]string{{"role": "user", "content": prompt}}})
 			}
-			// The real authenticated handler must reject before launching Pi or inference.
+			// The real authenticated handler must reject before launching a harness or inference.
 			unauthorized, _ := http.NewRequestWithContext(ctx, "POST", server.URL+"/v1/chat/completions", strings.NewReader(string(body)))
 			denied, e := server.Client().Do(unauthorized)
 			if e != nil {
@@ -179,7 +178,7 @@ func TestHTTPNativePiHostTools(t *testing.T) {
 				}
 				return
 			}
-			if terminal.Kind != runtime.TaskCompleted || out.Turns != 2 || out.Usage == nil || out.Usage.InputTokens != 30 || out.Usage.OutputTokens != 6 || out.HarnessOutcome == nil || out.HarnessOutcome.Actual.AdapterVersion != pi.AgentAdapterVersion || !strings.Contains(string(output), "verified API answer") || strings.Contains(string(output), token) {
+			if terminal.Kind != runtime.TaskCompleted || out.Turns != 2 || out.Usage == nil || out.Usage.InputTokens != 30 || out.Usage.OutputTokens != 6 || out.HarnessOutcome == nil || out.HarnessOutcome.Actual.AdapterVersion != adapter || !strings.Contains(string(output), "verified API answer") || strings.Contains(string(output), token) {
 				t.Fatal("lost verified API result", out, string(output))
 			}
 			if !strings.Contains(string(output), `"prompt_tokens":30`) || !strings.Contains(string(output), `"completion_tokens":6`) {

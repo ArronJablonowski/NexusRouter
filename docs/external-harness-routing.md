@@ -765,7 +765,7 @@ approval-backed create, denied writes, path traversal rejection, response contra
 automatic selection, queued idempotency, redaction and measured per-turn usage.
 This is integration evidence, not a real-model quality ranking or deployment.
 
-Authenticated HTTP qualification also runs installed Pi through the real chat
+Authenticated HTTP qualification runs installed Pi and OpenHands through the real chat
 handler and application service with pinned Ollama-wire fixtures. Plain and SSE
 responses preserve canonical completion and measured multi-turn usage; file-tool
 secrets remain redacted. Client cancellation after the tool completes leaves a
@@ -776,14 +776,14 @@ that remains an operator registration setting. Browser approval presentation
 remains unqualified; compiled CLI and HTTP operator approval qualification are
 described below.
 
-Compiled CLI qualification builds `cmd/nexus` and runs installed Pi with a private
+Compiled CLI qualification builds `cmd/nexus` and runs both installed harnesses with a private
 CLI home and process-owner directory. Both plain output and `--json` preserve
 rooted reads, redaction, verified per-turn usage and the durable tool journal.
 The test uses the production host resource profiler and requires measurable local
 capacity. A CLI invocation without a reviewer/presenter refuses configured writes
 at admission, before inference or task storage; it does not implicitly approve them.
 
-Authenticated HTTP operator decisions are also qualified with installed Pi and a
+Authenticated HTTP operator decisions are qualified with both installed harnesses and a
 controlled provider. A pending create leaves the file absent; unauthenticated and
 argument-digest-mismatched decisions are rejected. Replaying the same bound
 approval records one operator decision and one confirmed write. Denial and request
@@ -822,5 +822,7 @@ OpenHands SDK routing uses the same scoped host registry and approval authority 
 Pi, including automatic selection, YAML registration, queued execution and final
 response validation. Installed-SDK fixtures qualify approved/denied creates, rooted
 reads, escape rejection, secret redaction, per-turn usage and queued idempotency.
-Its tool identity also binds extension policy rules. Dedicated HTTP/CLI/browser
-qualification and real-model comparative evidence remain separate work.
+Its tool identity also binds extension policy rules. The authenticated HTTP,
+durable operator-decision and compiled CLI checks described above also cover
+OpenHands. Browser presentation and real-model comparative evidence remain
+separate work.

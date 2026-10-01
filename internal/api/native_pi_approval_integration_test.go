@@ -2,15 +2,12 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -18,6 +15,8 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
+	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
@@ -29,15 +28,16 @@ func TestHTTPNativePiDurableOperatorApproval(t *testing.T) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("requires installed Pi")
 	}
-	executable, e := exec.LookPath("pi")
-	if e != nil {
-		t.Fatal(e)
+	testHTTPNativeApproval(t, "pi", pi.AgentAdapterVersion)
+}
+func TestHTTPNativeOpenHandsDurableOperatorApproval(t *testing.T) {
+	if os.Getenv("NEXUS_OPENHANDS_PYTHON") == "" {
+		t.Skip("requires installed OpenHands")
 	}
-	artifact, e := os.ReadFile(executable)
-	if e != nil {
-		t.Fatal(e)
-	}
-	pin := sha256.Sum256(artifact)
+	testHTTPNativeApproval(t, "openhands", openhands.AgentAdapterVersion)
+}
+func testHTTPNativeApproval(t *testing.T, kind, adapter string) {
+	registration := nativeHTTPRegistration(t, kind)
 	for _, mode := range []string{"approve", "deny", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
@@ -69,7 +69,7 @@ func TestHTTPNativePiDurableOperatorApproval(t *testing.T) {
 			cfg.Telemetry.Database = filepath.Join(t.TempDir(), "approvals.db")
 			cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL, RequestTimeout: "15s"}}
 			cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 16384, Capabilities: []string{"chat"}}}
-			cfg.NativeHarnesses = []config.NativeHarness{{ID: "pi-tools", NativeTools: true, Kind: "pi", ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(pin[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
+			cfg.NativeHarnesses = []config.NativeHarness{registration}
 			proposals := make(chan tools.ApprovalPrompt, 1)
 			svc, e := app.NewServiceWithToolControls(cfg, nil, apiFixtureProfiler{}, nil, nil, nil, nil, nil, func(c context.Context, p tools.ApprovalPrompt) error {
 				select {
@@ -107,7 +107,7 @@ func TestHTTPNativePiDurableOperatorApproval(t *testing.T) {
 			defer func() { cancel(); server.Close() }()
 			requestCtx, stop := context.WithCancel(ctx)
 			defer stop()
-			req, _ := http.NewRequestWithContext(requestCtx, "POST", server.URL+"/v1/chat/completions", strings.NewReader(`{"model":"chat","harness_id":"pi-tools","messages":[{"role":"user","content":"Create the requested file."}],"stream":true}`))
+			req, _ := http.NewRequestWithContext(requestCtx, "POST", server.URL+"/v1/chat/completions", strings.NewReader(`{"model":"chat","harness_id":"native-tools","messages":[{"role":"user","content":"Create the requested file."}],"stream":true}`))
 			req.Header.Set("Authorization", "Bearer "+token)
 			req.Header.Set("Content-Type", "application/json")
 			response, e := server.Client().Do(req)
@@ -194,7 +194,7 @@ func TestHTTPNativePiDurableOperatorApproval(t *testing.T) {
 			last := events[len(events)-1]
 			if mode == "approve" {
 				content, e := os.ReadFile(artifactPath)
-				if e != nil || string(content) != "operator authorized content" || record.State != approvals.Consumed || len(record.Decisions) != 1 || record.Decisions[0].Actor != "api_operator" || calls.Load() != 2 || last.Kind != runtime.TaskCompleted || out.HarnessOutcome == nil || !strings.Contains(string(output), "[DONE]") {
+				if e != nil || string(content) != "operator authorized content" || record.State != approvals.Consumed || len(record.Decisions) != 1 || record.Decisions[0].Actor != "api_operator" || calls.Load() != 2 || last.Kind != runtime.TaskCompleted || out.HarnessOutcome == nil || out.HarnessOutcome.Actual.AdapterVersion != adapter || !strings.Contains(string(output), "[DONE]") {
 					t.Fatal("approved lifecycle", record, out, e, calls.Load())
 				}
 				status, body := control("GET", endpoint+"/execution", "", true)
