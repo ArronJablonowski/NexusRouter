@@ -27,6 +27,7 @@ func profileLinuxHost(ctx context.Context, read func(context.Context, string) ([
 		return Snapshot{}, ctx.Err()
 	}
 	s.ThermalPressure = thermal(ctx)
+	s.UnifiedMemory = linuxUnifiedMemory(ctx, read)
 	if ctx.Err() != nil {
 		return Snapshot{}, ctx.Err()
 	}

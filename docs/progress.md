@@ -2086,3 +2086,20 @@ every selected source path/hash and unique original comment. This reduces record
 metadata without dropping attribution or increasing either safety bound. The
 actual repository evidence-derivation test now reports its canonical byte size.
 The waiting39ebadd validation was superseded before it ran; dc73f7f remains live.
+
+### 2026-10-02 — Spark unified-memory correction and real-model QA
+
+Live `nexus resources` on DGX Spark exposed a Linux detection defect: the CPU/GPU
+shared-memory host reported `UnifiedMemory: false`. Added bounded, exact kernel
+DMI detection for NVIDIA_DGX_Spark without inferring hardware from missing VRAM
+telemetry. Proc/cgroup RAM ceilings remain authoritative; a separate VRAM budget
+is rejected. Resource race tests and a patched physical Spark binary verify the
+correction. Added opt-in real-model HTTPS/SSH qualification and documented the
+local/remote QA scope in [Spark and local-model QA](spark-local-model-qa.md).
+The expanded real-model test passed over HTTPS and SSH (85.138s with the race
+detector), including cancellation after streamed output, caller-journal reopen,
+and request-key conflict rejection. Fifteen CLI scenarios covered small-model
+outputs, automatic selection, negative admission, SIGINT cancellation, and
+Spark 80B inference. An intermediate strict-output mismatch remains recorded;
+this is operational QA, not a universal model-accuracy claim. Full-suite
+validation and public push remain required for this checkpoint.
