@@ -139,10 +139,10 @@ func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	// Reviewed v1 assets: remote host borders use the Commander yellow in every connection state.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "be96715e0987503c05d5c1b66bb7ecd176302c3ca2cfc7113690e66fa6c689a0" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "1e02696b0c814dd5768b56f89706a08dcf6b334017e1ea1df958f61fc49d61aa" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -264,7 +264,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -487,7 +487,7 @@ let streams = 0;
 const node = {hidden:false, disabled:false, textContent:"", dataset:{}, children:[], classList:{toggle(){}},
   addEventListener(){}, setAttribute(){}, replaceChildren(){this.children=[]}, append(value){this.children.push(value)}};
 global.document = {body:{dataset:{basePath:"/app"}}, querySelector(){return node}, createElement(){return Object.assign({}, node, {dataset:{}, children:[]})}};
-global.window = {location:{pathname:"/app/workboards/%2F"}, NexusRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
+global.window = {location:{pathname:"/app/workboards/%2F"}, NexusRoutes:undefined, NexusLive:{watch(){},fetch:(...args)=>fetch(...args)}, addEventListener(){}, setTimeout, clearTimeout};
 window.NexusWorkboardClient = require("./assets/v1/workboard-client.js");
 global.fetch = url => { urls.push(String(url)); return Promise.reject(new Error("offline")); };
 global.EventSource = class { constructor(){ streams++ } close(){} addEventListener(){} };
@@ -515,7 +515,7 @@ function make() { return {hidden:false, disabled:false, textContent:"", value:""
   focus(){document.activeElement=this}, requestSubmit(){this.events.submit({preventDefault(){}})}}; }
 global.document = {body:{dataset:{basePath:"/app"}}, activeElement:null, querySelector(selector){if(!nodes.has(selector))nodes.set(selector,make());return nodes.get(selector)}, createElement(){return make()}};
 nodes.set("#board-state-filter", Object.assign(make(), {value:"active"}));
-global.window = {location:{pathname:"/app/workboards"}, NexusRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
+global.window = {location:{pathname:"/app/workboards"}, NexusRoutes:undefined, NexusLive:{watch(){},fetch:(...args)=>fetch(...args)}, addEventListener(){}, setTimeout, clearTimeout};
 window.NexusWorkboardClient = require("./assets/v1/workboard-client.js");
 global.fetch = url => { urls.push(String(url)); return Promise.reject(new Error("offline")); };
 global.EventSource = class { close(){} addEventListener(){} };

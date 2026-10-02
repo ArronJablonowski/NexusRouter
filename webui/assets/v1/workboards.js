@@ -44,7 +44,7 @@
 		node.hidden = false;
 	}
 	function requestJSON(path) {
-		return fetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
+		return window.NexusLive.fetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
 			if (!response.ok) throw new Error("request unavailable");
 			return response.json();
 		});
@@ -293,7 +293,7 @@
 		if (boardState !== "active" && boardState !== "archived") { notice(listState, "Choose a valid board state.", true); return; }
 		const query = new URLSearchParams({limit: String(boardPageLimit), state: boardState});
 		if (after) query.set("after", after);
-		requestJSON("/api/v1/workboards?" + query.toString()).then(page => {
+		return requestJSON("/api/v1/workboards?" + query.toString()).then(page => {
 			if (!client.current(current, boardRequestVersion)) return;
 			if (!validBoardPage(page) || boardTotal + page.items.length > maxBoards || after && boardCursors.has(after) || page.has_more && (page.next_cursor === after || boardCursors.has(page.next_cursor))) throw new Error("invalid workboard page");
 			const incoming = new Set();
@@ -628,7 +628,7 @@
 			streamRevision = payload.revision; queueInvalidation("Updating after a committed change…");
 		});
 		source.onopen = () => { if (boardSource === source) { streamFailures = 0; liveStatus.textContent = "Live updates connected."; } };
-		source.onerror = () => { if (boardSource === source) { streamFailures++; if (streamFailures >= 8) { closeBoardStream(); liveStatus.textContent = "Live updates stopped after repeated reconnect failures. Use Refresh to reconnect."; return; } liveStatus.textContent = "Reconnecting live updates…"; queueInvalidation(""); } };
+		source.onerror = () => { if (boardSource === source) { streamFailures++; if (streamFailures >= 8) { closeBoardStream(); liveStatus.textContent = "Live updates stopped after repeated reconnect failures. Use Refresh to reconnect."; return; } liveStatus.textContent = "Reconnecting live updates…"; } };
 	}
 	refresh.addEventListener("click", () => { loadBoards("", true); if (selectedID) { closeBoardStream(); connectBoard(selectedID); loadBoard(selectedID, "", true); } });
 	function applyCardFilters() {
@@ -645,8 +645,31 @@
 	showList.addEventListener("click", () => { presentation = "list"; renderPresentation(); showList.focus(); });
 	loadMoreBoards.addEventListener("click", () => { if (boardCursor) loadBoards(boardCursor, false); });
 	loadMoreCards.addEventListener("click", () => { if (selectedID && cardCursor) loadBoard(selectedID, cardCursor, false); });
-	loadBoards("", true);
-	if (route[1]) {
+ window.NexusLive.watch("workboard-list",async()=>{
+  const version=boardRequestVersion, state=appliedBoardState;
+  const page=await requestJSON("/api/v1/workboards?"+new URLSearchParams({limit:String(boardPageLimit),state}));
+  if(version!==boardRequestVersion||state!==appliedBoardState)return;
+  if(!validBoardPage(page))return false;
+  // Reconcile loaded rows without resetting pagination, selection, or keyboard focus.
+  for(const board of [...page.items].reverse()){
+   const existing=Array.from(list.children).find(node=>node.querySelector("a")?.getAttribute("href")===base+"/workboards/"+encodeURIComponent(board.id));
+   if(existing){existing.querySelector(".board-name").textContent=board.title;existing.querySelector(".board-summary").textContent=String(board.card_count)+" cards · "+board.state;}
+   else if(!boardIDs.has(board.id)&&boardTotal<maxBoards){list.prepend(boardLink(board));boardIDs.add(board.id);boardTotal++;}
+  }
+  boardCount.textContent=String(boardTotal);if(boardTotal)listState.hidden=true;
+ },{interval:10000,ready:()=>!loadMoreBoards.disabled&&!document.querySelector("dialog[open]")});
+ window.NexusLive.watch("workboard-reconnect",async()=>{
+  if(!selectedID||boardSource?.readyState===1||loadMoreCards.disabled)return;
+  const id=selectedID,version=cardRequestVersion;
+  if(!boardSource||boardSource.readyState===2){closeBoardStream();connectBoard(id);}
+  const query=new URLSearchParams({limit:String(cardPageLimit)});filterQuery(query);
+  const snapshot=await requestJSON("/api/v1/workboards/"+encodeURIComponent(id)+"?"+query);
+  if(id!==selectedID||version!==cardRequestVersion)return;
+  if(!validSnapshot(snapshot,id))return false;
+  if(!currentBoard||snapshot.board.event_sequence!==currentBoard.event_sequence||snapshot.board.revision!==currentBoard.revision)queueInvalidation("Synchronizing missed changes…");
+ },{interval:5000});
+ loadBoards("", true);
+ if (route[1]) {
 		try { const boardID = decodeURIComponent(route[1]); if (!idPattern.test(boardID)) throw new Error("invalid board id"); connectBoard(boardID); loadBoard(boardID, "", true); } catch (_) { notice(stateNode, "The workboard address is invalid.", true); }
 	}
 	window.addEventListener("beforeunload", () => { if (invalidationTimer) window.clearTimeout(invalidationTimer); closeBoardStream(); });

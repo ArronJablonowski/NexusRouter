@@ -46,9 +46,9 @@ func TestRoutingMapIgnoresStaleRefreshSuccessAndFailure(t *testing.T) {
 	script := `const vm=require('vm');
 const source=` + "`" + function + "`" + `;
 async function scenario(failOld) {
-  const nodes=new Map(); const document={hidden:false,querySelector(q){if(!nodes.has(q))nodes.set(q,{textContent:'',hidden:false,clears:0,replaceChildren(){this.clears++},append(){}});return nodes.get(q)}};
+  const nodes=new Map(); const document={hidden:false,querySelector(q){if(!nodes.has(q))nodes.set(q,{textContent:'',hidden:false,clears:0,contains(){return false},replaceChildren(){this.clears++},append(){}});return nodes.get(q)}};
   let resolveOld,rejectOld,resolveNew,calls=0,schedules=0;
-  const scope={document,window:{clearTimeout(){},setTimeout(){schedules++;return 1}},routingTimer:0,routingGeneration:0,snapshot:null,commander:()=>null,ranked:()=>[],drawBranches(){},jobs:[],creativePreference:'',inventory(){return new Promise((resolve,reject)=>{if(calls++===0){resolveOld=resolve;rejectOld=reject}else resolveNew=resolve})}};
+  const scope={document,window:{clearTimeout(){},setTimeout(){schedules++;return 1}},routingTimer:0,routingGeneration:0,snapshot:null,commander:()=>null,ranked:()=>[],drawBranches(){},jobs:[],creativePreference:'',creativeSignature:'',inventory(){return new Promise((resolve,reject)=>{if(calls++===0){resolveOld=resolve;rejectOld=reject}else resolveNew=resolve})}};
   vm.createContext(scope);vm.runInContext(source,scope);
   const old=scope.loadRouting(),fresh=scope.loadRouting();
   resolveNew({models:[{},{}],fitness:[],local_concurrency:'1'});await fresh;

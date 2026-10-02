@@ -33,7 +33,7 @@ var embeddedShellAssets embed.FS
 // filesystem metadata.
 func ShellAssetDigest() (string, error) {
 	hash := sha256.New()
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		body, err := fs.ReadFile(embeddedShellAssets, name)
 		if err != nil {
 			return "", err
@@ -144,6 +144,8 @@ func (h *bootstrapHandler) ServeHTTP(writer http.ResponseWriter, request *http.R
 		return
 	}
 	asset := h.assets[name]
+	digest := sha256.Sum256(asset.body)
+	writer.Header().Set("ETag", "\""+hex.EncodeToString(digest[:])+"\"")
 	writer.Header().Set("Content-Type", asset.contentType)
 	writer.Header().Set("Content-Length", decimalLength(len(asset.body)))
 	writer.WriteHeader(http.StatusOK)
@@ -180,6 +182,8 @@ func (h *shellHandler) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 		writeShellError(writer, request, http.StatusNotFound)
 		return
 	}
+	digest := sha256.Sum256(asset.body)
+	writer.Header().Set("ETag", "\""+hex.EncodeToString(digest[:])+"\"")
 	writer.Header().Set("Content-Type", asset.contentType)
 	writer.Header().Set("Content-Length", decimalLength(len(asset.body)))
 	writer.WriteHeader(http.StatusOK)
@@ -217,7 +221,7 @@ func (h *shellHandler) resolve(request *http.Request) (name string, route bool, 
 }
 
 func loadShellAssets(basePath string) (map[string]shellAsset, error) {
-	names := []string{"index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/app.js"}
+	names := []string{"index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/app.js"}
 	loaded := make(map[string]shellAsset, len(names))
 	for _, name := range names {
 		embedName := name
@@ -229,6 +233,12 @@ func loadShellAssets(basePath string) (map[string]shellAsset, error) {
 			return nil, err
 		}
 		if name == "index.html" {
+			css, e := fs.ReadFile(embeddedShellAssets, "assets/v1/app.css")
+			if e != nil {
+				return nil, e
+			}
+			digest := sha256.Sum256(css)
+			body = bytes.ReplaceAll(body, []byte("__NEXUS_CSS_DIGEST__"), []byte(hex.EncodeToString(digest[:])))
 			body = bytes.ReplaceAll(body, []byte("__DARWIN_BASE_PATH__"), []byte(basePath))
 		}
 		contentType := mime.TypeByExtension(path.Ext(name))

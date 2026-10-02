@@ -81,6 +81,21 @@
 			else setStatus("Settings were not saved. Review the values and try again.", true);
 		}).finally(() => setBusy(false));
 	}
+ let liveSettingsBusy=false;
+ async function reconcileSettings(){
+  if(loading||liveSettingsBusy||!projection||form.contains(document.activeElement))return;
+  liveSettingsBusy=true;
+  try{
+   const response=await window.NexusLive.fetch(base+"/api/v1/settings",{credentials:"same-origin",cache:"no-store"});if(!response.ok)throw Error();
+   const value=await response.json();if(!validProjection(value))throw Error();
+   if(value.digest===projection.digest&&JSON.stringify(value.active)===JSON.stringify(projection.active))return;
+   // Keep the original digest while a draft is dirty, so save still detects conflicts.
+   if(Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==projection.saved[key])){setStatus("Settings changed elsewhere. Your unsaved edits are preserved; use Reset or Refresh to load current settings.",false);return;}
+   render(value);
+  }catch{setStatus("Live settings check unavailable. Your edits are preserved; reconnecting automatically.",true);return false;}
+  finally{liveSettingsBusy=false;}
+ }
+ window.NexusLive.watch("settings",reconcileSettings,{ready:()=>!loading});
 	tools.addEventListener("change", syncDependency);
 	delegated.addEventListener("change", () => validate(formValue()));
 	root.addEventListener("input", () => { if (!validation.hidden) validate(formValue()); });

@@ -13,6 +13,7 @@
 	const digestPattern = /^[0-9a-f]{64}$/;
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 	const expanded = new Set();
+	let modelSignature = "";
 	let timer = 0, refreshMS = 10000, loading = false, loaded = false, stopped = false;
 	chat.hidden = true; workboards.hidden = true; settings.hidden = true; view.hidden = false;
 
@@ -87,7 +88,8 @@
 	function render(page) {
 		const locals = page.models.filter(item => item.locality === "local"), clouds = page.models.filter(item => item.locality === "cloud");
 		const present = new Set(page.models.map(item => item.id)); expanded.forEach(id => { if (!present.has(id)) expanded.delete(id); });
-		localList.replaceChildren(...locals.map(card)); cloudList.replaceChildren(...clouds.map(card));
+		const signature = JSON.stringify(page.models);
+		if (signature !== modelSignature && !localList.contains(document.activeElement) && !cloudList.contains(document.activeElement)) { localList.replaceChildren(...locals.map(card)); cloudList.replaceChildren(...clouds.map(card)); modelSignature = signature; }
 		localCount.textContent = String(locals.length); cloudCount.textContent = String(clouds.length);
 		localState.hidden = locals.length > 0; cloudState.hidden = clouds.length > 0;
 		if (!locals.length) notice(localState, "No local models were discovered or configured.", false);
@@ -99,7 +101,7 @@
 		const partial = page.local_total_coverage === "partial" ? "Partial logical total." : "Complete provider-reported logical total.";
 		const failed = unavailable.length ? " Unavailable local provider" + (unavailable.length === 1 ? ": " : "s: ") + unavailable.join(", ") + "." : "";
 		totalDetail.textContent = partial + " " + page.local_total_bytes.toLocaleString() + " bytes are reported; duplicate model digests are counted once." + unknown + failed + " Shared provider layers may use less physical space.";
-		refreshMS = page.refresh_interval_ms;
+		refreshMS = 5000;
 		liveStatus.textContent = "Inventory refreshed " + time(page.refreshed_at) + ". Updates automatically every " + (refreshMS / 1000).toLocaleString() + " seconds while this page is visible.";
 		liveStatus.classList.remove("error"); connection.textContent = "Connected"; loaded = true;
 	}
@@ -109,7 +111,7 @@
 		loading = true; refresh.disabled = true;
 		if (!loaded) liveStatus.textContent = "Loading model inventory…";
 		try {
-			const response = await fetch(base + "/api/v1/models", {credentials: "same-origin", cache: "no-store", headers: {Accept: "application/json"}});
+			const response = await window.NexusLive.fetch(base + "/api/v1/models", {credentials: "same-origin", cache: "no-store", headers: {Accept: "application/json"}});
 			if (!response.ok) throw new Error("inventory unavailable");
 			const page = await response.json();
 			if (!validPage(page)) throw new Error("invalid inventory");
@@ -119,7 +121,8 @@
 			liveStatus.classList.add("error"); connection.textContent = "Inventory needs attention";
 		} finally { loading = false; refresh.disabled = false; schedule(); }
 	}
-	function schedule() { window.clearTimeout(timer); if (!stopped && !document.hidden) timer = window.setTimeout(load, refreshMS); }
+	function schedule() {}
+ window.NexusLive.watch("models",load,{interval:5000,ready:()=>!loading&&!stopped});
 	refresh.addEventListener("click", load);
 	document.addEventListener("visibilitychange", () => { if (document.hidden) window.clearTimeout(timer); else load(); });
 	window.addEventListener("beforeunload", () => { stopped = true; window.clearTimeout(timer); });

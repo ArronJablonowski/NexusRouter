@@ -49,6 +49,15 @@ window.NexusRemoteMembership = (() => {
   }
   form.addEventListener("submit",event=>{event.preventDefault();if(!verified.checked||busy)return;try{const peer=editor.read();mutate({action:"pair",peer,identity_verified:true});}catch{message("Review the pairing fields and permission preview.");}});
   refresh.addEventListener("click",load);
+  let liveBusy=false;
+  async function reconcile(){
+   if(busy||liveBusy||!page||peers.querySelector("details[open]")||form.contains(document.activeElement))return;
+   liveBusy=true;
+   try{const response=await window.NexusLive.fetch(base+"/api/v1/remote-membership",{credentials:"same-origin",cache:"no-store"});if(!response.ok)throw Error();const value=await response.json();if(JSON.stringify(value)!==JSON.stringify(page))render(value);}
+   catch{message("Live membership check unavailable; reconnecting automatically. Pairing fields are preserved.");return false;}
+   finally{liveBusy=false;}
+  }
+  window.NexusLive.watch("membership",reconcile,{interval:5000});
   load();
  }
  return {mount};

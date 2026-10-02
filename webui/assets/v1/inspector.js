@@ -63,7 +63,7 @@
 	}
 
 	function requestJSON(path) {
-		return fetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
+		return window.NexusLive.fetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
 			if (!response.ok) throw new Error("request unavailable");
 			return response.json();
 		});
@@ -152,7 +152,7 @@
 		modelList.replaceChildren();
 		modelCount.textContent = "";
 		showNotice(modelsState, "Loading models…", false);
-		requestJSON("/api/v1/models").then(body => {
+		return requestJSON("/api/v1/models").then(body => {
 			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability) || !Array.isArray(body.models) || body.models.length > maxInspectedModels ||
 				(body.availability === "available") !== printable(body.config_id, 128, false) || body.availability === "available" &&
 				(!Number.isFinite(Date.parse(body.refreshed_at)) || !integer(body.local_total_bytes) || body.local_total_kind !== "logical_deduplicated" || !integer(body.local_unknown_size_count))) throw new Error("invalid models");
@@ -183,7 +183,7 @@
 	function loadHealth() {
 		healthDetails.replaceChildren();
 		showNotice(healthState, "Loading health…", false);
-		requestJSON("/api/v1/health").then(body => {
+		return requestJSON("/api/v1/health").then(body => {
 			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability) || !Array.isArray(body.checks) || body.checks.length > maxHealthChecks) throw new Error("invalid health");
 			if (body.availability === "unavailable") {
 				if (body.status !== "unavailable" || body.ready !== undefined || body.checked_at !== undefined || body.checks.length) throw new Error("invalid unavailable health");
@@ -205,7 +205,7 @@
 	function loadResources() {
 		resourcesDetails.replaceChildren();
 		showNotice(resourcesState, "Loading resources…", false);
-		requestJSON("/api/v1/resources").then(body => {
+		return requestJSON("/api/v1/resources").then(body => {
 			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability)) throw new Error("invalid resources");
 			const fields = ["cpus", "total_ram_bytes", "available_ram_bytes", "swap_used_bytes", "vram_total_bytes", "vram_available_bytes"];
 			if (body.availability === "unavailable") {
@@ -265,7 +265,7 @@
 		routeDetails.replaceChildren();
 		routeCandidates.replaceChildren();
 		showNotice(routeState, "Loading route…", false);
-		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/route").then(body => {
+		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/route").then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			renderRoute(body);
 		}).catch(() => {
@@ -276,7 +276,7 @@
 	function loadUsage(taskID, requestID) {
 		usageDetails.replaceChildren();
 		showNotice(usageState, "Loading usage…", false);
-		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/usage").then(body => {
+		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/usage").then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			if (!body || body.version !== 1 || body.task_id !== taskID || !["available", "unavailable"].includes(body.availability) ||
 				(body.availability === "available") !== Boolean(body.usage)) throw new Error("invalid usage");
@@ -310,7 +310,7 @@
 		const limit = Math.min(inspectionPageLimit, maxInspectionItems - toolTotal);
 		const query = new URLSearchParams({limit: String(limit)});
 		if (after) query.set("after", after);
-		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/tools?" + query.toString()).then(body => {
+		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/tools?" + query.toString()).then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			if (!body || body.version !== 1 || body.task_id !== taskID || !Array.isArray(body.tools) || body.tools.length > limit ||
 				!printable(body.next_cursor || "", 512, true) || body.next_cursor && toolCursors.has(body.next_cursor)) throw new Error("invalid tools");
@@ -360,7 +360,7 @@
 		const limit = Math.min(inspectionPageLimit, maxInspectionItems - auditTotal);
 		const query = new URLSearchParams({limit: String(limit)});
 		if (after) query.set("after", after);
-		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/audits?" + query.toString()).then(body => {
+		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/audits?" + query.toString()).then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			if (!body || body.version !== 1 || body.task_id !== taskID || !Array.isArray(body.audits) || body.audits.length > limit ||
 				!printable(body.next_cursor || "", 512, true) || body.next_cursor && auditCursors.has(body.next_cursor)) throw new Error("invalid audits");
@@ -401,11 +401,7 @@
 		taskInspector.hidden = true;
 	}
 
-	function loadGlobals() {
-		loadModels();
-		loadHealth();
-		loadResources();
-	}
+	function loadGlobals() { return Promise.all([loadModels(),loadHealth(),loadResources()]); }
 
 	loadMoreTools.addEventListener("click", () => { if (selectedTaskID && toolCursor) loadTools(selectedTaskID, toolCursor, false, inspectorRequest); });
 	loadMoreAudits.addEventListener("click", () => { if (selectedTaskID && auditCursor) loadAudits(selectedTaskID, auditCursor, false, inspectorRequest); });

@@ -14,7 +14,7 @@ func TestRemoteMembershipBrowserFencesAndUncertainWrites(t *testing.T) {
  const peer={id:'<script>no</script>',endpoint:'https://127.0.0.1:8443',transport:'ssh'};
  const page={version:1,enabled:true,inspection_enabled:true,digest:'a'.repeat(64),registry:{version:1,peers:[peer]}};
  let posts=[],failure=false; const fetch=async(url,opts)=>{if(opts.method==='POST'){posts.push(JSON.parse(opts.body));if(failure)return {ok:false,status:409}}return {ok:true,json:async()=>page}};
- let clears=0; const window={NexusRemoteInspection:{attach(card){const button=element();button.type="button";button.disabled=true;card.append(button);}},NexusRemoteDiscovery:{mount(){return {setEnabled(){}}}},NexusRemotePairForm:{mount(){return {read:()=>peer,lock(){},clear(){clears++;}}}}};vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch});
+ let clears=0; const window={NexusRemoteInspection:{attach(card){const button=element();button.type="button";button.disabled=true;card.append(button);}},NexusRemoteDiscovery:{mount(){return {setEnabled(){}}}},NexusRemotePairForm:{mount(){return {read:()=>peer,lock(){},clear(){clears++;}}}}};window.NexusLive={watch(){},fetch:(...args)=>fetch(...args)};vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch});
  const tick=()=>new Promise(resolve=>setImmediate(resolve));
  (async()=>{
  window.NexusRemoteMembership.mount('/console','token');await tick();

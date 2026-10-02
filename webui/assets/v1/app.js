@@ -1,5 +1,4 @@
-"use strict";
-(() => {
+"use strict"; (() => {
 	const base = document.body.dataset.basePath || "";
 	const connection = document.querySelector("#connection-state"), list = document.querySelector("#chat-list");
 	const listState = document.querySelector("#chat-list-state"), chatCount = document.querySelector("#chat-count"), loadMore = document.querySelector("#load-more");
@@ -978,6 +977,7 @@
 	}
 	if (!skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
 	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
+ window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage,busy:value=>{loadingPage=value;},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
 		body: JSON.stringify({version: 1}), cache: "no-store"

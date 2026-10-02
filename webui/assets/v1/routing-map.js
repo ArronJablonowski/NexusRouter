@@ -22,7 +22,7 @@
 	];
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 	let snapshot = null, routingTimer = 0, routingGeneration = 0;
-	let creativePreference = "";
+	let creativePreference = "", creativeSignature = "";
 	const expandedModels = new Set(new URLSearchParams(window.location.search).getAll("expanded").filter(value => { const parts=value.split("|"); return parts.length===2 && jobs.some(job => job.key===parts[0]) && idPattern.test(parts[1]); }));
 	for (const selector of allViews) document.querySelector(selector).hidden = selector !== (window.NexusRoutes.routing(relative) ? "#routing-view" : "#elimination-view");
 
@@ -32,7 +32,7 @@
 	function validFallbacks(value) { return value === undefined || Array.isArray(value) && value.length <= 128 && value.every(item => item && [item.domain,item.profile,item.source_domain,item.source_profile].every(part => typeof part === "string" && idPattern.test(part)) && (item.domain !== item.source_domain || item.profile !== item.source_profile)) && new Set(value.map(item => item.domain+"|"+item.profile)).size === value.length; }
     function validRankings(rows, models) { return rows === undefined || Array.isArray(rows) && rows.length <= jobs.length && new Set(rows.map(row => row.key)).size === rows.length && rows.every(row => row && (row.requires_evidence === undefined || typeof row.requires_evidence === "boolean") && [row.key,row.domain,row.profile].every(value => idPattern.test(value)) && Array.isArray(row.models) && row.models.length <= 3 && new Set(row.models.map(item => item.model_id)).size === row.models.length && row.models.every(item => item && models.some(model => model.id === item.model_id) && [item.domain,item.profile].every(value => idPattern.test(value)) && [item.score,item.confidence].every(value => Number.isFinite(value) && value >= 0 && value <= 1) && Number.isSafeInteger(item.samples) && item.samples >= 0 && (!row.requires_evidence || item.samples > 0))); }
 	function validSnapshot(value) { const concurrency = value && value.local_concurrency === "auto" ? 1 : Number(value && value.local_concurrency); return value && value.version === 1 && value.availability === "available" && Array.isArray(value.models) && value.models.length <= 256 && value.models.every(validModel) && validRankings(value.rankings,value.models) && Array.isArray(value.fitness) && value.fitness.length <= 4096 && value.fitness.every(validFitness) && validFallbacks(value.evidence_fallbacks) && (value.commander_id === undefined || idPattern.test(value.commander_id)) && (value.commander_fallback_id === undefined || idPattern.test(value.commander_fallback_id)) && (value.local_concurrency === "auto" || Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64 && String(concurrency) === value.local_concurrency) && ["reject","wait"].includes(value.local_pressure_policy) && Number.isFinite(value.local_ram_limit_pct) && value.local_ram_limit_pct > 0 && value.local_ram_limit_pct <= 100 && Number.isFinite(value.local_vram_limit_pct) && value.local_vram_limit_pct > 0 && value.local_vram_limit_pct <= 100 && typeof value.managed_residency === "boolean" && typeof value.specialists_allow_cloud === "boolean"; }
-	async function inventory() { const response = await fetch(base + "/api/v1/models", {credentials:"same-origin", cache:"no-store", headers:{Accept:"application/json"}}); if (!response.ok) throw new Error("inventory unavailable"); const value = await response.json(); if (!validSnapshot(value)) throw new Error("invalid inventory"); return value; }
+	async function inventory() { const response = await window.NexusLive.fetch(base + "/api/v1/models", {credentials:"same-origin", cache:"no-store", headers:{Accept:"application/json"}}); if (!response.ok) throw new Error("inventory unavailable"); const value = await response.json(); if (!validSnapshot(value)) throw new Error("invalid inventory"); return value; }
 	function learned(model, job) {
         const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key));
         return scope ? scope.models.find(item => item.model_id === model.id) || null : null;
@@ -94,7 +94,7 @@
 		}
 	}
 
-	async function loadRouting() {
+ async function loadRouting() {
 		const generation = ++routingGeneration;
 		window.clearTimeout(routingTimer);
 		const status = document.querySelector("#routing-live-status"); status.textContent = "Synchronizing live model inventory…";
@@ -112,12 +112,14 @@
 			const grid = document.querySelector("#specialist-grid"); grid.replaceChildren();
 			for (const job of jobs) { const card = element("article","specialist-card"), heading = element("div","specialist-heading"); card.dataset.route = job.key; heading.append(element("span","job-glyph",job.label.slice(0,2).toUpperCase()), element("h3","",job.label)); card.append(heading,element("small","route-scope",scopeLabel(job)+" · policy preview")); const routes = element("div","route-stack"), models = ranked(job); if (!models.length) routes.append(element("p","route-empty",emptyRankingLabel(job))); else models.forEach((model,index) => routes.append(modelChip(model,index,job))); card.append(routes); grid.append(card); }
 			drawBranches();
-			const creative = ranked(jobs[jobs.length-1]), choices = document.querySelector("#creative-choices"), preference = document.querySelector("#creative-preference"); choices.replaceChildren();
-			creative.forEach(model => { const button = element("button","tron-choice",model.model); button.type="button"; button.setAttribute("aria-pressed",String(creativePreference === model.id)); button.addEventListener("click",() => { creativePreference = model.id; for (const item of choices.querySelectorAll("button")) item.setAttribute("aria-pressed",String(item === button)); preference.textContent = "User preference recorded for this consultation: " + model.model + "."; }); choices.append(button); });
+			const creative = ranked(jobs[jobs.length-1]), choices = document.querySelector("#creative-choices"), preference = document.querySelector("#creative-preference");
+			const nextCreative = JSON.stringify(creative.map(model => [model.id, model.model]));
+			if (nextCreative !== creativeSignature && !choices.contains(document.activeElement)) { choices.replaceChildren(); creativeSignature = nextCreative;
+			creative.forEach(model => { const button = element("button","tron-choice",model.model); button.type="button"; button.setAttribute("aria-pressed",String(creativePreference === model.id)); button.addEventListener("click",() => { creativePreference = model.id; for (const item of choices.querySelectorAll("button")) item.setAttribute("aria-pressed",String(item === button)); preference.textContent = "User preference recorded for this consultation: " + model.model + "."; }); choices.append(button); }); }
 			preference.textContent = creativePreference ? "Current consultation preference: " + creativePreference + ". The commander should ask again when the creative brief materially changes." : "No preference recorded. The commander must ask before choosing between subjective outputs.";
 			status.textContent = "Grid synchronized at " + new Date().toLocaleTimeString() + " · " + snapshot.models.length + " models · learned evidence updates automatically. Scores include configured weights and decay. Dispatch still checks request constraints, exploration and available capacity.";
 		} catch (_) { if (generation !== routingGeneration) return; status.textContent = "Routing grid unavailable. The last display was cleared."; document.querySelector("#specialist-grid").replaceChildren(); }
-		window.clearTimeout(routingTimer); if (!document.hidden) routingTimer = window.setTimeout(loadRouting, snapshot && snapshot.refresh_interval_ms || 10000);
+		window.clearTimeout(routingTimer); if (!document.hidden) routingTimer = window.setTimeout(loadRouting, 5000);
 	}
 
 	async function report(model, domain, threshold) {
@@ -125,13 +127,15 @@
 		const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key));
 		if (!scope) throw new Error("evidence scope unavailable");
 		const query = new URLSearchParams({model:model.id, domain:scope.domain, profile:scope.profile, window:"100", min_samples:"20", failure_threshold:String(threshold)});
-		const response = await fetch(base + "/api/v1/models/deprecation?" + query.toString(), {credentials:"same-origin",cache:"no-store",headers:{Accept:"application/json"}});
+		const response = await window.NexusLive.fetch(base + "/api/v1/models/deprecation?" + query.toString(), {credentials:"same-origin",cache:"no-store",headers:{Accept:"application/json"}});
 		if (!response.ok) throw new Error("report unavailable"); const value = await response.json();
 		if (!value || value.version !== 1 || value.configured_model_id !== model.id || typeof value.candidate !== "boolean" || !Number.isSafeInteger(value.eligible_samples) || typeof value.failure_rate !== "number" || typeof value.reason !== "string") throw new Error("invalid report");
 		return value;
 	}
 	function tribunalCard(model, value) { const card = element("article","tribunal-card"); const rate = Math.round(value.failure_rate * 1000) / 10; card.append(element("strong","",model.model), element("span",value.candidate ? "verdict eliminate" : "verdict retain",value.candidate ? "REVIEW" : "HOLD"), element("p","",value.reason.replaceAll("_"," ")), element("small","",value.eligible_samples + " eligible samples · " + rate + "% failures · " + contextLabel(model) + " · approval required")); return card; }
-	async function loadElimination() {
+	let eliminationBusy=false;
+ async function loadElimination() {
+ if(eliminationBusy)return;eliminationBusy=true;
 		const status = document.querySelector("#elimination-live-status"), candidateList = document.querySelector("#elimination-candidates"), retainedList = document.querySelector("#elimination-retained");
 		candidateList.replaceChildren(); retainedList.replaceChildren(); status.textContent = "Scanning persisted evaluation evidence…";
 		try {
@@ -140,11 +144,13 @@
 			if (!candidateList.children.length) candidateList.append(element("p","route-empty","No model crosses the evidence threshold."));
 			status.textContent = "Evidence scan complete · " + candidates + " review candidates · " + unavailable + " unavailable reports.";
 		} catch (_) { status.textContent = "Elimination evidence is unavailable. No recommendation was manufactured."; }
+ eliminationBusy=false;
 	}
 
-	if (window.NexusRoutes.routing(relative)) { document.querySelector("#refresh-routing").addEventListener("click",loadRouting); document.addEventListener("visibilitychange",() => { window.clearTimeout(routingTimer); if (!document.hidden) loadRouting(); }); window.addEventListener("resize",drawBranches); window.addEventListener("routing-remote-updated",drawBranches); loadRouting(); }
+	if (window.NexusRoutes.routing(relative)) { document.querySelector("#refresh-routing").addEventListener("click",loadRouting); document.addEventListener("visibilitychange",() => { window.clearTimeout(routingTimer); if (!document.hidden) loadRouting(); }); window.addEventListener("resize",drawBranches); window.addEventListener("routing-remote-updated",drawBranches); window.addEventListener("online",loadRouting);window.addEventListener("focus",loadRouting);loadRouting(); }
 	if (window.NexusRoutes.elimination(relative)) {
 		const select = document.querySelector("#elimination-job"); for (const job of jobs) { const option = element("option","",job.label); option.value = job.key; select.append(option); }
 		document.querySelector("#refresh-elimination").addEventListener("click",loadElimination); document.querySelector("#elimination-controls").addEventListener("submit",event => { event.preventDefault(); loadElimination(); }); loadElimination();
+ window.NexusLive.watch("elimination",loadElimination,{interval:30000,ready:()=>!document.querySelector("#elimination-controls").contains(document.activeElement)});
 	}
 })();

@@ -29,6 +29,9 @@
   return count.measured>0?"All recorded usage has token counts.":"No usage recorded in this period.";
  }
  function render(data){
+  const signature=JSON.stringify({...data,updated_at:"",remote:data.remote?{...data.remote,observed_at:""}:undefined});
+  if(signature===render.signature){status.textContent="Live · checked "+new Date(data.updated_at).toLocaleTimeString();return;}
+
   if(data.version!==1)throw new Error("Invalid stats");root.replaceChildren();
   for(const kind of ["cloud","local"]){const meter=data[kind];if(!meter||!Number.isSafeInteger(meter.revision))throw new Error("Invalid stats");
    const card=node("article","stats-card stats-"+kind);card.append(node("p","eyebrow",kind==="cloud"?"Cloud models":"Local models"),node("h2","","Lifetime odometer"));
@@ -50,9 +53,9 @@
    remote.append(node("p","stats-note","Lifetime tokens for work requested by this caller, across paired NexusRouter instances. Includes reported failed attempts and auxiliary model calls. Missing measurements are not estimated. These totals are separate from this router’s local and cloud odometers."));
   }
   root.append(remote);
-  snapshot=data;status.textContent="Updated "+new Date(data.updated_at).toLocaleTimeString()+" · "+data.unclassified+" records have unknown model locality. Counts cover usage recorded by this NexusRouter instance; external app usage is not included.";document.querySelector("#connection-state").textContent="Connected";
+  render.signature=signature;snapshot=data;status.textContent="Updated "+new Date(data.updated_at).toLocaleTimeString()+" · "+data.unclassified+" records have unknown model locality. Counts cover usage recorded by this NexusRouter instance; external app usage is not included.";document.querySelector("#connection-state").textContent="Connected";
  }
- async function json(path,options={}){const response=await fetch(base+path,{credentials:"same-origin",cache:"no-store",...options});if(!response.ok)throw new Error(response.status===409?"This trip changed in another window. Refresh and try again.":"Stats unavailable. Refresh or reconnect your browser.");return response.json();}
+ async function json(path,options={}){const response=await window.NexusLive.fetch(base+path,{credentials:"same-origin",cache:"no-store",...options});if(!response.ok)throw new Error(response.status===409?"This trip changed in another window. Refresh and try again.":"Stats unavailable. Refresh or reconnect your browser.");return response.json();}
  async function load(){if(busy||dialog.open)return;busy=true;try{render(await json("/api/v1/stats"));}catch(error){status.textContent=error.message;}finally{busy=false;}}
  check.addEventListener("change",()=>{confirm.disabled=!check.checked||busy;});
  confirm.addEventListener("click",async()=>{if(!pending||!check.checked||busy)return;busy=true;confirm.disabled=true;try{
@@ -60,6 +63,5 @@
   const data=await json("/api/v1/stats",{method:"POST",headers:{"Content-Type":"application/json","X-Darwin-CSRF":auth.csrf_token},body:JSON.stringify({version:1,locality:pending.kind,revision:pending.revision,confirm:true})});dialog.close();pending=null;render(data);
  }catch(error){dialog.close();status.textContent=error.message;}finally{busy=false;}});
  document.querySelector("#stats-refresh").addEventListener("click",load);
- function poll(){window.clearTimeout(timer);if(!document.hidden)load();timer=window.setTimeout(poll,15000);}
- document.addEventListener("visibilitychange",poll);poll();
+ window.NexusLive.watch("stats",load,{interval:3000,ready:()=>!busy&&!dialog.open});load();
 })();

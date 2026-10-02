@@ -1,3 +1,11 @@
+## 2026-10-02 — Live WebUI reconciliation
+
+The WebUI now reconciles chats, model inventory, routing, remote membership and caller-owned task results, skills, settings and token odometers in place. Existing chat/workboard event streams remain authoritative; reconnect checks recover missed snapshots without automatically replaying mutations. Visible-page read intervals are generally 3–10 seconds (elimination evidence 30 seconds). Shared watchers bound concurrent jobs, back off failed reads, pause while hidden/offline and wake on reconnect/focus. Read requests have a 12-second deadline. Open confirmations and dirty settings are protected; routing remote model lists retain scroll and unchanged model/creative controls retain focus. Workboard reconnect checks compare committed revisions before rebuilding details.
+
+Authenticated CSS assets publish content ETags and are replaced atomically in the current document when changed. This supports stylesheet deployment without discarding drafts. It does not execute arbitrary new JavaScript or replace the HTML shell; a browser that predates this change must load the updated shell once. New JS/HTML deployments still require opening the new shell.
+
+Verification: browser checks exercise automatically changing token counts and stylesheet updates in the same document, including focused draft preservation; a separate Chrome settings check verifies dirty drafts survive external changes and clean settings converge. Scheduler checks cover overlapping reads, hidden/offline pause, reconnect, disposal and form readiness. Full repository validation and the GitHub push are tracked by the durable validation supervisor after earlier odometer/outline checkpoints.
+
 # Implementation evidence
 
 This file tracks recent work and remaining gaps. Earlier entries are preserved,
