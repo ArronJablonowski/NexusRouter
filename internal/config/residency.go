@@ -56,8 +56,8 @@ func (s Settings) validateResidency() error {
 			}
 			seen[identity] = true
 		}
-		if p.DedicatedWarmMemory && (p.ManageResidency || len(seen) != 1 || s.Hardware.Concurrent != "1" || s.Workers.Max != 1) {
-			return errors.New("warm memory requires one dedicated model, serial execution and no managed unloading")
+		if p.DedicatedWarmMemory && (p.ManageResidency || len(seen) != 1) {
+			return errors.New("warm memory requires one model per dedicated provider and no managed unloading")
 		}
 	}
 	return nil

@@ -2143,3 +2143,28 @@ Final fenced physical 80B qualification passed in 15.918s, again verifying one
 cold and three warm durable charges across HTTPS/SSH. Prior failure and earlier
 passing evidence remain separate. Source checks and targeted regression gates
 passed; full make check and public push remain pending.
+
+
+## Concurrent models with Spark unified-memory reserve (2026-10-02)
+
+Added an automatic 8 GiB platform reserve on positively identified DGX Spark
+hosts, applied consistently to admission, advisory capacity and residency pressure.
+Existing RAM percentages remain authoritative when stricter. Two different models
+can contend through independent host coordinator handles; no separate GPU pool or
+resident-byte credit is introduced. Parallel worker configurations are accepted
+with dedicated warm settings but fall back to full cold estimates; verified warm
+admission remains serial and fenced. Per-provider single-model ownership remains
+required only for the warm optimization.
+
+Boundary, percentage precedence, integer overflow, tiny-container, planner,
+idempotent release and two-store parallel model tests pass under the race detector.
+The application warm-fallback regressions and source/vet checks also pass.
+Physical two-model Spark qualification passed in 61.04 seconds: Qwen3 8B
+(16 GiB cold reservation) and Qwen3-Coder-Next (64 GiB cold reservation) had two
+active durable reservations and both model residents in the same observation.
+Both completed their requested tasks; 101 samples observed a minimum available
+RAM of 62,667,771,904 bytes (58.36 GiB), above the 8 GiB reserve. The dedicated
+temporary provider was stopped; the shared Ollama service was not altered.
+Initial fixture permission and short request-ID failures occurred before
+inference and are preserved separately. The full release gate and push are pending.
+This is not a kernel guarantee against external allocations or underestimated needs.

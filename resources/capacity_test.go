@@ -224,6 +224,9 @@ func TestCapacityPlanMatchesReservationProperty(t *testing.T) {
 		availableRAM := uint64(random.Intn(int(totalRAM/gib)+1)) * gib
 		swap, swapPressure, thermal := uint64(random.Intn(9))*gib, false, false
 		snapshot := Snapshot{Time: now, CPUs: 1 + random.Intn(16), TotalRAM: totalRAM, AvailableRAM: availableRAM, SwapUsed: &swap, SwapPressure: &swapPressure, ThermalPressure: &thermal, Source: "property"}
+		if iteration%2 == 0 {
+			snapshot.RAMReserveBytes = SparkRAMReserveBytes
+		}
 		need := Need{RAM: uint64(1+random.Intn(8)) * gib}
 		switch iteration % 3 {
 		case 0:

@@ -82,6 +82,24 @@ func TestPhysicalTwoHostLiveModel(t *testing.T) {
 			t.Fatal("invalid dedicated warm fixture", e)
 		}
 	}
+
+	parallel := os.Getenv("NEXUS_REMOTE_TEST_SECOND_MODEL")
+	if parallel != "" {
+		if os.Getenv("NEXUS_REMOTE_TEST_WARM_RAM") != "" {
+			t.Fatal("parallel qualification uses full cold estimates")
+		}
+		secondRAM, e := strconv.ParseUint(os.Getenv("NEXUS_REMOTE_TEST_SECOND_RAM"), 10, 64)
+		if e != nil || secondRAM == 0 {
+			t.Fatal("explicit second model estimate required")
+		}
+		cfg.Workers.Max = 2
+		cfg.Hardware.Concurrent = "2"
+		cfg.Providers[0].Endpoint = os.Getenv("NEXUS_REMOTE_TEST_PROVIDER_ENDPOINT")
+		cfg.Models = append(cfg.Models, config.Model{ID: "second", Provider: "local", Model: parallel, Locality: "local", RAMBytes: secondRAM, Capabilities: []string{"chat"}, ContextTokens: 8192, EstimatedCost: &zero})
+		if e := cfg.Validate(); e != nil {
+			t.Fatal(e)
+		}
+	}
 	ca := newCA(t)
 	sc, sp := ca.leaf(t, "node-a")
 	cc, cp := ca.leaf(t, "node-b")
@@ -100,6 +118,9 @@ func TestPhysicalTwoHostLiveModel(t *testing.T) {
 	}
 	files["config.yaml"] = base64.StdEncoding.EncodeToString(cfgBody)
 	caller := testPeer("node-b", cp, "https://127.0.0.1:443")
+	if parallel != "" {
+		caller.Models = append(caller.Models, "second")
+	}
 	trustBody, _ := json.Marshal(Registry{Version: 1, Peers: []Peer{caller}})
 	files["trust.json"] = base64.StdEncoding.EncodeToString(trustBody)
 	payload, _ := json.Marshal(map[string]any{"files": files, "address": address, "binary": binary, "sha256": digest})
@@ -151,6 +172,9 @@ func TestPhysicalTwoHostLiveModel(t *testing.T) {
 	}
 	trust := filepath.Join(local, "peers.json")
 	destination := testPeer("node-a", sp, fmt.Sprintf("https://%s:%d", address, host.Port))
+	if parallel != "" {
+		destination.Models = append(destination.Models, "second")
+	}
 	writeRegistry(t, trust, destination)
 	client := &Client{Trust: TrustFile(trust), Credentials: cc}
 	deadline := time.Now().Add(15 * time.Second)
@@ -167,6 +191,11 @@ func TestPhysicalTwoHostLiveModel(t *testing.T) {
 	}
 	if !ready {
 		t.Fatal("remote host did not become ready")
+	}
+
+	if parallel != "" {
+		qualifyParallelModels(t, ctx, client, admin, host.Directory, cfg.Providers[0].Endpoint, model, parallel)
+		return
 	}
 
 	for _, transport := range []string{"https", "ssh"} {

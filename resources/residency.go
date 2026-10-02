@@ -24,7 +24,7 @@ func (b *Budget) LowMemory(s Snapshot, n Need, now time.Time) (bool, error) {
 	}
 	// Exhausted headroom is low, even when unloading may later recover some.
 	// A failed headroom calculation cannot be interpreted as free capacity.
-	room, _ := headroom(s.TotalRAM, s.AvailableRAM, b.used.RAM, b.limits.RAMPercent)
+	room, _ := ramHeadroom(s, b.used.RAM, b.limits.RAMPercent)
 	usable := room
 	if n.VRAM > 0 {
 		var total, available, reserved uint64

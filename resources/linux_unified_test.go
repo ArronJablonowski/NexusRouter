@@ -29,6 +29,9 @@ func TestLinuxSparkUnifiedMemory(t *testing.T) {
 			if err != nil || s.UnifiedMemory != tc.want || s.TotalRAM != 524288 || s.AvailableRAM != 393216 || s.VRAMTotal != nil || s.VRAMAvailable != nil {
 				t.Fatalf("profile = %+v, %v", s, err)
 			}
+			if tc.want && s.RAMReserveBytes != SparkRAMReserveBytes || !tc.want && s.RAMReserveBytes != 0 {
+				t.Fatal("incorrect platform reserve", s.RAMReserveBytes)
+			}
 			if !tc.want {
 				return
 			}
@@ -39,12 +42,17 @@ func TestLinuxSparkUnifiedMemory(t *testing.T) {
 			if release, err := b.Reserve(s, Need{RAM: 1, VRAM: 1}, time.Now()); err == nil || release != nil {
 				t.Fatal("Spark admitted a separate VRAM pool")
 			}
-			release, err := b.Reserve(s, Need{RAM: 200000}, time.Now())
+			// A container smaller than the reserve must fail closed.
+			if release, err := b.Reserve(s, Need{RAM: 1}, time.Now()); err == nil || release != nil {
+				t.Fatal("admitted below Spark reserve")
+			}
+			s.TotalRAM, s.AvailableRAM = 128<<30, 100<<30
+			release, err := b.Reserve(s, Need{RAM: 40 << 30}, time.Now())
 			if err != nil {
 				t.Fatal("shared RAM reservation failed", err)
 			}
 			defer release()
-			if extra, err := b.Reserve(s, Need{RAM: 200000}, time.Now()); err == nil || extra != nil {
+			if extra, err := b.Reserve(s, Need{RAM: 40 << 30}, time.Now()); err == nil || extra != nil {
 				t.Fatal("shared RAM overcommitted")
 			}
 		})

@@ -18,7 +18,9 @@ type Snapshot struct {
 	Time                   time.Time     `json:"time"`
 	CPUs                   int           `json:"cpu_threads"`
 	TotalRAM, AvailableRAM uint64
-	SwapUsed               *uint64
+	// RAMReserveBytes is a platform safety floor excluded from admission headroom.
+	RAMReserveBytes uint64 `json:"ram_reserve_bytes,omitempty"`
+	SwapUsed        *uint64
 	// SwapPressure is an explicit active-pressure observation. SwapUsed alone
 	// may contain cold historical pages and must not be interpreted as pressure.
 	SwapPressure             *bool `json:"swap_pressure,omitempty"`

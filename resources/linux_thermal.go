@@ -28,6 +28,9 @@ func profileLinuxHost(ctx context.Context, read func(context.Context, string) ([
 	}
 	s.ThermalPressure = thermal(ctx)
 	s.UnifiedMemory = linuxUnifiedMemory(ctx, read)
+	if s.UnifiedMemory {
+		s.RAMReserveBytes = SparkRAMReserveBytes
+	}
 	if ctx.Err() != nil {
 		return Snapshot{}, ctx.Err()
 	}

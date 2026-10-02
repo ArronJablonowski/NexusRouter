@@ -21,12 +21,16 @@ func TestDedicatedWarmMemoryConfiguration(t *testing.T) {
 	if err := base().Validate(); err != nil {
 		t.Fatal(err)
 	}
+	parallel := base()
+	parallel.Hardware.Concurrent = "auto"
+	parallel.Workers.Max = 4
+	if err := parallel.Validate(); err != nil {
+		t.Fatal("parallel cold fallback rejected", err)
+	}
 	for name, mutate := range map[string]func(*Settings){
 		"shared":      func(s *Settings) { s.Providers[0].DedicatedWarmMemory = false },
 		"remote":      func(s *Settings) { s.Providers[0].Endpoint = "http://10.77.7.202:11434" },
 		"unload":      func(s *Settings) { s.Providers[0].ManageResidency = true },
-		"parallel":    func(s *Settings) { s.Hardware.Concurrent = "auto" },
-		"worker":      func(s *Settings) { s.Workers.Max = 2 },
 		"digest":      func(s *Settings) { s.Models[0].ResidencyDigest = "bad" },
 		"budget":      func(s *Settings) { s.Models[0].WarmRAMBytes = 1 << 30 },
 		"vram":        func(s *Settings) { s.Models[0].VRAMBytes = 1 },

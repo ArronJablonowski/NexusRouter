@@ -148,7 +148,7 @@ func checkedCapacity(result CapacityResult) (CapacityResult, error) {
 }
 
 func capacityHeadroom(snapshot Snapshot, need Need, budget *Budget, now time.Time) CapacityHeadroom {
-	ram, _ := headroom(snapshot.TotalRAM, snapshot.AvailableRAM, budget.used.RAM, budget.limits.RAMPercent)
+	ram, _ := ramHeadroom(snapshot, budget.used.RAM, budget.limits.RAMPercent)
 	result := CapacityHeadroom{RAMBytes: ram, Device: need.Device}
 	if need.Device != "" {
 		total, available, err := DeviceMemory(snapshot, need.Device, now, budget.limits.MaxAge)

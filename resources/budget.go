@@ -67,6 +67,20 @@ func headroom(total, available, reserved uint64, pct float64) (uint64, bool) {
 	return ceiling - used - reserved, true
 }
 
+// SparkRAMReserveBytes preserves at least 8 GiB of measured unified-memory
+// headroom. This is larger than 8 decimal GB. It is not a kernel allocation cap.
+const SparkRAMReserveBytes uint64 = 8 << 30
+
+// ramHeadroom applies the stricter of the percentage ceiling and platform free
+// reserve, then charges every live reservation exactly once against that room.
+func ramHeadroom(s Snapshot, reserved uint64, pct float64) (uint64, bool) {
+	room, ok := headroom(s.TotalRAM, s.AvailableRAM, reserved, pct)
+	if !ok || s.AvailableRAM < s.RAMReserveBytes || reserved > s.AvailableRAM-s.RAMReserveBytes {
+		return 0, false
+	}
+	return min(room, s.AvailableRAM-s.RAMReserveBytes-reserved), true
+}
+
 func NewBudget(l Limits) (*Budget, error) {
 	if l.MaxConcurrent < 1 || l.MaxConcurrent > 64 || l.MaxAge <= 0 || !percent(l.RAMPercent) || !percent(l.VRAMPercent) {
 		return nil, ErrCapacity
@@ -123,7 +137,7 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	if b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) || (s.SwapPressure != nil && *s.SwapPressure) || b.swapGrowthExceeded(s) {
 		return nil, ErrCapacity
 	}
-	ramRoom, ok := headroom(s.TotalRAM, s.AvailableRAM, b.used.RAM, b.limits.RAMPercent)
+	ramRoom, ok := ramHeadroom(s, b.used.RAM, b.limits.RAMPercent)
 	if !ok || n.RAM > ramRoom {
 		return nil, ErrCapacity
 	}

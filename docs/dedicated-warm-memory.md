@@ -5,7 +5,38 @@ an already loaded model. It does not add provider-reported bytes to available
 RAM, turn storage size into reusable memory, or treat Spark GPU memory as a
 second independent pool. The default remains the full cold-load estimate.
 
-## Supported boundary
+## Concurrent models and the Spark reserve
+
+NexusRouter can admit multiple models concurrently when their **combined full
+cold estimates**, existing host usage, and the safety reserve fit. Set
+`hardware.concurrent` to `auto` (adaptive admission) or an explicit ceiling such
+as `2`, and set `workers.max` to at least that many workers. Estimates must include
+weights, KV/context allocations, runtime buffers, and output workload. A provider
+also needs its own concurrency and loaded-model limits configured accordingly;
+a router slot alone does not make a serial provider run in parallel.
+
+On a detected DGX Spark, all RAM admission and capacity planning preserve an
+**8 GiB (8,589,934,592 bytes)** platform reserve. This conservatively exceeds
+8 decimal GB. The stricter of this reserve and `hardware.max_ram_usage_pct` applies.
+Every active reservation across the host coordinator is charged against the
+same pool, including different models and daemons. CPU and GPU RAM are never
+added together on the Spark. A container smaller than the reserve admits no new
+model work. Pressure, stale measurements, and concurrency limits still deny work.
+
+Parallel configurations may retain qualified warm settings, but use full cold
+estimates. The warm optimization below remains serial; changing concurrency does
+not silently grant unsafe residency credit. Dedicated warm providers still have
+one configured model each. A dedicated provider used solely with cold accounting
+can have several configured models and `OLLAMA_MAX_LOADED_MODELS` greater than one.
+
+The reserve is enforced at admission using measured available RAM, including
+Linux reclaimable memory. It is not a promise that unrelated processes or an
+underestimated provider allocation cannot consume RAM later. No unrelated model
+is unloaded, no process is killed, and percentage limits are never raised to make
+a task fit. Upgrade every daemon sharing the Spark coordinator before relying
+on the new floor; older binaries do not implement it. Qualify estimates and monitor the host before production deployment.
+
+## Supported warm boundary
 
 The initial implementation is limited to coordinated native execution on a
 unified-memory host, with one configured model on a dedicated loopback Ollama
@@ -97,3 +128,12 @@ streamed output passed in 15.918 seconds with the final transaction fence. The i
 one cold and three warm charges. The temporary dedicated provider was stopped
 after qualification; the existing shared Ollama service was unchanged. This is
 a measured development checkpoint, not exhaustive workload or release approval.
+
+
+Parallel cold-accounting qualification on the Spark used Qwen3 8B and
+Qwen3-Coder-Next with 16 GiB and 64 GiB estimates. Both completed over the secure
+remote HTTPS route in 61.04 seconds; a single observation confirmed two active
+reservations and both residents. Across 101 samples the minimum available RAM
+was 62,667,771,904 bytes. This verifies the tested two-model workload, not arbitrary
+model combinations. The temporary dedicated service allowed two loaded models,
+kept provider parallelism at one request per model, and was stopped afterward.

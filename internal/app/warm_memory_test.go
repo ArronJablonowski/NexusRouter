@@ -24,7 +24,7 @@ func (f *reservationCoordinatorFixture) AcquireVerifiedWarm(ctx context.Context,
 
 func TestWarmMemoryUsesQualifiedBudgetAndPreservesAdmission(t *testing.T) {
 	digest := strings.Repeat("a", 64)
-	for _, mode := range []string{"warm", "absent", "digest", "context", "expiry", "inventory", "other-resident", "discrete", "pressure", "overhead", "unavailable", "oversize"} {
+	for _, mode := range []string{"warm", "absent", "digest", "context", "expiry", "inventory", "other-resident", "discrete", "pressure", "overhead", "unavailable", "oversize", "parallel", "workers"} {
 		t.Run(mode, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != "GET" {
@@ -78,6 +78,12 @@ func TestWarmMemoryUsesQualifiedBudgetAndPreservesAdmission(t *testing.T) {
 			service.settings.Models = []config.Model{model}
 			service.settings.Hardware.Concurrent = "1"
 			service.settings.Workers.Max = 1
+			if mode == "parallel" {
+				service.settings.Hardware.Concurrent = "auto"
+			}
+			if mode == "workers" {
+				service.settings.Workers.Max = 2
+			}
 			service.providerFactory = nil
 			limits := resources.Limits{MaxConcurrent: 1, RAMPercent: 90, VRAMPercent: 90, MaxAge: time.Second}
 			service.budget, _ = resources.NewBudget(limits)
