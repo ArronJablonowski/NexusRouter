@@ -2181,3 +2181,25 @@ serves “Connect to NexusRouter” with no old brand references. The WebUI and
 WebUI application race suites pass; the embedded asset manifest was reviewed and
 updated for the monogram. Existing storage paths and authentication
 protocol identifiers remain compatibility details, not visible product branding.
+
+## Remote systems on the routing grid (2026-10-02)
+
+Added paired remote systems below the specialist cards, connected to the same
+routing diagram. Each card shows the instance, SSH/HTTPS transport, endpoint,
+fresh connection status and caller-visible model inventory. Availability remains
+advisory; no task is dispatched by this view. Unknown/unreachable peers stay
+visible and do not inherit a previous successful status. Unconfigured, empty and
+failed membership states are explicit. Inspections use the existing authenticated
+and CSRF-protected endpoints, four bounded concurrent requests, cancellation on
+refresh/hide, and a 30-second refresh after completion. Specialist inventory is
+independent of remote inspection failures. Private SSH credentials are not shown.
+
+Required Chrome qualification passed for two peers, connection failure, escaped
+model text, the diagram's 16 terminals, placement below 14 specialist cards,
+390-pixel layout, empty membership and membership failure. WebUI and WebUI
+application race suites pass. The live service was updated after a private state
+backup and idle checks. An authenticated browser session verified the new page
+and script through the running daemon, then was revoked. This live daemon has
+remote membership disabled and zero paired systems, so the new section correctly
+shows setup guidance rather than inventing connected hosts. Full release gate
+and public push remain pending.

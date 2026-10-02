@@ -73,7 +73,7 @@
 		for (const direction of ["out", "in"]) { const flow = document.createElementNS(svg.namespaceURI, "path"); flow.setAttribute("d", d); flow.setAttribute("class", "routing-flow routing-flow-" + direction); svg.append(flow); }
 	}
 	function drawBranches() {
-		const network = document.querySelector("#routing-network"), core = document.querySelector(".commander-core"), svg = document.querySelector("#routing-branches"), cards = [...document.querySelectorAll("#specialist-grid .specialist-card")];
+		const network = document.querySelector("#routing-network"), core = document.querySelector(".commander-core"), svg = document.querySelector("#routing-branches"), cards = [...document.querySelectorAll("#specialist-grid .specialist-card, #remote-route-grid .remote-route-card")];
 		if (!network || !core || !svg || !cards.length) return;
 		const box = network.getBoundingClientRect(), root = core.getBoundingClientRect();
 		if (!box.width || !box.height) return;
@@ -142,7 +142,7 @@
 		} catch (_) { status.textContent = "Elimination evidence is unavailable. No recommendation was manufactured."; }
 	}
 
-	if (window.NexusRoutes.routing(relative)) { document.querySelector("#refresh-routing").addEventListener("click",loadRouting); document.addEventListener("visibilitychange",() => { window.clearTimeout(routingTimer); if (!document.hidden) loadRouting(); }); window.addEventListener("resize",drawBranches); loadRouting(); }
+	if (window.NexusRoutes.routing(relative)) { document.querySelector("#refresh-routing").addEventListener("click",loadRouting); document.addEventListener("visibilitychange",() => { window.clearTimeout(routingTimer); if (!document.hidden) loadRouting(); }); window.addEventListener("resize",drawBranches); window.addEventListener("routing-remote-updated",drawBranches); loadRouting(); }
 	if (window.NexusRoutes.elimination(relative)) {
 		const select = document.querySelector("#elimination-job"); for (const job of jobs) { const option = element("option","",job.label); option.value = job.key; select.append(option); }
 		document.querySelector("#refresh-elimination").addEventListener("click",loadElimination); document.querySelector("#elimination-controls").addEventListener("submit",event => { event.preventDefault(); loadElimination(); }); loadElimination();

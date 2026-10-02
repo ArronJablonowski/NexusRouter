@@ -380,3 +380,16 @@ input, select { padding: .55rem .7rem; }
 #remote-peers form button { justify-self: start; }
 #remote-discovery-results > div { padding: .8rem 0; border-bottom: 1px solid #34415d; }
 #remote-discovery-results p { overflow-wrap: anywhere; }
+
+.remote-route-section { position:relative; z-index:2; margin:4rem auto 0; max-width:82rem; }
+.remote-route-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr)); gap:1.5rem; margin-top:1.5rem; }
+.remote-route-card { min-width:0; padding:1.25rem; border:1px solid #376570; border-radius:1rem; background:#071923; box-shadow:0 0 20px #0dd4ea15; overflow-wrap:anywhere; }
+.remote-route-card[data-connected="true"] { border-color:#5dddc7; }
+.remote-route-card .specialist-heading { flex-wrap:wrap; gap:.5rem; }
+.remote-route-state { font-size:.8rem; color:#b4dfdf; }
+.remote-route-path { color:#7feded; line-height:1.7; }
+.remote-route-endpoint { color:#b4cdd5; font-size:.85rem; }
+.remote-route-models { display:grid; gap:.6rem; list-style:none; padding:0; margin:1rem 0 0; max-height:22rem; overflow:auto; }
+.remote-route-models li { padding:.65rem; border:1px solid #28434d; border-radius:.5rem; }
+.remote-route-models strong,.remote-route-models small { display:block; }
+.remote-route-models small { color:#b4cdd5; margin-top:.25rem; }
