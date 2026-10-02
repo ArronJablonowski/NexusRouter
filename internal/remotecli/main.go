@@ -386,6 +386,13 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	if err != nil {
 		return err
 	}
+	// Remote execution must contend with other local daemons, not just the
+	// requests handled by this server. Install before starting any dispatcher.
+	closeResources, err := app.InstallHostResourceCoordinator(ctx, service, instance)
+	if err != nil {
+		return err
+	}
+	defer closeResources()
 	service.ConfigureHarnessEvidence(ledger)
 	journal, err := remote.OpenJournal(journalDir, instance)
 	if err != nil {

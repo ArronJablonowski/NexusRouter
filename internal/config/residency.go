@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"errors"
 	"net"
 	"net/url"
@@ -13,8 +14,23 @@ import (
 // Managed residency is explicit authority to unload configured idle models on
 // a dedicated local server. It is not an ownership lock against other clients.
 func (s Settings) validateResidency() error {
+	for _, m := range s.Models {
+		if m.WarmRAMBytes == 0 && m.ResidencyDigest == "" {
+			continue
+		}
+		found := false
+		for _, p := range s.Providers {
+			if p.ID == m.Provider {
+				found = p.DedicatedWarmMemory
+			}
+		}
+		d, err := hex.DecodeString(m.ResidencyDigest)
+		if !found || err != nil || len(d) != 32 || strings.ToLower(m.ResidencyDigest) != m.ResidencyDigest || m.WarmRAMBytes < 1<<30 || m.WarmRAMBytes >= m.RAMBytes || m.WarmRAMBytes < m.RAMBytes/2 || m.Locality != "local" || m.VRAMBytes != 0 || m.GPUDevice != "" || m.ContextTokens < 1 {
+			return errors.New("invalid dedicated warm memory estimate or model digest")
+		}
+	}
 	for i, p := range s.Providers {
-		if !p.ManageResidency {
+		if !p.ManageResidency && !p.DedicatedWarmMemory {
 			continue
 		}
 		endpoint := p.ResolvedEndpoint()
@@ -39,6 +55,9 @@ func (s Settings) validateResidency() error {
 				return errors.New("managed residency requires distinct local model identities")
 			}
 			seen[identity] = true
+		}
+		if p.DedicatedWarmMemory && (p.ManageResidency || len(seen) != 1 || s.Hardware.Concurrent != "1" || s.Workers.Max != 1) {
+			return errors.New("warm memory requires one dedicated model, serial execution and no managed unloading")
 		}
 	}
 	return nil

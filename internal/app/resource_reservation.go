@@ -209,6 +209,7 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 	if err != nil {
 		return execution, nil, ErrAdmission
 	}
+	warmRAM, warmObserved := s.warmMemoryEstimate(admission, model, input.contextTokens)
 	if err = s.lockResources(admission); err != nil {
 		return execution, nil, err
 	}
@@ -223,6 +224,11 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 		return execution, nil, ErrAdmission
 	}
 	now := s.routingNow()
+	coldRAM := uint64(0)
+	if snapshot.UnifiedMemory && warmRAM > 0 && !now.Before(warmObserved) && now.Sub(warmObserved) <= time.Second {
+		coldRAM = model.RAMBytes
+		model.RAMBytes = warmRAM
+	}
 	// Do not call reserveExplicitLocal from the coordinated path: its managed
 	// residency branch has only process-local active/uncertain maps and could
 	// unload a peer daemon's model. Coordinated daemons conservatively retain
@@ -233,6 +239,9 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 		ProviderID: model.Provider, ModelID: model.ID, Profile: input.profile, GPUDevice: model.GPUDevice,
 		RAMBytes: model.RAMBytes, VRAMBytes: model.VRAMBytes, ContextTokens: input.contextTokens,
 		ConfigDigest: configDigest, RequestedAt: now, TTL: s.resourceReservationTTL,
+	}
+	if coldRAM != 0 {
+		request.ColdRAMBytes, request.ResidencyDigest = coldRAM, model.ResidencyDigest
 	}
 	// Hold the process-local fast-path reservation while attempting the durable
 	// claim. A durable failure therefore cannot create local overlap, while a

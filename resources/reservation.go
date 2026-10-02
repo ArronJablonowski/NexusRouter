@@ -42,25 +42,35 @@ func (o ReservationOwner) Validate() error {
 // It intentionally has no prompt, output, endpoint, credential or free-form
 // metadata fields. RAM includes weights and context/KV memory.
 type ReservationRequest struct {
-	Version       int              `json:"version"`
-	ReservationID string           `json:"reservation_id"`
-	HostScope     string           `json:"host_scope"`
-	Owner         ReservationOwner `json:"owner"`
-	TaskID        string           `json:"task_id"`
-	SessionID     string           `json:"session_id"`
-	ProviderID    string           `json:"provider_id"`
-	ModelID       string           `json:"model_id"`
-	Profile       string           `json:"profile"`
-	GPUDevice     string           `json:"gpu_device,omitempty"`
-	RAMBytes      uint64           `json:"ram_bytes"`
-	VRAMBytes     uint64           `json:"vram_bytes"`
-	ContextTokens int              `json:"context_tokens"`
-	ConfigDigest  string           `json:"config_digest"`
-	RequestedAt   time.Time        `json:"requested_at"`
-	TTL           time.Duration    `json:"ttl"`
+	// Nonzero ColdRAMBytes marks a qualified warm estimate. This preserves the
+	// original full estimate and pinned model identity in the durable receipt;
+	// RAMBytes remains the actual incremental charge, never negative credit.
+	ColdRAMBytes    uint64           `json:"cold_ram_bytes,omitempty"`
+	ResidencyDigest string           `json:"residency_digest,omitempty"`
+	Version         int              `json:"version"`
+	ReservationID   string           `json:"reservation_id"`
+	HostScope       string           `json:"host_scope"`
+	Owner           ReservationOwner `json:"owner"`
+	TaskID          string           `json:"task_id"`
+	SessionID       string           `json:"session_id"`
+	ProviderID      string           `json:"provider_id"`
+	ModelID         string           `json:"model_id"`
+	Profile         string           `json:"profile"`
+	GPUDevice       string           `json:"gpu_device,omitempty"`
+	RAMBytes        uint64           `json:"ram_bytes"`
+	VRAMBytes       uint64           `json:"vram_bytes"`
+	ContextTokens   int              `json:"context_tokens"`
+	ConfigDigest    string           `json:"config_digest"`
+	RequestedAt     time.Time        `json:"requested_at"`
+	TTL             time.Duration    `json:"ttl"`
 }
 
 func (r ReservationRequest) Validate() error {
+	if r.ColdRAMBytes != 0 || r.ResidencyDigest != "" {
+		if r.ColdRAMBytes <= r.RAMBytes || !reservationDigest(r.ResidencyDigest) || r.VRAMBytes != 0 || r.GPUDevice != "" {
+			return ErrReservation
+		}
+	}
 	if r.Version != ReservationContractVersion || !reservationText(r.ReservationID, 128) ||
 		!reservationText(r.HostScope, 128) || r.Owner.Validate() != nil ||
 		!reservationText(r.TaskID, 128) || !reservationText(r.SessionID, 128) ||

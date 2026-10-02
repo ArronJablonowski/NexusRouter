@@ -111,7 +111,9 @@ func TestReservationCanonicalDigestAndBinding(t *testing.T) {
 }
 
 func TestReservationPublicTypesDoNotGrowPayloadFields(t *testing.T) {
-	requestFields := []string{"Version", "ReservationID", "HostScope", "Owner", "TaskID", "SessionID", "ProviderID", "ModelID", "Profile", "GPUDevice", "RAMBytes", "VRAMBytes", "ContextTokens", "ConfigDigest", "RequestedAt", "TTL"}
+	// The warm fields contain only a byte estimate and model digest, never
+	// prompts, endpoints or credentials. Aggregate diagnostics still omit them.
+	requestFields := []string{"ColdRAMBytes", "ResidencyDigest", "Version", "ReservationID", "HostScope", "Owner", "TaskID", "SessionID", "ProviderID", "ModelID", "Profile", "GPUDevice", "RAMBytes", "VRAMBytes", "ContextTokens", "ConfigDigest", "RequestedAt", "TTL"}
 	typeOf := reflect.TypeOf(ReservationRequest{})
 	if typeOf.NumField() != len(requestFields) {
 		t.Fatal("review new reservation fields for sensitive payloads", typeOf.NumField())
@@ -136,6 +138,31 @@ func TestReservationErrorsAreDistinct(t *testing.T) {
 	for _, pair := range [][2]error{{ErrReservation, ErrReservationConflict}, {ErrReservationConflict, ErrReservationOwner}, {ErrReservationOwner, ErrReservationExpired}} {
 		if errors.Is(pair[0], pair[1]) || errors.Is(pair[1], pair[0]) {
 			t.Fatal("reservation errors collapsed", pair)
+		}
+	}
+}
+
+func TestWarmReservationBindsOriginalEstimateAndDigest(t *testing.T) {
+	r := validReservationRequest(time.Now().UTC())
+	r.VRAMBytes, r.GPUDevice = 0, ""
+	r.ColdRAMBytes, r.ResidencyDigest = 4<<30, strings.Repeat("b", 64)
+	d, err := r.CanonicalDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*ReservationRequest){func(r *ReservationRequest) { r.ColdRAMBytes++ }, func(r *ReservationRequest) { r.ResidencyDigest = strings.Repeat("c", 64) }} {
+		v := r
+		mutate(&v)
+		other, e := v.CanonicalDigest()
+		if e != nil || other == d {
+			t.Fatal("warm identity not bound", e)
+		}
+	}
+	for _, mutate := range []func(*ReservationRequest){func(r *ReservationRequest) { r.ColdRAMBytes = r.RAMBytes }, func(r *ReservationRequest) { r.ResidencyDigest = "" }, func(r *ReservationRequest) { r.VRAMBytes = 1 }} {
+		v := r
+		mutate(&v)
+		if v.Validate() == nil {
+			t.Fatal("invalid warm receipt")
 		}
 	}
 }

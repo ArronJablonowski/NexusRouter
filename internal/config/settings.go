@@ -121,15 +121,18 @@ type Workers struct {
 	DelegateMaxTurns  int     `yaml:"delegate_max_turns" json:"delegate_max_turns"`
 }
 type Provider struct {
-	ManageResidency bool   `yaml:"manage_residency" json:"manage_residency,omitempty"`
-	ID              string `yaml:"id" json:"id"`
-	Kind            string `yaml:"kind" json:"kind"`
-	Endpoint        string `yaml:"endpoint" json:"endpoint"`
-	RequestTimeout  string `yaml:"request_timeout,omitempty" json:"request_timeout,omitempty"`
-	APIKeyEnv       string `yaml:"api_key_env" json:"api_key_env,omitempty"`
-	Executable      string `yaml:"executable,omitempty" json:"executable,omitempty"`
+	DedicatedWarmMemory bool   `yaml:"dedicated_warm_memory,omitempty" json:"dedicated_warm_memory,omitempty"`
+	ManageResidency     bool   `yaml:"manage_residency" json:"manage_residency,omitempty"`
+	ID                  string `yaml:"id" json:"id"`
+	Kind                string `yaml:"kind" json:"kind"`
+	Endpoint            string `yaml:"endpoint" json:"endpoint"`
+	RequestTimeout      string `yaml:"request_timeout,omitempty" json:"request_timeout,omitempty"`
+	APIKeyEnv           string `yaml:"api_key_env" json:"api_key_env,omitempty"`
+	Executable          string `yaml:"executable,omitempty" json:"executable,omitempty"`
 }
 type Model struct {
+	WarmRAMBytes         uint64   `yaml:"warm_ram_bytes,omitempty" json:"warm_ram_bytes,omitempty"`
+	ResidencyDigest      string   `yaml:"residency_digest,omitempty" json:"residency_digest,omitempty"`
 	ContextTokens        int      `yaml:"context_tokens" json:"context_tokens"`
 	DefaultContextTokens int      `yaml:"default_context_tokens,omitempty" json:"default_context_tokens,omitempty"`
 	EstimatedCost        *float64 `yaml:"estimated_cost" json:"estimated_cost,omitempty"`

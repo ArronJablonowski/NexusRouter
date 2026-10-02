@@ -2103,3 +2103,30 @@ outputs, automatic selection, negative admission, SIGINT cancellation, and
 Spark 80B inference. An intermediate strict-output mismatch remains recorded;
 this is operational QA, not a universal model-accuracy claim. Full-suite
 validation and public push remain required for this checkpoint.
+
+### 2026-10-02 — Dedicated warm-memory accounting
+
+Added explicit cold/warm RAM estimates for a dedicated, serial, single-model
+loopback Ollama provider on unified-memory hosts. Warm selection requires fresh
+installed/resident digest, context and lifetime checks; uncertain cases retain
+the cold estimate. No provider-reported byte credits, cross-pool sums, managed
+unloading or inference retries. Durable receipts preserve cold estimate and
+resident identity while charging the complete incremental estimate. See
+[deployment boundary and qualification](dedicated-warm-memory.md).
+
+The initial physical test exposed that `nexus remote serve` had not installed
+the main daemon's host-wide resource coordinator. Corrected that omission before
+starting the dispatcher. Original failed live evidence is preserved. Regression
+coverage includes configuration restrictions, identity/context drift, pressure,
+concurrency, replay and cross-store RAM contention. Fresh physical qualification,
+full repository validation and publication are tracked separately; passing unit
+tests does not complete production deployment or automatic warm-fit routing.
+
+Corrected physical Qwen3-Coder-Next 80B HTTPS/SSH qualification passed in 15.176s,
+including live cancellation, caller replay and payload conflicts. Independent
+read-only receipt audit verified one 64 GiB cold and three 32 GiB warm reservations.
+Dedicated Ollama ran separately with serial execution and indefinite keep-alive,
+then stopped; the existing service was untouched. A separate native cgroup probe
+showed that MemoryMax does not cover the whole Spark GPU allocation, so no such
+enforcement claim or cgroup-derived GPU credit was added. Full check and public
+push are still required for this checkpoint.

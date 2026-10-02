@@ -69,6 +69,19 @@ func TestPhysicalTwoHostLiveModel(t *testing.T) {
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://127.0.0.1:11434"}}
 	zero := 0.0
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: model, Locality: "local", RAMBytes: ram, Capabilities: []string{"chat"}, ContextTokens: 8192, EstimatedCost: &zero}}
+	if warm := os.Getenv("NEXUS_REMOTE_TEST_WARM_RAM"); warm != "" {
+		warmRAM, e := strconv.ParseUint(warm, 10, 64)
+		if e != nil {
+			t.Fatal(e)
+		}
+		cfg.Providers[0].DedicatedWarmMemory = true
+		cfg.Providers[0].Endpoint = os.Getenv("NEXUS_REMOTE_TEST_PROVIDER_ENDPOINT")
+		cfg.Models[0].WarmRAMBytes = warmRAM
+		cfg.Models[0].ResidencyDigest = os.Getenv("NEXUS_REMOTE_TEST_MODEL_DIGEST")
+		if e := cfg.Validate(); e != nil {
+			t.Fatal("invalid dedicated warm fixture", e)
+		}
+	}
 	ca := newCA(t)
 	sc, sp := ca.leaf(t, "node-a")
 	cc, cp := ca.leaf(t, "node-b")
@@ -229,6 +242,25 @@ func TestPhysicalTwoHostLiveModel(t *testing.T) {
 			}
 			physicalLiveCancellation(t, ctx, client, transport)
 		})
+	}
+	if cfg.Models[0].WarmRAMBytes != 0 {
+		input, _ := json.Marshal(map[string]any{"directory": host.Directory, "cold": ram, "warm": cfg.Models[0].WarmRAMBytes, "digest": cfg.Models[0].ResidencyDigest})
+		out, e := admin(ctx, `import sys,json,sqlite3,pathlib
+p=json.load(sys.stdin);db=pathlib.Path(p['directory'])/'owners'/'host-resources.db'
+c=sqlite3.connect('file:'+str(db)+'?mode=ro',uri=True)
+rows=[json.loads(r[0]) for r in c.execute('select request from reservations')];c.close()
+cold=warm=0
+for r in rows:
+ if r.get('cold_ram_bytes',0):
+  assert r['cold_ram_bytes']==p['cold'] and r['ram_bytes']==p['warm'] and r['residency_digest']==p['digest'];warm+=1
+ else:
+  assert r['ram_bytes']==p['cold'];cold+=1
+assert cold==1 and warm==3,(cold,warm)
+print(json.dumps({'cold_reservations':cold,'warm_reservations':warm}))`, input)
+		if e != nil {
+			t.Fatalf("warm durable receipt audit: %v %s", e, out)
+		}
+		t.Logf("independent durable receipt audit: %s", out)
 	}
 }
 
