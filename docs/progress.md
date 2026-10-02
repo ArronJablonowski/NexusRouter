@@ -2168,3 +2168,16 @@ temporary provider was stopped; the shared Ollama service was not altered.
 Initial fixture permission and short request-ID failures occurred before
 inference and are preserved separately. The full release gate and push are pending.
 This is not a kernel guarantee against external allocations or underestimated needs.
+
+
+## Live WebUI branding refresh (2026-10-02)
+
+The published WebUI already uses NexusRouter throughout its visible text. The
+local live-test service was still running a pre-rename embedded-asset binary and
+served “Connect to DarwinRouter.” Corrected the remaining D monogram to N. The
+live service was refreshed after confirming no active submissions or resource
+reservations and taking a private state/binary backup. Its running bootstrap now
+serves “Connect to NexusRouter” with no old brand references. The WebUI and
+WebUI application race suites pass; the embedded asset manifest was reviewed and
+updated for the monogram. Existing storage paths and authentication
+protocol identifiers remain compatibility details, not visible product branding.
