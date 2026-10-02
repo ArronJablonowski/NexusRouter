@@ -1,3 +1,7 @@
+## 2026-10-02 — Vertical remote host connections
+
+Remote host flow lines terminate at the top center of each host card; the commander trunk stops at the first remote row. Remote cards no longer receive specialist-style diagonal side branches. Specialist connections and yellow host outlines are preserved. Verified with the existing real-Chrome remote routing checks and embedded asset checks.
+
 ## 2026-10-02 — Live WebUI reconciliation
 
 The WebUI now reconciles chats, model inventory, routing, remote membership and caller-owned task results, skills, settings and token odometers in place. Existing chat/workboard event streams remain authoritative; reconnect checks recover missed snapshots without automatically replaying mutations. Visible-page read intervals are generally 3–10 seconds (elimination evidence 30 seconds). Shared watchers bound concurrent jobs, back off failed reads, pause while hidden/offline and wake on reconnect/focus. Read requests have a 12-second deadline. Open confirmations and dirty settings are protected; routing remote model lists retain scroll and unchanged model/creative controls retain focus. Workboard reconnect checks compare committed revisions before rebuilding details.
