@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"io"
 	"net"
 	"net/http"
@@ -274,6 +275,22 @@ func (s *Server) finish(w http.ResponseWriter, ctx context.Context, caller, op, 
 	if err != nil {
 		s.fail(w, code)
 		return
+	}
+	if status, ok := result.(submissions.Status); ok {
+		var usage *usagestats.RemoteUsage
+		if b, ok := s.backend.(interface {
+			RemoteUsage(context.Context, []string) (usagestats.RemoteUsage, error)
+		}); ok {
+			u, e := b.RemoteUsage(ctx, status.TaskIDs)
+			if e == nil && u.Valid() {
+				usage = &u
+			}
+		}
+		result = struct {
+			submissions.Status
+			Caller string                  `json:"caller"`
+			Usage  *usagestats.RemoteUsage `json:"remote_usage,omitempty"`
+		}{status, caller, usage}
 	}
 	body, e := json.Marshal(result)
 	if e != nil || len(body) > 8<<20 {

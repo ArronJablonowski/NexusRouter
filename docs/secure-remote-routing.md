@@ -1668,3 +1668,11 @@ against the saved choice, reopens the caller route store, and recovers that choi
 with no current candidates or valid ranking policy. Expected total provider calls
 become ten. Confirmed/advisory/effective sample counts must remain zero: this is
 single-candidate workflow evidence, not a comparative accuracy result.
+
+## Remote router token odometer
+
+The calling NexusRouter's **Stats** page records remote input/output tokens separately from its own local/cloud usage. The remote card includes combined lifetime totals and separate counts for local models and cloud models running through paired routers. Existing trust and cloud-inference permissions still apply; enabling accounting does not authorize cloud execution.
+
+Both hosts must run a receipt-capable build. The caller reconciles its own remote request inventory on startup and every 30 seconds while `nexus serve` runs. Receipts are stored privately beside the trust registry in `<trust-file>.usage.db`; preserve this sidecar with configuration backups. CLI dispatch/status observations using the same trust file contribute to that ledger too. Repeated inspection and caller certificate rotation do not multiply usage. Available historical requests are backfilled without repeating inference.
+
+Counts use remote immutable accounting heads, including recorded failed attempts and auxiliary model calls. Missing token measurements are displayed as incomplete, not estimated as zero. Removed model configurations can leave locality unclassified. An unavailable peer retains earlier totals and marks reconciliation incomplete; work whose remote journal/accounting has already been removed cannot be reconstructed. The remote odometer has no reset control and does not include work belonging to other remote callers.

@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"math"
 	"slices"
 	"time"
@@ -17,6 +18,8 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	Usage func(context.Context, []string) (usagestats.RemoteUsage, error)
+
 	CheckHarness func(context.Context, string, string, int) (harness.Readiness, error)
 	PlanHarness  func(context.Context, string, string, int) (harness.Identity, resources.Need, resources.CapacityResult, error)
 	Identify     func(string, string, int) (harness.Identity, error)
@@ -156,4 +159,11 @@ func cloneModels(source []Model) []Model {
 		}
 	}
 	return out
+}
+
+func (b *SDKBackend) RemoteUsage(ctx context.Context, tasks []string) (usagestats.RemoteUsage, error) {
+	if b.Usage == nil {
+		return usagestats.RemoteUsage{}, ErrUnavailable
+	}
+	return b.Usage(ctx, tasks)
 }

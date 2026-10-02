@@ -2203,3 +2203,11 @@ and script through the running daemon, then was revoked. This live daemon has
 remote membership disabled and zero paired systems, so the new section correctly
 shows setup guidance rather than inventing connected hosts. Full release gate
 and public push remain pending.
+
+### 2026-10-02 — Caller-side remote router token odometer
+
+The Stats page now has a separate lifetime remote-router odometer, combining input/output tokens with local/cloud breakdowns. Paired hosts expose token-only, caller-owned receipts derived from current immutable accounting heads across submission task lineages, including auxiliary operations and recorded usage from failed/canceled attempts. Partial measured turns remain lower bounds; missing evidence and unknown locality remain explicit. Locality follows the remote configuration's actual provider/model mapping, never the caller's model names or the transport.
+
+The calling service reconciles owned requests every 30 seconds and at startup, storing cumulative receipts in the private `<remote_trust_file>.usage.db` sidecar. Dispatch/status observations also record receipts. Destination/caller/request keys prevent duplicate polling charges and survive certificate rotation; newer observations replace prior measurements to support accounting corrections. Reconciliation does not dispatch inference or change quality feedback. Retained totals survive peer outages and removals; incomplete reconciliation is shown. Older remote binaries without receipts require upgrade. Existing historical caller-owned requests are backfilled when their remote journals/accounting remain available. Unrelated remote users' tasks and external applications' usage are excluded. The existing on-host cloud/local trips remain independent.
+
+Validation: affected usage, remote, browser API, embedded WebUI and remote CLI race suites pass; Chrome verifies large integer precision, both localities, incomplete-coverage messaging and mobile layout. Tests cover partial failed usage, duplicate task IDs, caller isolation, receipt replay/restart, stale responses, corrections, certificate rotation and overflow. Full repository `make check`, live paired-host rollout and final push are tracked separately; no real cloud-provider spend is required for token-accounting fixtures.

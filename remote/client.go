@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/sessions"
@@ -15,6 +17,9 @@ import (
 )
 
 type Client struct {
+	// UsageFile enables durable caller-side remote usage receipts.
+	UsageFile string
+
 	Trust       TrustFile
 	Credentials Credentials
 }
@@ -157,6 +162,25 @@ func (c *Client) callPinned(ctx context.Context, destination, op, method, path s
 	}
 	if json.Unmarshal(bytes, out) != nil {
 		return ErrUnavailable
+	}
+	if status, ok := out.(*submissions.Status); ok && c.UsageFile != "" {
+		var envelope struct {
+			Caller string                  `json:"caller"`
+			Usage  *usagestats.RemoteUsage `json:"remote_usage"`
+		}
+		if json.Unmarshal(bytes, &envelope) != nil {
+			return ErrUnavailable
+		}
+		key := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/remote/tasks/"), "/cancel")
+		if envelope.Caller != "" {
+			if !id(envelope.Caller) || !requestID(key) || status.Version != Version || !name(status.ID) {
+				return ErrUnavailable
+			}
+			if envelope.Usage == nil {
+				return usagestats.SaveMissingRemoteUsage(ctx, c.UsageFile, destination, envelope.Caller, key, status.State)
+			}
+			return usagestats.SaveRemoteUsage(ctx, c.UsageFile, destination, envelope.Caller, key, status.State, *envelope.Usage)
+		}
 	}
 	return nil
 }

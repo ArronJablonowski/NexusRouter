@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"net/http"
 	"slices"
 )
@@ -9,12 +10,16 @@ import (
 // TaskSummary exposes caller-owned lifecycle metadata, never prompts or results.
 // Unknown status grants no retry authority; recover using the original request.
 type TaskSummary struct {
+	Usage *usagestats.RemoteUsage `json:"usage,omitempty"`
+
 	RequestID       string   `json:"request_id"`
 	State           string   `json:"state"`
 	TaskIDs         []string `json:"task_ids"`
 	CancelRequested bool     `json:"cancel_requested"`
 }
 type TaskPage struct {
+	Caller string `json:"caller,omitempty"`
+
 	Version  int           `json:"version"`
 	Instance string        `json:"instance"`
 	After    string        `json:"after"`
@@ -35,6 +40,9 @@ func (c *Client) Tasks(ctx context.Context, destination, after string) (TaskPage
 	if err == nil && (out.Version != Version || out.Instance != destination || out.After != after || !out.valid()) {
 		return TaskPage{}, ErrUnavailable
 	}
+	if err == nil && c.UsageFile != "" {
+		err = c.recordUsagePage(ctx, destination, out)
+	}
 	return out, err
 }
 func (p TaskPage) valid() bool {
@@ -43,6 +51,9 @@ func (p TaskPage) valid() bool {
 	}
 	previous := p.After
 	for _, t := range p.Tasks {
+		if t.Usage != nil && !t.Usage.Valid() {
+			return false
+		}
 		if !requestID(t.RequestID) || t.RequestID <= previous || len(t.TaskIDs) > 128 {
 			return false
 		}
@@ -64,7 +75,7 @@ func (p TaskPage) valid() bool {
 	return p.Next == previous
 }
 func (s *Server) taskPage(ctx context.Context, caller, after string) (TaskPage, error) {
-	out := TaskPage{Version: Version, Instance: s.instance, After: after, Next: after, Tasks: []TaskSummary{}}
+	out := TaskPage{Caller: caller, Version: Version, Instance: s.instance, After: after, Next: after, Tasks: []TaskSummary{}}
 	if after != "" && !requestID(after) {
 		return out, ErrInvalid
 	}
@@ -101,6 +112,14 @@ func (s *Server) taskPage(ctx context.Context, caller, after string) (TaskPage, 
 					t.State = status.State
 					t.TaskIDs = slices.Clone(status.TaskIDs)
 					t.CancelRequested = status.CancelRequested
+					if b, ok := s.backend.(interface {
+						RemoteUsage(context.Context, []string) (usagestats.RemoteUsage, error)
+					}); ok {
+						u, e := b.RemoteUsage(ctx, status.TaskIDs)
+						if e == nil && u.Valid() {
+							t.Usage = &u
+						}
+					}
 				}
 			}
 		}

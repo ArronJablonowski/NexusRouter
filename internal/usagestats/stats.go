@@ -33,11 +33,13 @@ type Meter struct {
 	ResetAt  string `json:"reset_at"`
 }
 type Snapshot struct {
-	Version      int    `json:"version"`
-	Cloud        Meter  `json:"cloud"`
-	Local        Meter  `json:"local"`
-	Unclassified int64  `json:"unclassified"`
-	UpdatedAt    string `json:"updated_at"`
+	Remote            *RemoteMeter `json:"remote,omitempty"`
+	RemoteUnavailable bool         `json:"remote_unavailable,omitempty"`
+	Version           int          `json:"version"`
+	Cloud             Meter        `json:"cloud"`
+	Local             Meter        `json:"local"`
+	Unclassified      int64        `json:"unclassified"`
+	UpdatedAt         string       `json:"updated_at"`
 }
 type Reset struct {
 	Version  int    `json:"version"`

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"math/big"
 	"net"
 	"net/http"
@@ -25,6 +26,8 @@ import (
 )
 
 type fakeBackend struct {
+	usage func() usagestats.RemoteUsage
+
 	mu      sync.Mutex
 	tasks   map[string]submissions.Status
 	creates int
@@ -171,7 +174,7 @@ func setup(t *testing.T) *fixture {
 	}
 	go httpServer.ServeTLS(ln, "", "")
 	t.Cleanup(func() { httpServer.Close(); journal.Close() })
-	return &fixture{&Client{TrustFile(ct), cc}, server, httpServer, journal, backend, clientPeer, serverPeer, st, ct, ca, sc, endpoint}
+	return &fixture{&Client{Trust: TrustFile(ct), Credentials: cc}, server, httpServer, journal, backend, clientPeer, serverPeer, st, ct, ca, sc, endpoint}
 }
 func TestMutualTLSLifecycleAndDurableOwnership(t *testing.T) {
 	f := setup(t)
@@ -209,7 +212,7 @@ func TestMutualTLSLifecycleAndDurableOwnership(t *testing.T) {
 	c2, pin := f.ca.leaf(t, "node-c")
 	peer2 := testPeer("node-c", pin, "https://127.0.0.1:443")
 	writeRegistry(t, f.serverTrust, f.clientPeer, peer2)
-	other := &Client{f.client.Trust, c2}
+	other := &Client{Trust: f.client.Trust, Credentials: c2}
 	if _, e = other.Status(ctx, "node-a", key); e == nil {
 		t.Fatal("cross-peer status")
 	}
@@ -353,4 +356,13 @@ func TestTLSRequiresTrustedClientCertificate(t *testing.T) {
 	if _, e = client.Get(f.url + "/v1/remote/info"); e == nil {
 		t.Fatal("missing client certificate accepted")
 	}
+}
+
+func (b *fakeBackend) RemoteUsage(context.Context, []string) (usagestats.RemoteUsage, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.usage == nil {
+		return usagestats.RemoteUsage{}, ErrUnavailable
+	}
+	return b.usage(), nil
 }

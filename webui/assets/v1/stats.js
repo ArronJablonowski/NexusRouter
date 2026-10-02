@@ -38,6 +38,18 @@
    const pair=node("div","stats-counter-pair");counters(pair,meter.trip,"Trip ");trip.append(pair,node("p","stats-note",coverage(meter.trip)));card.append(trip);
    root.append(card);
   }
+  const remote=node("article","stats-card stats-remote");remote.append(node("p","eyebrow","Remote routers"),node("h2","","Remote router odometer"));
+  if(data.remote_unavailable){remote.append(node("p","stats-note","Remote usage unavailable. Previously recorded totals have not been reset."));}
+  else if(!data.remote){remote.append(node("p","stats-note","Pair a remote NexusRouter to record its token usage here."));}
+  else {
+   const meter=data.remote;
+   const total=node("div","stats-counter-pair");counters(total,meter.total);remote.append(total,node("p","stats-note",coverage(meter.total)));
+   for(const kind of ["local","cloud"]){const group=node("div","stats-trip");group.append(node("h3","",kind==="local"?"Local models on remote routers":"Cloud models on remote routers"));const pair=node("div","stats-counter-pair");counters(pair,meter[kind]);group.append(pair,node("p","stats-note",coverage(meter[kind])));remote.append(group);}
+   remote.append(node("p","stats-note",meter.requests+" remote requests recorded · "+meter.pending+" pending · "+meter.unavailable+" tasks missing usage evidence · "+meter.unclassified+" records with unknown locality."));
+   remote.append(node("p","stats-note",meter.last_sync?(meter.sync_error?"Reconciliation incomplete; retained totals may lag. Last attempt ":"Last reconciled ")+new Date(meter.last_sync).toLocaleString():"Waiting for the first remote reconciliation."));
+   remote.append(node("p","stats-note","Lifetime tokens for work requested by this caller, across paired NexusRouter instances. Includes reported failed attempts and auxiliary model calls. Missing measurements are not estimated. These totals are separate from this router’s local and cloud odometers."));
+  }
+  root.append(remote);
   snapshot=data;status.textContent="Updated "+new Date(data.updated_at).toLocaleTimeString()+" · "+data.unclassified+" records have unknown model locality. Counts cover usage recorded by this NexusRouter instance; external app usage is not included.";document.querySelector("#connection-state").textContent="Connected";
  }
  async function json(path,options={}){const response=await fetch(base+path,{credentials:"same-origin",cache:"no-store",...options});if(!response.ok)throw new Error(response.status===409?"This trip changed in another window. Refresh and try again.":"Stats unavailable. Refresh or reconnect your browser.");return response.json();}

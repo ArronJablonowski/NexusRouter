@@ -171,6 +171,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var harnessCatchup *app.HarnessEvidenceCatchup
 	var remoteReviews *remoteReviewSupervisor
 	var runRemoteReviews func(context.Context) error
+	var remoteUsageClient *remote.Client
 	healthReport := func(ctx context.Context) (health.Report, error) {
 		if dispatcher == nil {
 			return health.Report{}, errors.New("supervisor unavailable")
@@ -295,8 +296,9 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		var remoteInspector webuiapp.RemoteInspector
 		var remoteTaskController webuiapp.RemoteTaskController
 		if c := s.WebUI.RemoteClient; c != nil {
-			client := &remote.Client{Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
+			client := &remote.Client{UsageFile: s.WebUI.RemoteTrustFile + ".usage.db", Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
 			remoteInspector = client
+			remoteUsageClient = client
 			if dir := s.WebUI.RemoteDispatchDirectory; dir != "" {
 				store, err := remote.OpenRouteStore(dir)
 				if err != nil {
@@ -550,6 +552,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer dispatcher.Close()
+	if remoteUsageClient != nil {
+		usageCtx, stopUsage := context.WithCancel(ctx)
+		usageDone := make(chan struct{})
+		go func() { defer close(usageDone); remoteUsageClient.RunUsageSync(usageCtx) }()
+		defer func() { stopUsage(); <-usageDone }()
+	}
 	if runRemoteReviews != nil {
 		remoteReviews = startRemoteReviewSupervisor(ctx, runRemoteReviews)
 		defer remoteReviews.Close()

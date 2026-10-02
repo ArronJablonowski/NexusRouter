@@ -171,7 +171,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	if operation == "serve" {
 		return serve(ctx, *instance, *listen, *journal, *configFile, registry, credentials, *advertiseInterface, *advertiseName, *advertiseSSH)
 	}
-	client := remote.Client{Trust: registry, Credentials: credentials}
+	client := remote.Client{UsageFile: string(registry) + ".usage.db", Trust: registry, Credentials: credentials}
 	if operation == "enqueue-review" || operation == "enqueue-auto-review" || operation == "run-review-jobs" || operation == "auto-dispatch-review-job" {
 		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
 			return remote.ErrInvalid
@@ -399,7 +399,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{Client: client, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
+	backend := &remote.SDKBackend{Client: client, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
 	}
