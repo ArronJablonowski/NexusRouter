@@ -63,7 +63,7 @@ func addCount(a, b Count) (Count, error) {
 func (u RemoteUsage) Valid() bool {
 	_, a := addCount(emptyCount(), u.Local)
 	_, b := addCount(emptyCount(), u.Cloud)
-	return a == nil && b == nil && u.Unclassified >= 0 && u.Unavailable >= 0 && !u.ObservedAt.IsZero() && u.Local.Partial <= u.Local.Unknown && u.Cloud.Partial <= u.Cloud.Unknown
+	return a == nil && b == nil && u.Unclassified >= 0 && u.Unavailable >= 0 && !u.ObservedAt.IsZero() && u.Local.Partial <= u.Local.Unknown && u.Cloud.Partial <= u.Cloud.Unknown && u.Local.Partial <= u.Local.Measured && u.Cloud.Partial <= u.Cloud.Measured
 }
 
 // TaskRemoteUsage projects current immutable accounting heads for caller-owned
@@ -89,7 +89,7 @@ func TaskRemoteUsage(ctx context.Context, path string, locality map[[2]string]st
 			continue
 		}
 		seen[task] = true
-		rows, e := tx.QueryContext(ctx, `SELECT r.body,c.body,h.current_id,r.id FROM usage_records r JOIN usage_heads h ON h.base_id=r.id LEFT JOIN usage_corrections c ON c.id=h.current_id WHERE json_extract(r.body,'$.task_id')=?`, task)
+		rows, e := tx.QueryContext(ctx, `SELECT r.body,c.body,h.current_id,r.id FROM usage_records r JOIN usage_heads h ON h.base_id=r.id LEFT JOIN usage_corrections c ON c.id=h.current_id WHERE r.task_id=?`, task)
 		if e != nil {
 			return out, e
 		}
@@ -266,6 +266,12 @@ func ReadRemoteUsage(ctx context.Context, path string) (RemoteMeter, error) {
 		return out, e
 	}
 	out.Total, e = addCount(out.Local, out.Cloud)
+	if e == nil {
+		out.Total, e = addCount(out.Total, Count{Input: "0", Output: "0", Unknown: out.Unavailable})
+	}
+	if e == nil {
+		out.Total, e = addCount(out.Total, Count{Input: "0", Output: "0", Unknown: out.Unclassified})
+	}
 	if e != nil {
 		return out, e
 	}

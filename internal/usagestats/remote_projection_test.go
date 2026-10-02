@@ -2,7 +2,10 @@ package usagestats_test
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/accounting"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"github.com/ArronJablonowski/NexusRouter/providers"
@@ -49,6 +52,30 @@ func TestRemoteProjectionOwnTasksBothLocalitiesAndPartialFailure(t *testing.T) {
 	kinds := map[[2]string]string{{"local", "model"}: "local", {"cloud", "model"}: "cloud"}
 	got, e := usagestats.TaskRemoteUsage(ctx, path, kinds, []string{"local", "cloud", "local"})
 	if e != nil || got.Local.Input != "10" || got.Cloud.Input != "20" || got.Cloud.Unknown != 1 || got.Cloud.Partial != 1 {
+		t.Fatal(got, e)
+	}
+	db, e := sql.Open("sqlite", path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer db.Close()
+	var raw []byte
+	if e = db.QueryRow("SELECT body FROM usage_records WHERE task_id='local'").Scan(&raw); e != nil {
+		t.Fatal(e)
+	}
+	var original accounting.Record
+	if e = json.Unmarshal(raw, &original); e != nil {
+		t.Fatal(e)
+	}
+	corrected := accounting.CloneRecord(original)
+	corrected.ID = "local-correction"
+	corrected.Usage = &providers.Usage{InputTokens: 8, OutputTokens: 1}
+	correction := accounting.Correction{Version: 1, ID: corrected.ID, BaseID: original.ID, Supersedes: original.ID, Evidence: "provider-receipt", Reason: accounting.ProviderReconciliation, Record: corrected, RecordedAt: original.OccurredAt.Add(time.Second)}
+	if e = store.CorrectUsage(ctx, correction); e != nil {
+		t.Fatal(e)
+	}
+	got, e = usagestats.TaskRemoteUsage(ctx, path, kinds, []string{"local", "cloud"})
+	if e != nil || got.Local.Input != "8" || got.Local.Output != "1" {
 		t.Fatal(got, e)
 	}
 	got, e = usagestats.TaskRemoteUsage(ctx, path, kinds, []string{"missing"})
