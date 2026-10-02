@@ -7,7 +7,12 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/policy"
 	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
+
+type warmMemoryCoordinator interface {
+	AcquireVerifiedWarm(context.Context, resources.Snapshot, resources.ReservationRequest, time.Time, func(context.Context) (resources.Snapshot, time.Time, error)) (resources.ReservationBinding, error)
+}
 
 // warmMemoryEstimate never credits provider-reported bytes to host availability.
 // It selects an explicitly qualified incremental estimate on a dedicated,

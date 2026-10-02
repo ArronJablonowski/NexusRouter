@@ -225,7 +225,8 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 	}
 	now := s.routingNow()
 	coldRAM := uint64(0)
-	if snapshot.UnifiedMemory && warmRAM > 0 && !now.Before(warmObserved) && now.Sub(warmObserved) <= time.Second {
+	verifier, canFence := coordinator.(warmMemoryCoordinator)
+	if canFence && snapshot.UnifiedMemory && warmRAM > 0 && !now.Before(warmObserved) && now.Sub(warmObserved) <= time.Second {
 		coldRAM = model.RAMBytes
 		model.RAMBytes = warmRAM
 	}
@@ -254,7 +255,25 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 		}
 		return execution, nil, ErrAdmission
 	}
-	binding, err := coordinator.Acquire(admission, snapshot, request, now)
+	var binding resources.ReservationBinding
+	if coldRAM != 0 {
+		coldModel := model
+		coldModel.RAMBytes = coldRAM
+		binding, err = verifier.AcquireVerifiedWarm(admission, snapshot, request, now, func(ctx context.Context) (resources.Snapshot, time.Time, error) {
+			amount, observed := s.warmMemoryEstimate(ctx, coldModel, input.contextTokens)
+			if amount != warmRAM {
+				return resources.Snapshot{}, time.Time{}, resources.ErrCapacity
+			}
+			fresh, e := s.resourceProfile(ctx)
+			at := s.routingNow()
+			if e != nil || !fresh.UnifiedMemory || at.Before(observed) || at.Sub(observed) > time.Second {
+				return resources.Snapshot{}, time.Time{}, resources.ErrCapacity
+			}
+			return fresh, at, nil
+		})
+	} else {
+		binding, err = coordinator.Acquire(admission, snapshot, request, now)
+	}
 	if err != nil {
 		localRelease()
 		if errors.Is(err, resources.ErrCapacity) {
@@ -262,6 +281,8 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 		}
 		return execution, nil, ErrAdmission
 	}
+	// Fenced observation can advance acquisition time; inspect with a fresh clock.
+	now = s.routingNow()
 	digest, digestErr := request.CanonicalDigest()
 	status, statusErr := coordinator.Status(admission, request.ReservationID, now)
 	if binding.Validate() != nil || digestErr != nil || binding.RequestDigest != digest ||

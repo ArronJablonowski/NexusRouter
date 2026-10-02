@@ -2130,3 +2130,16 @@ then stopped; the existing service was untouched. A separate native cgroup probe
 showed that MemoryMax does not cover the whole Spark GPU allocation, so no such
 enforcement claim or cgroup-derived GPU credit was added. Full check and public
 push are still required for this checkpoint.
+
+Review tightened the final residency check: it now runs inside the host
+coordinator's cross-process admission transaction, with no active reservations,
+including expired/unreleased claims. Added a two-store concurrent cold-admission
+regression and expiry fencing. Warm requests cannot use the ordinary unfenced
+Acquire method. Updated binding inspection to use a fresh post-probe clock;
+focused resource/application regressions pass. This supersedes the initial
+local checkpoint before publication; physical verification is being repeated.
+
+Final fenced physical 80B qualification passed in 15.918s, again verifying one
+cold and three warm durable charges across HTTPS/SSH. Prior failure and earlier
+passing evidence remain separate. Source checks and targeted regression gates
+passed; full make check and public push remain pending.

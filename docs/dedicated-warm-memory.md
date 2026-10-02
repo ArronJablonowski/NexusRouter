@@ -33,6 +33,13 @@ present, its context must equal the requested working tier, and its reported
 footprint must not exceed the cold estimate. Expiry must be more than 24 hours
 away; the normal short-lived Ollama cache is insufficient. The observation must
 be no more than one second old when fresh host capacity is checked.
+The durable coordinator then repeats the observation under its cross-process
+admission transaction, requiring no other active reservation. Expired but
+unreleased reservations also block this warm verification until release or
+process-proof recovery. A concurrent daemon cannot change the admitted model
+between that final check and committing the reservation. Observations never
+grant permission to unload models; external users of the dedicated provider
+remain outside the supported ownership boundary.
 
 Missing, stale, malformed, changed, or unavailable facts select the full cold
 estimate. Context expansion, native harness overhead, custom provider factories,
@@ -86,7 +93,7 @@ shared Ollama service or install a persistent production deployment.
 The 2026-10-02 Spark check used the pinned Qwen3-Coder-Next model at 8192
 context, a 64 GiB cold estimate and a 32 GiB warm estimate. HTTPS and SSH
 arithmetic, caller replay, payload-conflict rejection and cancellation after
-streamed output passed in 15.176 seconds. The independent receipt audit found
+streamed output passed in 15.918 seconds with the final transaction fence. The independent receipt audit found
 one cold and three warm charges. The temporary dedicated provider was stopped
 after qualification; the existing shared Ollama service was unchanged. This is
 a measured development checkpoint, not exhaustive workload or release approval.

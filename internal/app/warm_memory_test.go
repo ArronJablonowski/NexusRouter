@@ -14,6 +14,14 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
+func (f *reservationCoordinatorFixture) AcquireVerifiedWarm(ctx context.Context, s resources.Snapshot, r resources.ReservationRequest, now time.Time, verify func(context.Context) (resources.Snapshot, time.Time, error)) (resources.ReservationBinding, error) {
+	observed, at, err := verify(ctx)
+	if err != nil {
+		return resources.ReservationBinding{}, err
+	}
+	return f.Acquire(ctx, observed, r, at)
+}
+
 func TestWarmMemoryUsesQualifiedBudgetAndPreservesAdmission(t *testing.T) {
 	digest := strings.Repeat("a", 64)
 	for _, mode := range []string{"warm", "absent", "digest", "context", "expiry", "inventory", "other-resident", "discrete", "pressure", "overhead", "unavailable", "oversize"} {

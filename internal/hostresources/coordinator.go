@@ -276,6 +276,23 @@ func registerProcess(ctx context.Context, conn *sql.Conn, ref processguard.Refer
 }
 
 func (c *Coordinator) Acquire(ctx context.Context, snapshot resources.Snapshot, request resources.ReservationRequest, now time.Time) (resources.ReservationBinding, error) {
+	if request.ColdRAMBytes != 0 {
+		return resources.ReservationBinding{}, resources.ErrReservation
+	}
+	return c.acquire(ctx, snapshot, request, now, nil)
+}
+
+// AcquireVerifiedWarm fences the final residency observation with the same
+// cross-process transaction that admits every cold and warm execution. The
+// verifier must be bounded, read-only, and must not reenter the coordinator.
+func (c *Coordinator) AcquireVerifiedWarm(ctx context.Context, snapshot resources.Snapshot, request resources.ReservationRequest, now time.Time, verify func(context.Context) (resources.Snapshot, time.Time, error)) (resources.ReservationBinding, error) {
+	if request.ColdRAMBytes == 0 || verify == nil || c.limits.MaxConcurrent != 1 {
+		return resources.ReservationBinding{}, resources.ErrReservation
+	}
+	return c.acquire(ctx, snapshot, request, now, verify)
+}
+
+func (c *Coordinator) acquire(ctx context.Context, snapshot resources.Snapshot, request resources.ReservationRequest, now time.Time, verify func(context.Context) (resources.Snapshot, time.Time, error)) (resources.ReservationBinding, error) {
 	canonical, err := request.Canonical()
 	if err != nil {
 		return resources.ReservationBinding{}, resources.ErrReservation
@@ -320,6 +337,26 @@ func (c *Coordinator) Acquire(ctx context.Context, snapshot resources.Snapshot, 
 		return row.binding(), nil
 	} else if !errors.Is(readErr, sql.ErrNoRows) {
 		return resources.ReservationBinding{}, readErr
+	}
+	if verify != nil {
+		var active int
+		// Expiry alone does not prove that an old execution stopped changing
+		// provider residency. Require release or process-proof recovery first.
+		if err = tx.conn.QueryRowContext(ctx, `SELECT count(*) FROM reservations WHERE host_scope=? AND state='active'`, request.HostScope).Scan(&active); err != nil {
+			return resources.ReservationBinding{}, err
+		}
+		if active != 0 {
+			return resources.ReservationBinding{}, resources.ErrCapacity
+		}
+		var observed time.Time
+		snapshot, observed, err = verify(ctx)
+		if err != nil {
+			return resources.ReservationBinding{}, err
+		}
+		if now, err = clock(ctx, tx.conn, observed); err != nil {
+			return resources.ReservationBinding{}, err
+		}
+		request.RequestedAt = now
 	}
 	if err = c.admit(ctx, tx.conn, snapshot, request, now); err != nil {
 		return resources.ReservationBinding{}, err
