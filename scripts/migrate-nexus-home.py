@@ -54,6 +54,8 @@ def check_idle(moves):
 
 def prepare(home):
     root = home / '.NexusRouter'
+    if os.path.lexists(home / 'Library/Application Support/NexusRouter'):
+        raise RuntimeError('intermediate installation path exists; reconcile first')
     if os.path.lexists(root):
         raise RuntimeError('destination exists; reconcile rather than overwrite')
     moves = inventory(home)
@@ -111,6 +113,8 @@ def apply(home, binary):
         dst.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         src.rename(dst)
         src.symlink_to(dst, target_is_directory=True)
+    # Already deployed clients discover this canonical-brand compatibility path.
+    (home / 'Library/Application Support/NexusRouter').symlink_to(root / 'data', target_is_directory=True)
     target_config = root / 'data/live-test/config.yaml'
     temporary = target_config.with_name('config.yaml.consolidation')
     private_write(temporary, config)
