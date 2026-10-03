@@ -1655,3 +1655,11 @@ list across boards. Show running tasks and queued/admitted work, remove terminal
 work on successful refresh, and label stale or incomplete reads explicitly.
 Remote-only work requires federation; commander-only coverage must be visible
 to the user until that integration is verified.
+
+### Remote routing-grid presentation
+
+Remote systems remain below all specialist cards and use matching responsive
+card dimensions with Commander colors and animation. Selecting a host opens its
+own specialist view. Host-advertised capabilities must be distinguished from
+learned rankings, and inspection must honor paired permissions without exposing
+remote credentials or opening arbitrary browser URLs.

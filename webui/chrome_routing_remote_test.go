@@ -60,7 +60,7 @@ func TestChromeRoutingRemotePaths(t *testing.T) {
 				http.Error(w, "private error", 503)
 				return
 			}
-			writeChromeJSON(w, map[string]any{"version": 1, "observed_at": time.Now().UTC(), "info": map[string]any{"version": 1, "instance": "spark", "available": true, "models": []any{map[string]any{"id": "coder", "provider": "ollama", "model": "Qwen3 Coder <img src=x onerror=alert(1)>", "local": true}}}})
+			writeChromeJSON(w, map[string]any{"version": 1, "observed_at": time.Now().UTC(), "info": map[string]any{"version": 1, "instance": "spark", "available": true, "models": []any{map[string]any{"id": "coder", "provider": "ollama", "model": "Qwen3 Coder <img src=x onerror=alert(1)>", "local": true, "capabilities": []string{"coding"}, "context_tokens": 131072}}}})
 		default:
 			http.Error(w, "unexpected", 404)
 		}
@@ -80,9 +80,14 @@ func TestChromeRoutingRemotePaths(t *testing.T) {
 const chromeRoutingRemoteSteps = `
 await cdp('Page.navigate',{url:origin+'/app/routing-map'});
 await eventually('document.querySelector("#remote-route-status").textContent.includes("2 paired systems · 1 connected")','remote paths unavailable');
-const result=await evaluate('({cards:document.querySelectorAll(".remote-route-card").length,specialists:document.querySelectorAll(".specialist-card").length,text:document.querySelector("#remote-route-grid").textContent,below:document.querySelector(".remote-route-section").getBoundingClientRect().top>=document.querySelector("#specialist-grid").getBoundingClientRect().bottom,injected:document.querySelectorAll("#remote-route-grid img").length,branches:document.querySelectorAll("#routing-branches .routing-terminal").length})');
-if(result.cards!==2||result.specialists!==14||!result.below||result.injected||result.branches!==16||!result.text.includes('Commander → SSH → spark → models')||!result.text.includes('Connection unavailable')||!result.text.includes('<img'))throw Error(JSON.stringify(result));
-await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+const result=await evaluate('({cards:document.querySelectorAll(".remote-route-card").length,specialists:document.querySelectorAll("#specialist-grid .specialist-card").length,text:document.querySelector("#remote-route-grid").textContent,below:document.querySelector(".remote-route-section").getBoundingClientRect().top>=document.querySelector("#specialist-grid").getBoundingClientRect().bottom,injected:document.querySelectorAll("#remote-route-grid img").length,branches:document.querySelectorAll("#routing-branches .routing-terminal").length})');
+if(result.cards!==2||result.specialists!==14||!result.below||result.injected||result.branches!==16||!result.text.includes('Connection unavailable'))throw Error(JSON.stringify(result));
+const sizing=await evaluate('({remote:document.querySelector(".remote-route-card").getBoundingClientRect().width,local:document.querySelector("#specialist-grid .specialist-card").getBoundingClientRect().width,remoteHeight:document.querySelector(".remote-route-card").getBoundingClientRect().height,localHeight:Math.max(...[...document.querySelectorAll("#specialist-grid .specialist-card")].map(c=>c.getBoundingClientRect().height)),color:getComputedStyle(document.querySelector(".remote-route-card")).borderTopColor,animation:getComputedStyle(document.querySelector(".remote-route-card .core-rings span")).animationName})');
+if(Math.abs(sizing.remote-sizing.local)>1||Math.abs(sizing.remoteHeight-sizing.localHeight)>1||sizing.color!=='rgb(255, 229, 106)'||sizing.animation!=='core-pulse')throw Error(JSON.stringify(sizing));
+await evaluate('document.querySelector(".remote-route-card").click()');
+if(!await evaluate('document.querySelector("#remote-grid-dialog").open&&document.querySelector("#remote-specialist-grid").textContent.includes("coding")&&document.querySelector("#remote-specialist-grid").textContent.includes("<img")&&!document.querySelector("#remote-specialist-grid img")'))throw Error('remote drilldown');
+await evaluate('document.querySelector("#remote-grid-close").click()');
+await cdp('Emulation.setDeviceMetricsOverride' ,{width:390,height:844,deviceScaleFactor:1,mobile:false});
 if(await evaluate('document.documentElement.scrollWidth>document.documentElement.clientWidth'))throw Error('mobile overflow');
 await evaluate('document.querySelector(".remote-route-section").scrollIntoView()');
 if(process.env.NEXUS_ROUTING_SCREENSHOT){const fs=await import('node:fs');const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_ROUTING_SCREENSHOT,Buffer.from(shot.data,'base64'));}

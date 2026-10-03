@@ -305,9 +305,14 @@
           <section class="remote-route-section" aria-labelledby="remote-routes-title">
             <div class="tron-section-heading"><div><p class="eyebrow">Remote execution paths</p><h2 id="remote-routes-title">Connected systems</h2></div><a href="__DARWIN_BASE_PATH__/settings#remote-membership">Manage connections</a></div>
             <output id="remote-route-status" class="tron-status" role="status" aria-live="polite">Loading paired remote systems…</output>
-            <div id="remote-route-grid" class="remote-route-grid"></div>
+            <div id="remote-route-grid" class="remote-route-grid specialist-grid"></div>
           </section>
         </section>
+        <dialog id="remote-grid-dialog" class="remote-grid-dialog" aria-labelledby="remote-grid-title">
+          <div class="tron-section-heading"><h2 id="remote-grid-title">Remote specialist grid</h2><button id="remote-grid-close" type="button" class="tron-button" autofocus>Back to commander grid</button></div>
+          <p id="remote-grid-status" role="status"></p>
+          <div id="remote-specialist-grid" class="specialist-grid"></div>
+        </dialog>
         <section id="creative-consultation" class="creative-console" aria-labelledby="creative-title">
           <p class="eyebrow">Human preference loop</p><h2 id="creative-title">Creative tasks require consultation</h2>
           <p id="creative-question">The commander asks: “Which model’s output do you prefer?”</p>

@@ -2296,3 +2296,25 @@ Remote-only work is not yet federated into this view, and the UI says so.
 Full validation, normal GitHub push and idle-boundary deployment remain pending.
 Focused race tests cover authentication, query rejection, failure handling,
 pagination, queued jobs and browser reconciliation.
+
+## 2026-10-02 — Remote cards and specialist drilldown
+
+Remote hosts occupy the same responsive two-column layout as specialists, in
+a separate final section below every specialist. Cards match the tallest
+specialist card and share Commander gold colors, background, glow and pulsing
+rings. Vertical-only connectors are retained. Native buttons open an accessible
+modal with the selected host's live permitted models grouped by advertised
+capability. Refreshes update the open view; revoked peers and failed membership
+reads close it, and failed inspections clear the host's cached data.
+
+The remote info protocol does not export learned routing rankings or Commander
+selection. The drilldown explicitly labels capability grouping and that missing
+ranking scope; it never substitutes the local commander's rankings. It uses
+existing authenticated, CSRF-protected SSH/mTLS inspection with no browser
+connections to remote URLs. Remote protocol expansion for exact learned-grid
+parity remains outstanding.
+
+Real Chromium checks cover bottom positioning, equal column widths and card
+height, gold animation, drilldown, injection-safe text, mobile overflow, empty
+membership and unavailable hosts. Mobile screenshot inspected. Full validation,
+normal GitHub push and safe idle deployment remain required.
