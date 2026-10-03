@@ -2353,3 +2353,16 @@ preservation, path rewriting, permissions, environment migration and refusal
 without changes. Live dry-run passed. Full make check and normal push are queued
 behind browser-feedback-recovery. The installed path has not yet changed:
 application is explicitly gated on full validation and a reconciled idle rollout.
+
+
+## Unified ~/.NexusRouter installation correction
+
+The user superseded the Application Support-only rename: source, associated
+worktrees, skills, pairing configuration, executable and runtime data now have
+one canonical parent, ~/.NexusRouter. Added a path-only inventory and guarded
+offline consolidation preserving data inodes and legacy references. CLI config
+and browser approval prefer the new home; the old migration command refuses
+application. Regression tests verify longest-path rewriting, preserved skills,
+private configuration and service environment migration. Live application and
+full validation status are tracked in the deployment evidence; no completed
+migration is inferred from the dry run.

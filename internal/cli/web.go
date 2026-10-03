@@ -44,8 +44,11 @@ func runWeb(args []string, stdout, stderr io.Writer) int {
 	}
 	token := branding.Getenv("DARWIN_API_TOKEN")
 	home, _ := os.UserHomeDir()
-	installedPath := filepath.Join(home, "Library/Application Support/NexusRouter/live-test/config.yaml")
+	installedPath := filepath.Join(home, ".NexusRouter/data/live-test/config.yaml")
 	serviceLabel := "com.nexusrouter.live-test"
+	if _, err := os.Stat(installedPath); os.IsNotExist(err) {
+		installedPath = filepath.Join(home, "Library/Application Support/NexusRouter/live-test/config.yaml")
+	}
 	if _, err := os.Stat(installedPath); os.IsNotExist(err) {
 		installedPath = filepath.Join(home, "Library/Application Support/DarwinRouter/live-test/config.yaml")
 		serviceLabel = "com.darwinrouter.live-test"

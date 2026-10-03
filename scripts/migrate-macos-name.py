@@ -100,6 +100,8 @@ def migrate(home):
 
 
 if __name__ == '__main__':
+    print('Superseded: use scripts/migrate-nexus-home.py for ~/.NexusRouter.', file=sys.stderr)
+    sys.exit(1)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply', action='store_true', help='requires both services unloaded and no open data files')
     args = parser.parse_args()

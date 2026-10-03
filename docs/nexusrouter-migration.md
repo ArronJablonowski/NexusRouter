@@ -51,39 +51,43 @@ SDK consumers update imports to the new module path together; mixing old and
 new import paths creates distinct Go types. The repository destination must be
 renamed on GitHub before the new module path is advertised as downloadable.
 
-## Rename an installed macOS data directory
+## Unified installation home
 
-The Skills form shows the configured store path, rather than a cosmetic label.
-An older installation may therefore still show
-`~/Library/Application Support/DarwinRouter/live-test/skills`.
-The canonical path is
-`~/Library/Application Support/NexusRouter/live-test/skills`.
+All owned source code, worktrees, skills, configuration, binaries and runtime
+resources belong below `~/.NexusRouter`:
 
-From a validated checkout, run `python3 -B scripts/migrate-macos-name.py` to
-inspect the migration without changing files. Before applying it, quiesce all
-review dispatchers and reconcile every remote receipt. Wait for zero active
-local and remote tasks/reservations, unload the old launch agent, and ensure
-no other process is using the installation. Do not race an inter-wave gap.
-Then run `python3 -B scripts/migrate-macos-name.py --apply`.
+- `code/`: existing main checkout, preserving uncommitted work and Git history.
+- `worktrees/`: associated source and validation checkouts, preserving contents.
+- `skills/`: existing skill store, moved without copying or resetting it.
+- `config/`: configuration and private Spark pairing credentials.
+- `data/`: task databases, process guards and resource accounting.
+- `bin/nexus`: verified installed executable.
+- `migration-backup/`: private originals and the exact move inventory.
 
-The utility refuses loaded services, open data files, existing destinations,
-and conflicting environment aliases. It renames the entire data directory in
-place, preserving skill/database inode identity; rewrites configured data
-paths; installs `com.nexusrouter.live-test.plist` using `/opt/homebrew/bin/nexus`
-and canonical `NEXUS_` environment names; and retains a relative `DarwinRouter`
-compatibility alias. Both names thus reach the same process guards and resource
-ledger, including when older binaries use the legacy paths. Do not remove this
-alias or independently create a second guard directory during mixed-version use.
+`python3 -B scripts/migrate-nexus-home.py` emits a path-only dry-run inventory.
+The earlier Application Support/NexusRouter migration is superseded and its
+command refuses application. Explicit configuration paths remain supported;
+default user configuration prefers `~/.NexusRouter/config/config.yaml`, and
+browser approval prefers `~/.NexusRouter/data/live-test/config.yaml`.
 
-Verify the new configuration with the validated binary before bootstrapping the
-new launch agent. Confirm the Skills form, skill inventory, database identity,
-service label and zero duplicate daemons, then resume the campaign from its
-existing receipts. The utility does not start or stop services itself.
+Before applying, pause dispatch, reconcile the current remote task and receipts,
+and verify zero active tasks/reservations on both hosts. Unload both service
+labels and stop validation processes using affected checkouts, preserving their
+logs for restart. Then run the migration with `--apply --binary PATH`, supplying
+the already validated executable selected for the rollout. The utility refuses
+loaded services, open files, destination collisions, or ambiguous environment
+aliases. It does not start/stop services or kill tasks itself.
 
-Private originals are retained under `NexusRouter/name-migration-backup` with
-mode0600. If interrupted, do not rerun blindly: reconcile the two directory
-names and launch-agent files using these originals while services remain
-unloaded. For rollback, restore the original config and launch agent, remove
-only the verified compatibility symlink, rename the data directory back, and
-load only the old service. Never overwrite a distinct destination or merge two
-live stores. Durable database filenames and signed evidence are not rebranded.
+Directory moves preserve data and inode identity. Legacy paths become aliases
+so historical receipts, registered worktrees and shared resource guards still
+resolve to the same files. Only OS-required launch-agent integration remains
+outside the parent folder; its executable/config paths point inside the home.
+Do not remove aliases or create independent legacy stores during compatibility.
+Verify the skill inventory, database identities, Git state, new Skills UI path
+and service health before resuming existing review receipts and validation.
+
+A failure after mutation requires manual reconciliation against the private
+`migration-backup/moves.json`, original configuration and launch agent. Do not
+rerun blindly, merge competing stores, or rewrite signed historical evidence.
+Rollback while stopped by restoring original config/service files, removing
+only verified aliases, and reversing the recorded directory moves.

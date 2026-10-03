@@ -47,6 +47,17 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if *user == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			candidate := filepath.Join(home, ".NexusRouter", "config", "config.yaml")
+			if _, err := os.Stat(candidate); err == nil {
+				*user = candidate
+			} else if !os.IsNotExist(err) {
+				_, _ = fmt.Fprintln(stderr, "cannot inspect user configuration")
+				return 1
+			}
+		}
+	}
+	if *user == "" {
 		if dir, err := os.UserConfigDir(); err == nil {
 			candidate := filepath.Join(dir, "nexusrouter", "config.yaml")
 			if _, err := os.Stat(candidate); os.IsNotExist(err) {

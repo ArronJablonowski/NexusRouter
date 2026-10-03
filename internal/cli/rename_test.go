@@ -56,4 +56,12 @@ func TestRenameConfigDiscoveryPrefersNewAndRetainsLegacy(t *testing.T) {
 	show(`"max_depth": 3`)
 	write("nexusrouter", "workboard:\n  decomposition:\n    max_depth: 4\n")
 	show(`"max_depth": 4`)
+	homeConfig := filepath.Join(root, ".NexusRouter", "config", "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(homeConfig), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(homeConfig, []byte("workboard:\n  decomposition:\n    max_depth: 5\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	show(`"max_depth": 5`)
 }
