@@ -2333,3 +2333,8 @@ Spark source-review batch0056 identified missing retry hints and masked history-
 ## 2026-10-03 — OpenAI deadline error classification
 
 When an admission/unsupported-harness error also matches an expired deadline, the nonstreaming API already prioritized HTTP504/deadline_exceeded but retained invalid_request_error. Reset its type to server_error consistently. A regression covers joined deadline/admission and deadline/unsupported errors. Focused race tests, vet and source checks are required; full make check/normal push are queued behind feedback-api-capacity. Not deployed; broader source review remains incomplete.
+
+
+### 2026-10-03 — Browser feedback receipt recovery
+
+A durable feedback append followed by a later revision could leave the original browser operation unable to recover its pending receipt: the handler compared its feedback ID only with the latest history entry. Receipt construction now locates the operation's exact entry and uses its original revision. New regression first reproduced `browser mutation unavailable`, then verifies recovery, identical replay and preservation of the later revision. Full validation and normal push remain queued; no deployment claimed. The separate deep session follow-up replay candidate remains under investigation.

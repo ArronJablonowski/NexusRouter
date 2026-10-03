@@ -340,3 +340,58 @@ func TestBrowserListsLiveBlockedProposalAfterToolStarted(t *testing.T) {
 		t.Fatal("denied provider run did not resume")
 	}
 }
+
+func TestBrowserFeedbackPendingReceiptSurvivesLaterRevision(t *testing.T) {
+	svc, cfg := autoFixture(t)
+	ctx := context.Background()
+	out, err := svc.Run(ctx, Request{Prompt: "hello", Domain: "coding"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := browserops.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	mutations, err := NewBrowserMutations(svc, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cost := .25
+	request := contract.FeedbackRequest{Version: 1, IdempotencyKey: "feedback-pending-recovery-01", TaskID: out.TaskID, Action: contract.FeedbackRecord, Accepted: false, AttemptCost: &cost}
+	operation, _, err := mutations.begin(ctx, browserMutationTestSubject, string(request.Action), request.IdempotencyKey, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := telemetry.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	firstID := browserFeedbackID(operation.OperationID)
+	first := telemetry.BrowserFeedback{Version: 1, ID: firstID, TaskID: out.TaskID, Accepted: false, AttemptCost: cost, CreatedAt: time.Now().UTC()}
+	if err = db.AppendBrowserFeedback(ctx, first, 0); err != nil {
+		t.Fatal(err)
+	}
+	// The original append is durable but its browser receipt is not yet committed.
+	revision := int64(1)
+	later := contract.FeedbackRequest{Version: 1, IdempotencyKey: "feedback-pending-recovery-02", TaskID: out.TaskID, FeedbackID: firstID, Action: contract.FeedbackRevise, Accepted: true, ExpectedRevision: &revision}
+	if _, err = mutations.Feedback(ctx, browserMutationTestSubject, later); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := mutations.Feedback(ctx, browserMutationTestSubject, request)
+	if err != nil {
+		t.Fatalf("recover original durable feedback: %v", err)
+	}
+	if recovered.FeedbackID != firstID || recovered.Revision != 1 || recovered.Accepted {
+		t.Fatal(recovered)
+	}
+	replayed, err := mutations.Feedback(ctx, browserMutationTestSubject, request)
+	if err != nil || replayed != recovered {
+		t.Fatal(replayed, err)
+	}
+	history, err := db.BrowserFeedbackHistory(ctx, out.TaskID)
+	if err != nil || len(history) != 2 || !history[1].Accepted {
+		t.Fatal(history, err)
+	}
+}

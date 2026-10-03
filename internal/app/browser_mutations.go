@@ -293,15 +293,24 @@ func (b *BrowserMutations) Feedback(ctx context.Context, subject string, request
 	if err != nil || len(history) == 0 {
 		return contract.FeedbackReceipt{}, ErrBrowserMutation
 	}
-	current := history[len(history)-1]
-	if current.ID != feedbackID || current.Accepted != request.Accepted {
+	// A later revision may commit before this operation journals its receipt.
+	// Recover the exact durable entry rather than claiming the current head.
+	var current telemetry.BrowserFeedback
+	var revision int64
+	for i, item := range history {
+		if item.ID == feedbackID {
+			current, revision = item, int64(i+1)
+			break
+		}
+	}
+	if revision == 0 || current.Accepted != request.Accepted {
 		return contract.FeedbackReceipt{}, ErrBrowserMutation
 	}
 	state := "recorded"
 	if request.Action == contract.FeedbackRevise {
 		state = "revised"
 	}
-	receipt := contract.FeedbackReceipt{Version: 1, OperationID: record.OperationID, TaskID: request.TaskID, FeedbackID: current.ID, Revision: int64(len(history)), State: state, Accepted: request.Accepted, EvidenceClass: contract.SubjectiveEvidence, Source: "user_feedback"}
+	receipt := contract.FeedbackReceipt{Version: 1, OperationID: record.OperationID, TaskID: request.TaskID, FeedbackID: current.ID, Revision: revision, State: state, Accepted: request.Accepted, EvidenceClass: contract.SubjectiveEvidence, Source: "user_feedback"}
 	if receipt.Validate() != nil {
 		return contract.FeedbackReceipt{}, ErrBrowserMutation
 	}
