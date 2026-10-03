@@ -152,7 +152,7 @@ func (s *Service) nativeModelInventory(ctx context.Context, p config.Provider, l
 	if p.APIKeyEnv != "" && s.secret != nil {
 		key = s.secret(p.APIKeyEnv)
 	}
-	adapter, err := providers.Build(check, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: p.ResolvedEndpoint(), Kind: p.Kind, Purpose: providers.PurposeDiscovery, Timeout: httpProviderTimeout(p), APIKey: key, Transport: tr})
+	adapter, err := providers.Build(check, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: p.ResolvedEndpoint(), Kind: p.Kind, Purpose: providers.PurposeDiscovery, Timeout: httpProviderTimeout(p), OllamaThink: p.OllamaThink, APIKey: key, Transport: tr})
 	if err != nil {
 		return nil, err
 	}

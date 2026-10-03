@@ -2265,3 +2265,18 @@ restart. OS/service logs, pre-authentication TLS failures, standalone non-runtim
 learning records and a central log browsing dashboard are not implemented by
 this increment. No live collection is claimed until the upgraded remote and
 commander are deployed and explicitly configured.
+
+## 2026-10-02 — Explicit Ollama thinking control
+
+The generic Ollama provider now accepts an optional provider configuration field
+`ollama_think: false` or `true`. Omission preserves the model's default; this is
+not a global default change. The setting is restricted to Ollama and propagated
+through trusted provider construction to `/api/chat`. Adapters copy the configured
+value, and reasoning remains separate from final content. Pi-native adapters keep
+their existing independent protocol behavior.
+
+This enables a controlled configuration change for future Spark review calls.
+It does not establish why two Qwen batch0004 attempts emitted no final content,
+or authorize another attempt on that batch. The source-review coverage gap and
+both failed records remain preserved. No live configuration/deployment change is
+claimed until separately verified; full validation and normal push remain gates.

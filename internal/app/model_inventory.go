@@ -64,7 +64,7 @@ func (s *Service) localModelInventory(ctx context.Context) map[string]providerIn
 					var adapter providers.Provider
 					adapter, err = providers.Build(query, s.providerFactory, providers.Connection{Version: 1, ID: configured.ID,
 						Endpoint: configured.ResolvedEndpoint(), Kind: configured.Kind, Purpose: providers.PurposeDiscovery,
-						Timeout: httpProviderTimeout(configured), APIKey: key, Transport: transport})
+						Timeout: httpProviderTimeout(configured), OllamaThink: configured.OllamaThink, APIKey: key, Transport: transport})
 					if err == nil {
 						if inventory, ok := adapter.(providers.ModelInventoryProvider); ok {
 							entry.models, err = inventory.InstalledModels(query)

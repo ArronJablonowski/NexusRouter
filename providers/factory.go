@@ -16,6 +16,8 @@ import (
 // reject redirects, honor contexts, and never log credentials or retain the
 // connection beyond the adapter's operation. Arbitrary Go code is not sandboxed.
 type Connection struct {
+	// OllamaThink overrides the model default only when explicitly configured.
+	OllamaThink        *bool
 	Version            int
 	ID, Endpoint, Kind string
 	// Purpose distinguishes pre-task discovery/health construction from the
@@ -72,6 +74,15 @@ func Build(ctx context.Context, factory Factory, connection Connection) (out Pro
 	builtin, err := NewHTTPWithTimeout(connection.Endpoint, connection.Kind, connection.APIKey, connection.Transport, timeout)
 	if err != nil {
 		return nil, adapterFailure(false)
+	}
+	if connection.OllamaThink != nil {
+		if connection.Kind != "ollama" {
+			return nil, adapterFailure(false)
+		}
+		value := *connection.OllamaThink
+		builtin.ollamaThink = &value
+		copyValue := value
+		connection.OllamaThink = &copyValue
 	}
 	if factory == nil {
 		return builtin, nil

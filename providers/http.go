@@ -13,10 +13,11 @@ import (
 )
 
 type HTTP struct {
-	base   string
-	kind   string
-	key    string
-	client *http.Client
+	ollamaThink *bool
+	base        string
+	kind        string
+	key         string
+	client      *http.Client
 }
 
 const defaultRequestTimeout = 5 * time.Minute
@@ -46,7 +47,7 @@ func NewHTTPWithTimeout(base, kind, key string, transport http.RoundTripper, tim
 	if timeout < 100*time.Millisecond || timeout > MaxRequestTimeout {
 		return nil, errors.New("invalid provider request timeout")
 	}
-	return &HTTP{strings.TrimRight(base, "/"), kind, key, &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &HTTP{nil, strings.TrimRight(base, "/"), kind, key, &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
 func (p *HTTP) send(ctx context.Context, method, path string, body any) (*http.Response, error) {
@@ -215,6 +216,9 @@ func (p *HTTP) Stream(ctx context.Context, r Request, emit func(Chunk) error) er
 	path := "/chat/completions"
 	if p.kind == "ollama" {
 		path = "/api/chat"
+		if p.ollamaThink != nil {
+			body["think"] = *p.ollamaThink
+		}
 		options := map[string]int64{}
 		if r.MaxOutputTokens > 0 {
 			options["num_predict"] = r.MaxOutputTokens

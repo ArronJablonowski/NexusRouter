@@ -199,7 +199,7 @@ func prepareTaskProvider(s config.Settings, provider config.Provider, model conf
 			return nil, nil, ErrAdmission
 		}
 		open := func(ctx context.Context) (providers.Provider, func(), error) {
-			adapter, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: endpoint, Kind: provider.Kind, Purpose: purpose, Timeout: httpProviderTimeout(provider), APIKey: key, Transport: transport})
+			adapter, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: endpoint, Kind: provider.Kind, Purpose: purpose, Timeout: httpProviderTimeout(provider), OllamaThink: provider.OllamaThink, APIKey: key, Transport: transport})
 			if err != nil {
 				return nil, nil, err
 			}

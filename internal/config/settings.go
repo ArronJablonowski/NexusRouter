@@ -122,6 +122,7 @@ type Workers struct {
 	DelegateMaxTurns  int     `yaml:"delegate_max_turns" json:"delegate_max_turns"`
 }
 type Provider struct {
+	OllamaThink         *bool  `yaml:"ollama_think,omitempty" json:"ollama_think,omitempty"`
 	DedicatedWarmMemory bool   `yaml:"dedicated_warm_memory,omitempty" json:"dedicated_warm_memory,omitempty"`
 	ManageResidency     bool   `yaml:"manage_residency" json:"manage_residency,omitempty"`
 	ID                  string `yaml:"id" json:"id"`
@@ -551,6 +552,9 @@ func (s Settings) Validate() error {
 		}
 		if p.Kind != "ollama" && p.Kind != "openai_compatible" && p.Kind != "codex_app_server" {
 			return errors.New("unsupported provider kind")
+		}
+		if p.OllamaThink != nil && p.Kind != "ollama" {
+			return errors.New("ollama_think requires Ollama provider")
 		}
 		if p.RequestTimeout != "" {
 			timeout, err := Duration(p.RequestTimeout)
