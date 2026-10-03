@@ -43,7 +43,7 @@ func TestTaskPageRejectsMalformedMetadata(t *testing.T) {
 	for _, mutate := range []func(*TaskPage){
 		func(p *TaskPage) { p.Items[0].TaskID = "bad id" },
 		func(p *TaskPage) { p.Items[0].State = "queued" },
-		func(p *TaskPage) { p.Items[0].Sequence = 10001 },
+		func(p *TaskPage) { p.Items[0].Sequence = 0 },
 		func(p *TaskPage) { p.Items = append(p.Items, p.Items[0]) },
 		func(p *TaskPage) { p.HasMore = true },
 	} {
@@ -52,5 +52,14 @@ func TestTaskPageRejectsMalformedMetadata(t *testing.T) {
 		if page.Validate() == nil {
 			t.Fatal("invalid page accepted", page)
 		}
+	}
+}
+
+func TestTaskPageAcceptsLongStreamSequence(t *testing.T) {
+	item := taskSummaryFixture("task")
+	item.Sequence = 10871
+	page := TaskPage{Version: 1, Items: []TaskSummary{item}}
+	if err := page.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }
