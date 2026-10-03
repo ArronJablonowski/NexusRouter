@@ -2,6 +2,7 @@ package remotecli
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"math"
 	"time"
@@ -135,4 +136,19 @@ func dispatchQueuedReviewOperation(ctx context.Context, client *remote.Client, q
 	}
 	result.Phase = "review_queued"
 	return result, nil
+}
+
+// Report partial queue progress even when a later job or the overall wait fails.
+// Keep the error so CLI callers still receive a nonzero exit status.
+func writeReviewQueueResult(output io.Writer, operation string, result any, operationErr error) error {
+	if operation == "run-review-jobs" || operation == "auto-dispatch-review-job" {
+		if err := json.NewEncoder(output).Encode(result); err != nil {
+			return err
+		}
+		return operationErr
+	}
+	if operationErr != nil {
+		return operationErr
+	}
+	return json.NewEncoder(output).Encode(result)
 }

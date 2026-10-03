@@ -2235,3 +2235,7 @@ Validation: affected usage, remote, browser API, embedded WebUI and remote CLI r
 ### 2026-10-02 — Remote host card outline
 
 Remote host cards on the Routing Grid use the Commander’s exact `#ffe56a` one-pixel outline. The connected-state border override is removed, so both connected and unavailable hosts retain the requested yellow outline; connection state remains in the card text. Existing Chrome routing layout and embedded asset checks pass. Full repository validation and push remain gated separately.
+
+### Spark model review: preserve partial queue results
+
+Qwen review of baseline496458c identified that `run-review-jobs` discarded completed-job metadata when a later queue read or overall wait failed. The CLI now emits available job statuses while retaining a nonzero error exit; enqueue validation behavior is unchanged. Regression coverage checks partial completed/pending results, deadline propagation and output-write failures. Full validation and GitHub push remain queued behind27e3d79; the ongoing remote review continues on its pinned baseline.

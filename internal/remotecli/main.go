@@ -197,16 +197,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 				result, e = enqueueReviewOperation(ctx, &client, operation == "enqueue-auto-review", *reviewQueue, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, deadline, input)
 			}
 		}
-		if operation == "auto-dispatch-review-job" {
-			if encodeErr := json.NewEncoder(output).Encode(result); encodeErr != nil {
-				return encodeErr
-			}
-			return e
-		}
-		if e != nil {
-			return e
-		}
-		return json.NewEncoder(output).Encode(result)
+		return writeReviewQueueResult(output, operation, result, e)
 	}
 	if operation == "dispatch-evaluate" || operation == "auto-dispatch-evaluate" {
 		if *modelID != "" || *harnessID != "" || *contextTokens != 0 {
