@@ -2318,3 +2318,8 @@ Real Chromium checks cover bottom positioning, equal column widths and card
 height, gold animation, drilldown, injection-safe text, mobile overflow, empty
 membership and unavailable hosts. Mobile screenshot inspected. Full validation,
 normal GitHub push and safe idle deployment remain required.
+
+## 2026-10-02 — Router Commander label
+
+Renamed the routing-grid heading from Commander / brain to Router Commander.
+This label change awaits the same validated idle-boundary UI rollout.
