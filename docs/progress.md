@@ -2239,3 +2239,7 @@ Remote host cards on the Routing Grid use the Commander’s exact `#ffe56a` one-
 ### Spark model review: preserve partial queue results
 
 Qwen review of baseline496458c identified that `run-review-jobs` discarded completed-job metadata when a later queue read or overall wait failed. The CLI now emits available job statuses while retaining a nonzero error exit; enqueue validation behavior is unchanged. Regression coverage checks partial completed/pending results, deadline propagation and output-write failures. Full validation and GitHub push remain queued behind27e3d79; the ongoing remote review continues on its pinned baseline.
+
+### Spark review: routing-grid recovery and adaptive label
+
+Confirmed Qwen baseline findings: auto concurrency rendered as “Up to auto local models,” and failed grid refreshes retried at a fixed five seconds. The grid now labels adaptive concurrency explicitly and backs off failed requests through10/20/40/60seconds, resetting to five seconds after success. Tests cover failure caps, recovery, hidden-tab scheduling and existing stale-response protection. Prior behavior fails the regression. Full gate and normal push remain queued; the active Spark review is uninterrupted.

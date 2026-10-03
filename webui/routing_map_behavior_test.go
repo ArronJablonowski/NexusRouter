@@ -48,7 +48,7 @@ const source=` + "`" + function + "`" + `;
 async function scenario(failOld) {
   const nodes=new Map(); const document={hidden:false,querySelector(q){if(!nodes.has(q))nodes.set(q,{textContent:'',hidden:false,clears:0,contains(){return false},replaceChildren(){this.clears++},append(){}});return nodes.get(q)}};
   let resolveOld,rejectOld,resolveNew,calls=0,schedules=0;
-  const scope={document,window:{clearTimeout(){},setTimeout(){schedules++;return 1}},routingTimer:0,routingGeneration:0,snapshot:null,commander:()=>null,ranked:()=>[],drawBranches(){},jobs:[],creativePreference:'',creativeSignature:'',inventory(){return new Promise((resolve,reject)=>{if(calls++===0){resolveOld=resolve;rejectOld=reject}else resolveNew=resolve})}};
+  const scope={document,window:{clearTimeout(){},setTimeout(){schedules++;return 1}},routingTimer:0,routingGeneration:0,routingFailures:0,snapshot:null,commander:()=>null,ranked:()=>[],drawBranches(){},jobs:[],creativePreference:'',creativeSignature:'',inventory(){return new Promise((resolve,reject)=>{if(calls++===0){resolveOld=resolve;rejectOld=reject}else resolveNew=resolve})}};
   vm.createContext(scope);vm.runInContext(source,scope);
   const old=scope.loadRouting(),fresh=scope.loadRouting();
   resolveNew({models:[{},{}],fitness:[],local_concurrency:'1'});await fresh;
@@ -112,5 +112,19 @@ func TestRoutingMapExpandedCategoriesValidateAndAwaitEvidence(t *testing.T) {
  if(!validRankings(snapshot.rankings,models)||ranked({key:'research'})[0].id!=='a')throw Error('new evidence not displayed');
  if(validRankings([...snapshot.rankings,{key:'overflow',domain:'overflow',profile:'default',models:[]}],models))throw Error('unbounded response accepted');
  `
+	runRoutingMapScript(t, script)
+}
+
+func TestRoutingMapBackoffRecoveryAndAdaptiveLabel(t *testing.T) {
+	function := routingMapSection(t, "async function loadRouting()", "async function report(")
+	script := `const nodes=new Map();const document={hidden:false,querySelector(q){if(!nodes.has(q))nodes.set(q,{textContent:'',hidden:false,contains(){return false},replaceChildren(){},append(){}});return nodes.get(q)}};
+ let delay=0,fail=true,routingTimer=0,routingGeneration=0,routingFailures=0,snapshot=null,creativePreference='',creativeSignature='';
+ const window={clearTimeout(){},setTimeout(fn,ms){delay=ms;return 1}},jobs=[];function commander(){return null}function ranked(){return []}function drawBranches(){}
+ async function inventory(){if(fail)throw Error('offline');return {models:[],fitness:[],local_concurrency:'auto'}};
+ ` + function + `
+ (async()=>{for(const expected of [10000,20000,40000,60000,60000]){await loadRouting();if(delay!==expected)throw Error('failure backoff '+delay+' expected '+expected)}
+ fail=false;await loadRouting();if(delay!==5000)throw Error('successful refresh did not reset backoff');if(document.querySelector('#resource-guard-title').textContent!=='Adaptive local model concurrency')throw Error('auto concurrency mislabeled');
+ fail=true;await loadRouting();if(delay!==10000)throw Error('recovery did not reset failure count');document.hidden=true;delay=0;await loadRouting();if(delay!==0)throw Error('hidden page scheduled polling');
+ })().catch(e=>{console.error(e);process.exitCode=1});`
 	runRoutingMapScript(t, script)
 }

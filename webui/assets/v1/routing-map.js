@@ -21,7 +21,7 @@
 		{key:"creative", label:"Creative work", capabilities:["creative","writing","chat"]}
 	];
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
-	let snapshot = null, routingTimer = 0, routingGeneration = 0;
+	let snapshot = null, routingTimer = 0, routingGeneration = 0, routingFailures = 0;
 	let creativePreference = "", creativeSignature = "";
 	const expandedModels = new Set(new URLSearchParams(window.location.search).getAll("expanded").filter(value => { const parts=value.split("|"); return parts.length===2 && jobs.some(job => job.key===parts[0]) && idPattern.test(parts[1]); }));
 	for (const selector of allViews) document.querySelector(selector).hidden = selector !== (window.NexusRoutes.routing(relative) ? "#routing-view" : "#elimination-view");
@@ -110,7 +110,7 @@
 			document.querySelector("#commander-detail").textContent = brain ? (brain.reasoning_effort ? brain.reasoning_effort + " reasoning · " : "") + (snapshot.commander_source || "derived") + " command authority · " + contextLabel(brain) : "No explicit commander is configured; NexusRouter chooses from eligible routes.";
 			const fallback = snapshot.commander_fallback_id ? snapshot.models.find(model => model.id === snapshot.commander_fallback_id) : null, fallbackNode = document.querySelector("#commander-fallback"); fallbackNode.hidden = !fallback;
 			if (fallback) { document.querySelector("#commander-fallback-model").textContent = fallback.model; document.querySelector("#commander-fallback-detail").textContent = contextLabel(fallback) + " · activates after retryable cloud failure"; }
-			document.querySelector("#resource-guard-title").textContent = (snapshot.local_concurrency === "1" ? "One local model at a time" : "Up to " + snapshot.local_concurrency + " local models");
+			document.querySelector("#resource-guard-title").textContent = (snapshot.local_concurrency === "auto" ? "Adaptive local model concurrency" : snapshot.local_concurrency === "1" ? "One local model at a time" : "Up to " + snapshot.local_concurrency + " local models");
 			document.querySelector("#resource-guard-detail").textContent = "RAM / unified memory " + snapshot.local_ram_limit_pct + "% · VRAM " + snapshot.local_vram_limit_pct + "% · pressure " + snapshot.local_pressure_policy + (snapshot.managed_residency ? " · managed unload enabled" : "");
 			document.querySelector("#specialist-policy").textContent = snapshot.specialists_allow_cloud ? "Top 3 by backend routing policy · local + cloud" : "Top 3 by backend routing policy · local endpoints only";
 			const grid = document.querySelector("#specialist-grid"); grid.replaceChildren();
@@ -122,8 +122,9 @@
 			creative.forEach(model => { const button = element("button","tron-choice",model.model); button.type="button"; button.setAttribute("aria-pressed",String(creativePreference === model.id)); button.addEventListener("click",() => { creativePreference = model.id; for (const item of choices.querySelectorAll("button")) item.setAttribute("aria-pressed",String(item === button)); preference.textContent = "User preference recorded for this consultation: " + model.model + "."; }); choices.append(button); }); }
 			preference.textContent = creativePreference ? "Current consultation preference: " + creativePreference + ". The commander should ask again when the creative brief materially changes." : "No preference recorded. The commander must ask before choosing between subjective outputs.";
 			status.textContent = "Grid synchronized at " + new Date().toLocaleTimeString() + " · " + snapshot.models.length + " models · learned evidence updates automatically. Scores include configured weights and decay. Dispatch still checks request constraints, exploration and available capacity.";
-		} catch (_) { if (generation !== routingGeneration) return; status.textContent = "Routing grid unavailable. The last display was cleared."; document.querySelector("#specialist-grid").replaceChildren(); }
-		window.clearTimeout(routingTimer); if (!document.hidden) routingTimer = window.setTimeout(loadRouting, 5000);
+		routingFailures = 0;
+		} catch (_) { if (generation !== routingGeneration) return; routingFailures = Math.min(routingFailures + 1, 4); status.textContent = "Routing grid unavailable. The last display was cleared."; document.querySelector("#specialist-grid").replaceChildren(); }
+		window.clearTimeout(routingTimer); if (!document.hidden) routingTimer = window.setTimeout(loadRouting, Math.min(60000, 5000 * 2 ** routingFailures));
 	}
 
 	async function report(model, domain, threshold) {
