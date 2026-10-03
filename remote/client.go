@@ -156,8 +156,12 @@ func (c *Client) callPinned(ctx context.Context, destination, op, method, path s
 	default:
 		return ErrUnavailable
 	}
-	bytes, err := io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
-	if err != nil || len(bytes) > 8<<20 {
+	maxBytes := 8 << 20
+	if op == "logs" {
+		maxBytes = maxLogPageBytes
+	}
+	bytes, err := io.ReadAll(io.LimitReader(response.Body, int64(maxBytes)+1))
+	if err != nil || len(bytes) > maxBytes {
 		return ErrUnavailable
 	}
 	if json.Unmarshal(bytes, out) != nil {

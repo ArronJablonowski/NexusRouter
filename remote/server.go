@@ -123,6 +123,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if r.URL.Path == "/v1/remote/logs" && r.Method == http.MethodGet {
+		op = "logs"
+	}
 	if op == "" {
 		s.fail(w, 404)
 		return
@@ -151,7 +154,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var result any
-	if r.URL.Path == "/v1/remote/catalogue" {
+	if op == "logs" {
+		result, err = s.logPage(ctx, r)
+	} else if r.URL.Path == "/v1/remote/catalogue" {
 		result, err = s.catalogue(ctx, peer)
 	} else if r.URL.Path == "/v1/remote/harness-readiness" {
 		result, err = s.harnessReadiness(ctx, peer, r)
@@ -293,7 +298,11 @@ func (s *Server) finish(w http.ResponseWriter, ctx context.Context, caller, op, 
 		}{status, caller, usage}
 	}
 	body, e := json.Marshal(result)
-	if e != nil || len(body) > 8<<20 {
+	maxBytes := 8 << 20
+	if op == "logs" {
+		maxBytes = maxLogPageBytes
+	}
+	if e != nil || len(body) > maxBytes {
 		s.fail(w, 503)
 		return
 	}

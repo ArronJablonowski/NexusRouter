@@ -18,6 +18,8 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	LogEvents func(context.Context, sessions.EventLogOptions) (sessions.CommittedEventPage, error)
+
 	Usage func(context.Context, []string) (usagestats.RemoteUsage, error)
 
 	CheckHarness func(context.Context, string, string, int) (harness.Readiness, error)
@@ -166,4 +168,11 @@ func (b *SDKBackend) RemoteUsage(ctx context.Context, tasks []string) (usagestat
 		return usagestats.RemoteUsage{}, ErrUnavailable
 	}
 	return b.Usage(ctx, tasks)
+}
+
+func (b *SDKBackend) CommittedLogs(ctx context.Context, o sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
+	if b.LogEvents == nil {
+		return sessions.CommittedEventPage{}, ErrUnavailable
+	}
+	return b.LogEvents(ctx, o)
 }

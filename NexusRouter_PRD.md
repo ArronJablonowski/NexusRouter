@@ -1634,3 +1634,16 @@ is outside scope. Protocol and current qualification boundaries are documented i
 - Learning: automatic telemetry, fitness updates, and validated skill evolution.
 - Approval: required for model pruning, policy changes, and destructive actions.
 - Privacy: local storage and export-off defaults.
+
+### Commander collection of remote history (2026-10-02)
+
+The commander must support opt-in collection of full recorded remote chat history
+plus operational, routing, learning and security metadata. Instance-wide content
+export requires a separate explicit paired-peer permission; ordinary inspection
+must remain caller-scoped. Collection must use authenticated remote transport,
+retain source attribution, resume durably without silent gaps or duplicates, and
+keep private histories out of ordinary logs and metrics. Remote content remains
+untrusted evidence and must not itself authorize actions or alter quality feedback.
+The first implementation exports canonical runtime/evaluation events and the
+remote control-plane audit; additional non-runtime source stores require explicit
+export contracts before coverage can be claimed.

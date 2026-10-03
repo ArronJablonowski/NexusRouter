@@ -23,7 +23,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote service-template|discover|auto-dispatch-review-job|enqueue-review|enqueue-auto-review|run-review-jobs|review-job-status|dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|recorded-status|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote collect-logs|logs-status|logs-read|service-template|discover|auto-dispatch-review-job|enqueue-review|enqueue-auto-review|run-review-jobs|review-job-status|dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|recorded-status|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -32,6 +32,9 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 		return err
 	}
 	operation := args[0]
+	if operation == "collect-logs" || operation == "logs-status" || operation == "logs-read" {
+		return loggingOperation(ctx, operation, args[1:], output, errorOutput)
+	}
 	if operation == "service-template" {
 		return serviceTemplate(args[1:], output, errorOutput)
 	}
@@ -390,7 +393,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{Client: client, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
+	backend := &remote.SDKBackend{Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
 	}

@@ -2243,3 +2243,25 @@ Qwen review of baseline496458c identified that `run-review-jobs` discarded compl
 ### Spark review: routing-grid recovery and adaptive label
 
 Confirmed Qwen baseline findings: auto concurrency rendered as “Up to auto local models,” and failed grid refreshes retried at a fixed five seconds. The grid now labels adaptive concurrency explicitly and backs off failed requests through10/20/40/60seconds, resetting to five seconds after success. Tests cover failure caps, recovery, hidden-tab scheduling and existing stale-response protection. Prior behavior fails the regression. Full gate and normal push remain queued; the active Spark review is uninterrupted.
+
+## 2026-10-02 — Commander central logging
+
+Implemented opt-in instance-wide `logs` export over the existing SSH/mTLS channel,
+with separate runtime and security streams. The user's explicit full-chat choice
+is preserved: canonical prompt/response/tool content and routing/evaluation
+metadata are replicated to a private commander SQLite store. Frozen cursors,
+anchor checks, contiguous positions and atomic cursor/record writes preserve
+restart safety and expose retention/history gaps. Added continuous `collect-logs`,
+metadata-only `logs-status`, explicit private `logs-read`, and an unchecked Web UI
+pairing permission. This does not import remote content as commands or learning
+quality feedback. See `docs/CENTRAL_LOGGING.md` for setup and coverage boundaries.
+
+Focused race tests cover both-side permissions and revocation, full chat content,
+restart/deduplication, source isolation, rollback after storage failure, pruned or
+rewritten audit history, frozen security pages, and private-path enforcement.
+Full `make check`, normal GitHub push and live deployment are separate gates.
+The active Spark source-review tasks must finish their wave before any router
+restart. OS/service logs, pre-authentication TLS failures, standalone non-runtime
+learning records and a central log browsing dashboard are not implemented by
+this increment. No live collection is claimed until the upgraded remote and
+commander are deployed and explicitly configured.
