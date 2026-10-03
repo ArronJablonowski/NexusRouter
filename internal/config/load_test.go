@@ -111,14 +111,14 @@ func TestDefaultsDurationAndFileLimits(t *testing.T) {
 }
 
 func TestProviderRequestTimeoutValidation(t *testing.T) {
-	for _, timeout := range []string{"100ms", "30s", "5m"} {
+	for _, timeout := range []string{"100ms", "30s", "5m", "30m"} {
 		body := "providers:\n  - id: local\n    kind: ollama\n    endpoint: http://127.0.0.1:11434\n    request_timeout: " + timeout + "\n"
 		settings, err := Load(Options{ProjectFile: file(t, body)})
 		if err != nil || len(settings.Providers) != 1 || settings.Providers[0].RequestTimeout != timeout {
 			t.Fatalf("valid timeout %q rejected: %+v %v", timeout, settings.Providers, err)
 		}
 	}
-	for _, timeout := range []string{"1ms", "0s", "5m1ns", "invalid"} {
+	for _, timeout := range []string{"1ms", "0s", "30m1ns", "invalid"} {
 		body := "providers:\n  - id: local\n    kind: ollama\n    endpoint: http://127.0.0.1:11434\n    request_timeout: " + timeout + "\n"
 		if _, err := Load(Options{ProjectFile: file(t, body)}); err == nil {
 			t.Fatalf("invalid timeout %q accepted", timeout)

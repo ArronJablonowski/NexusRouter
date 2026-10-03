@@ -95,12 +95,12 @@ func TestProviderCannotFollowRedirect(t *testing.T) {
 func TestProviderHeaderBudgetAndCancellation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
 	defer server.Close()
-	tr, err := NewTransportWithHeaderTimeout(true, []string{server.URL}, 5*time.Minute)
+	tr, err := NewTransportWithHeaderTimeout(true, []string{server.URL}, 30*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tr.CloseIdleConnections()
-	if tr.inner.ResponseHeaderTimeout != 5*time.Minute {
+	if tr.inner.ResponseHeaderTimeout != 30*time.Minute {
 		t.Fatal("provider header budget shortened")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
@@ -109,7 +109,7 @@ func TestProviderHeaderBudgetAndCancellation(t *testing.T) {
 	if _, err := (&http.Client{Transport: tr}).Do(req); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("caller cancellation lost: %v", err)
 	}
-	for _, timeout := range []time.Duration{0, 99 * time.Millisecond, 5*time.Minute + 1} {
+	for _, timeout := range []time.Duration{0, 99 * time.Millisecond, 30*time.Minute + 1} {
 		if _, err := NewTransportWithHeaderTimeout(true, []string{server.URL}, timeout); err == nil {
 			t.Fatal("invalid budget accepted", timeout)
 		}

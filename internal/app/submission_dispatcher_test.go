@@ -312,3 +312,44 @@ func TestDispatcherCancelBeforeExecutionSlotHasNoInventedTask(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDispatcherHonorsConfiguredExecutionDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+			fmt.Fprintln(w, `{"message":{"content":"late"},"done":true}`)
+		}
+	}))
+	defer provider.Close()
+	cfg := config.Defaults()
+	cfg.Mode = "local_only"
+	cfg.Workers.Max = 1
+	cfg.Daemon.ExecutionTimeout = "100ms"
+	cfg.Tools.Enabled = false
+	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "deadline.db")
+	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL, RequestTimeout: "30m"}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 8192, Capabilities: []string{"chat"}}}
+	s, err := NewService(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.profile = healthProfile
+	d, err := StartDispatcher(ctx, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	submitted, err := s.Submit(ctx, "deadline-test-0001", Request{ModelID: "chat", Prompt: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := awaitSubmission(t, ctx, s, submitted.ID, "canceled")
+	if status.ErrorCode != "canceled" {
+		t.Fatalf("unexpected terminal status %+v", status)
+	}
+}

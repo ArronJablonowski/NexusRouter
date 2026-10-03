@@ -44,7 +44,8 @@ type Settings struct {
 	Telemetry                Telemetry                  `yaml:"telemetry" json:"telemetry"`
 }
 type Daemon struct {
-	Listen string `yaml:"listen" json:"listen"`
+	ExecutionTimeout string `yaml:"execution_timeout,omitempty" json:"execution_timeout,omitempty"`
+	Listen           string `yaml:"listen" json:"listen"`
 }
 type WebUIRemoteClient struct {
 	CertificateFile string `yaml:"certificate_file" json:"certificate_file"`
@@ -254,7 +255,7 @@ func Defaults() Settings {
 	// File tools default to the launch directory rather than an ambient home.
 	// An unavailable working directory remains invalid until a root is supplied.
 	readRoot, _ := os.Getwd()
-	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h", ModelInventoryRefreshInterval: "10s"},
+	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{Listen: "127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h", ModelInventoryRefreshInterval: "10s"},
 		Workboard: Workboard{Enabled: true, Decomposition: WorkboardDecomposition{Version: 1, MaxDepth: 4, MaxChildrenPerParent: 8}, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
 		Hardware:  Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}, Classifier: RoutingClassifier{MaxInputTokens: 4096, MaxOutputTokens: 256, Timeout: "30s"}},
@@ -309,6 +310,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Mode != "local_only" && s.Mode != "cloud_only" && s.Mode != "hybrid" {
 		return errors.New("invalid deployment mode")
+	}
+	if _, err := s.Daemon.ExecutionDuration(); err != nil {
+		return err
 	}
 	host, port, err := net.SplitHostPort(s.Daemon.Listen)
 	n, pe := strconv.Atoi(port)
@@ -550,7 +554,7 @@ func (s Settings) Validate() error {
 		}
 		if p.RequestTimeout != "" {
 			timeout, err := Duration(p.RequestTimeout)
-			if err != nil || timeout < 100*time.Millisecond || timeout > 5*time.Minute || p.Kind == "codex_app_server" {
+			if err != nil || timeout < 100*time.Millisecond || timeout > 30*time.Minute || p.Kind == "codex_app_server" {
 				return errors.New("invalid provider request timeout")
 			}
 		}

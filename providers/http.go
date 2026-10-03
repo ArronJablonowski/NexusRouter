@@ -21,6 +21,9 @@ type HTTP struct {
 
 const defaultRequestTimeout = 5 * time.Minute
 
+// MaxRequestTimeout bounds explicitly configured long-running local reviews.
+const MaxRequestTimeout = 30 * time.Minute
+
 // NewHTTP accepts an owned transport so the application can enforce egress.
 // Redirects are rejected to avoid forwarding prompts or credentials elsewhere.
 func NewHTTP(base, kind, key string, transport http.RoundTripper) (*HTTP, error) {
@@ -40,7 +43,7 @@ func NewHTTPWithTimeout(base, kind, key string, transport http.RoundTripper, tim
 	if transport == nil {
 		return nil, errors.New("explicit provider transport required")
 	}
-	if timeout < 100*time.Millisecond || timeout > defaultRequestTimeout {
+	if timeout < 100*time.Millisecond || timeout > MaxRequestTimeout {
 		return nil, errors.New("invalid provider request timeout")
 	}
 	return &HTTP{strings.TrimRight(base, "/"), kind, key, &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil

@@ -1,3 +1,11 @@
+## 2026-10-02 — Spark review fixes: bounded live responses and configurable deadlines
+
+Muse's remote review of commit496458c identified that the live WebUI response limit was checked only after the entire body was buffered. Confirmed with a20MiB streaming fixture: baseline consumed21 stream reads; the fix cancels/aborts at the first byte-count overflow after9 reads. Both absent and misleading Content-Length are bounded by the streamed byte count. Existing authenticated CSS and draft-preservation behavior stays intact.
+
+The physical review also exposed the dispatcher's hard-coded five-minute execution deadline: Muse was still generating but terminalized canceled at301seconds. Added optional `daemon.execution_timeout` (100ms–30m; omitted retains5m). Explicit HTTP provider `request_timeout` and policy header deadlines now accept up to30m; defaults remain5m, and caller cancellation still wins. The Spark review configuration uses30m, two128K context models and the existing8GiB free-memory/80% ceiling. These are explicit dedicated-host settings, not new global defaults.
+
+Validation: targeted config/provider/policy/WebUI tests and a dispatcher cancellation integration test; full make check remains required before push. Source inventory, raw remote review output, failure receipts and independent triage are in the local reporting workspace's outputs/spark-code-review-20261002 directory. The full two-model review is ongoing; findings are not accepted without independent confirmation.
+
 ## 2026-10-02 — Vertical remote host connections
 
 Remote host flow lines terminate at the top center of each host card; the commander trunk stops at the first remote row. Remote cards no longer receive specialist-style diagonal side branches. Specialist connections and yellow host outlines are preserved. Verified with the existing real-Chrome remote routing checks and embedded asset checks.

@@ -33,7 +33,7 @@ func NewTransport(localOnly bool, endpoints []string) (*Transport, error) {
 // local prefill without an unrelated shorter transport deadline. Caller
 // cancellation and HTTP client total deadlines still take precedence.
 func NewTransportWithHeaderTimeout(localOnly bool, endpoints []string, timeout time.Duration) (*Transport, error) {
-	if timeout < 100*time.Millisecond || timeout > 5*time.Minute {
+	if timeout < 100*time.Millisecond || timeout > 30*time.Minute {
 		return nil, errors.New("invalid response header timeout")
 	}
 	if len(endpoints) == 0 {

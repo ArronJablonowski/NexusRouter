@@ -23,3 +23,11 @@ func TestLiveSchedulerNoOverlapPauseReconnectAndDisposal(t *testing.T) {
  })().catch(e=>{console.error(e);process.exitCode=1});`
 	runRoutingMapScript(t, preamble+source+steps)
 }
+
+func TestLiveFetchRejectsOversizedStreamBeforeBufferingWholeBody(t *testing.T) {
+	source := strings.Split(string(mustAsset(t, "assets/v1/live.js")), "// Styles can be replaced")[0]
+	preamble := `const window={addEventListener(){}},document={hidden:false,addEventListener(){}},navigator={onLine:true};let reads=0,canceled=false,signal;
+ const fetch=async(url,options)=>{signal=options.signal;return new Response(new ReadableStream({pull(c){reads++;if(reads>20){c.close();return;}c.enqueue(new Uint8Array(1024*1024));},cancel(){canceled=true;}},{highWaterMark:0}));};`
+	steps := `(async()=>{let rejected=false;try{await window.NexusLive.fetch('/oversize');}catch(e){rejected=e.message==='Live response too large';}if(!rejected||!signal.aborted||!canceled||reads!==9)throw Error('oversized stream was not stopped at byte bound: '+reads);})().catch(e=>{console.error(e);process.exitCode=1});`
+	runRoutingMapScript(t, preamble+source+steps)
+}

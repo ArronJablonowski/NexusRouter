@@ -195,7 +195,8 @@ func (d *Dispatcher) execute(ctx context.Context, s *Service, claim submissions.
 }
 
 func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submissions.Claim, workerID int) {
-	job, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	timeout, _ := s.settings.Daemon.ExecutionDuration() // Service construction validates this bound.
+	job, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	heartbeat, stopHeartbeat := context.WithCancel(job)
 	heartbeatDone := make(chan error, 1)

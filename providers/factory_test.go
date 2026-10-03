@@ -276,7 +276,7 @@ func TestFactoryAppliesConfiguredOperationTimeout(t *testing.T) {
 }
 
 func TestFactoryRejectsInvalidOperationTimeout(t *testing.T) {
-	for _, timeout := range []time.Duration{-1, time.Nanosecond, 99 * time.Millisecond, 5*time.Minute + time.Nanosecond} {
+	for _, timeout := range []time.Duration{-1, time.Nanosecond, 99 * time.Millisecond, 30*time.Minute + time.Nanosecond} {
 		connection := factoryConnection()
 		connection.Timeout = timeout
 		if provider, err := Build(context.Background(), nil, connection); err == nil || provider != nil {

@@ -25,7 +25,19 @@ window.NexusLive = (() => {
   const controller=new AbortController(),abort=()=>controller.abort();
   const signal=options.signal;if(signal){signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();}
   const timeout=setTimeout(abort,12000);
-  try{const response=await fetch(url,{...options,signal:controller.signal});const body=await response.text();if(body.length>8*1024*1024)throw Error("Live response too large");return new Response([204,205,304].includes(response.status)?null:body,{status:response.status,statusText:response.statusText,headers:response.headers});}
+  try{
+   const response=await fetch(url,{...options,signal:controller.signal}),limit=8*1024*1024;
+   // Bound bytes while streaming, including decoded/compressed responses whose
+   // Content-Length is absent or smaller than their delivered body.
+   if(Number(response.headers.get("Content-Length"))>limit){controller.abort();throw Error("Live response too large");}
+   let body="",size=0;
+   if(response.body){
+    const reader=response.body.getReader(),decoder=new TextDecoder();
+    try{while(true){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.byteLength;if(size>limit){controller.abort();void reader.cancel().catch(()=>{});throw Error("Live response too large");}body+=decoder.decode(chunk.value,{stream:true});}body+=decoder.decode();}
+    finally{reader.releaseLock();}
+   }
+   return new Response([204,205,304].includes(response.status)?null:body,{status:response.status,statusText:response.statusText,headers:response.headers});
+  }
   finally{clearTimeout(timeout);if(signal)signal.removeEventListener("abort",abort);}
  }
  document.addEventListener("visibilitychange",wake);window.addEventListener("online",wake);window.addEventListener("offline",wake);window.addEventListener("focus",wake);
