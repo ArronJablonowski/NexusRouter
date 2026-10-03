@@ -100,7 +100,7 @@ func (o TaskListOptions) Validate() error {
 }
 
 func (s TaskSummary) Validate() error {
-	if s.Version != 1 || !ValidEventPageID(s.TaskID) || !ValidEventPageID(s.SessionID) || !ValidTaskState(s.State) || s.Sequence < 1 || s.Sequence > 10000 || s.StartedAt.IsZero() {
+	if s.Version != 1 || !ValidEventPageID(s.TaskID) || !ValidEventPageID(s.SessionID) || !ValidTaskState(s.State) || s.Sequence < 1 || s.StartedAt.IsZero() {
 		return ErrTaskList
 	}
 	return nil

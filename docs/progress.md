@@ -2382,3 +2382,9 @@ this source change still await the normal validation rollout. Legacy locations
 are compatibility aliases, not separate stores. Interrupted validation logs
 were preserved, gates restarted, and review resumed at Muse0106 with Qwen0004
 still blocked. Full check/push for these source changes remains queued.
+
+## 2026-10-03 rollout read verification
+
+Live rollout verification reproduced two read failures. Task summaries incorrectly imposed the 10,000-event page bound on total task sequence; a stored 10,871-event stream caused the entire running-task list to fail. Summary SQL and validation now accept positive int64 sequences while retaining bounded pages and metadata checks. An existing private Skills directory without catalog.json returned an OS not-exist error rather than the library sentinel; BrowserSkills now presents the empty inventory without creating files.
+
+Both regression tests failed against b845532 and pass with these changes. Focused task-list/Skills race tests passed. Full make check/push and follow-up deployment remain pending. Remote-only jobs federation and exact remote ranking/Commander parity remain outstanding. Muse/Qwen review remains stopped by user.

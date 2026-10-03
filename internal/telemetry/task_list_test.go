@@ -105,3 +105,24 @@ func TestTaskListRejectsNonpositiveStorageOrdinal(t *testing.T) {
 		t.Fatal(page, err)
 	}
 }
+
+func TestTaskListLongStream(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(ctx, filepath.Join(t.TempDir(), "tasks.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	appendListedTask(t, db, "long", "session-long", "completed", time.Unix(100, 0))
+	// Model delta streams can legitimately exceed the event-page size limit.
+	if _, err := db.db.Exec(`UPDATE events SET sequence=10871, body=json_set(body,'$.sequence',10871) WHERE task_id='long' AND sequence=2`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec(`UPDATE task_heads SET sequence=10871 WHERE task_id='long'`); err != nil {
+		t.Fatal(err)
+	}
+	page, err := db.ListTasks(ctx, sessions.TaskListOptions{Limit: 10})
+	if err != nil || len(page.Items) != 1 || page.Items[0].Sequence != 10871 {
+		t.Fatalf("long stream: %+v %v", page, err)
+	}
+}

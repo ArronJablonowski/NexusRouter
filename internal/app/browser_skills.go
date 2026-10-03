@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/ArronJablonowski/NexusRouter/skills"
+	"os"
 )
 
 type BrowserSkillPage struct {
@@ -20,7 +21,7 @@ func (s *Service) BrowserSkills(ctx context.Context) (BrowserSkillPage, error) {
 		return p, nil
 	}
 	st, err := skills.OpenReadOnly(s.settings.Skills.Root, []string{s.settings.Skills.Scope})
-	if errors.Is(err, skills.ErrNotFound) {
+	if errors.Is(err, skills.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
 		return p, nil
 	}
 	if err != nil {
