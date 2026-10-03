@@ -2338,3 +2338,18 @@ When an admission/unsupported-harness error also matches an expired deadline, th
 ### 2026-10-03 — Browser feedback receipt recovery
 
 A durable feedback append followed by a later revision could leave the original browser operation unable to recover its pending receipt: the handler compared its feedback ID only with the latest history entry. Receipt construction now locates the operation's exact entry and uses its original revision. New regression first reproduced `browser mutation unavailable`, then verifies recovery, identical replay and preservation of the later revision. Full validation and normal push remain queued; no deployment claimed. The separate deep session follow-up replay candidate remains under investigation.
+
+
+## Installed macOS NexusRouter path migration
+
+Added an offline migration for the explicitly configured DarwinRouter skill
+store and associated data/service paths. The canonical directory becomes
+Application Support/NexusRouter; skills and SQLite files move in place, and a
+legacy directory alias retains shared process/resource guard identity. The
+launch agent adopts com.nexusrouter.live-test, nexus and NEXUS_ environment
+names. Existing destinations, loaded services and open data files fail closed;
+private rollback evidence is retained. Regression tests cover inode/data
+preservation, path rewriting, permissions, environment migration and refusal
+without changes. Live dry-run passed. Full make check and normal push are queued
+behind browser-feedback-recovery. The installed path has not yet changed:
+application is explicitly gated on full validation and a reconciled idle rollout.

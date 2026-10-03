@@ -6,10 +6,10 @@ The product is now NexusRouter. The executable is `nexus`, the Go module is
 
 ## Existing installations
 
-Keep the existing configuration and its database, memory, skills and working
-paths. This rename does not move, rewrite, reset or copy stored tasks, feedback,
-usage, approvals or benchmark evidence. Explicit `--config` and database paths
-continue to work. New default user configuration lookup uses
+Existing configuration and explicit `--config` and database paths continue to
+work. The offline macOS procedure below migrates the installed directory name
+without copying or resetting stored tasks, feedback, skills or other evidence.
+New default user configuration lookup uses
 `nexusrouter/config.yaml`; when absent it falls back to `darwinrouter/config.yaml`.
 
 `make build` creates `bin/nexus` and a `bin/darwin` compatibility symlink. The old
@@ -50,3 +50,40 @@ location remain discoverable when the new configuration is absent.
 SDK consumers update imports to the new module path together; mixing old and
 new import paths creates distinct Go types. The repository destination must be
 renamed on GitHub before the new module path is advertised as downloadable.
+
+## Rename an installed macOS data directory
+
+The Skills form shows the configured store path, rather than a cosmetic label.
+An older installation may therefore still show
+`~/Library/Application Support/DarwinRouter/live-test/skills`.
+The canonical path is
+`~/Library/Application Support/NexusRouter/live-test/skills`.
+
+From a validated checkout, run `python3 -B scripts/migrate-macos-name.py` to
+inspect the migration without changing files. Before applying it, quiesce all
+review dispatchers and reconcile every remote receipt. Wait for zero active
+local and remote tasks/reservations, unload the old launch agent, and ensure
+no other process is using the installation. Do not race an inter-wave gap.
+Then run `python3 -B scripts/migrate-macos-name.py --apply`.
+
+The utility refuses loaded services, open data files, existing destinations,
+and conflicting environment aliases. It renames the entire data directory in
+place, preserving skill/database inode identity; rewrites configured data
+paths; installs `com.nexusrouter.live-test.plist` using `/opt/homebrew/bin/nexus`
+and canonical `NEXUS_` environment names; and retains a relative `DarwinRouter`
+compatibility alias. Both names thus reach the same process guards and resource
+ledger, including when older binaries use the legacy paths. Do not remove this
+alias or independently create a second guard directory during mixed-version use.
+
+Verify the new configuration with the validated binary before bootstrapping the
+new launch agent. Confirm the Skills form, skill inventory, database identity,
+service label and zero duplicate daemons, then resume the campaign from its
+existing receipts. The utility does not start or stop services itself.
+
+Private originals are retained under `NexusRouter/name-migration-backup` with
+mode0600. If interrupted, do not rerun blindly: reconcile the two directory
+names and launch-agent files using these originals while services remain
+unloaded. For rollback, restore the original config and launch agent, remove
+only the verified compatibility symlink, rename the data directory back, and
+load only the old service. Never overwrite a distinct destination or merge two
+live stores. Durable database filenames and signed evidence are not rebranded.
