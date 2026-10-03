@@ -2280,3 +2280,19 @@ It does not establish why two Qwen batch0004 attempts emitted no final content,
 or authorize another attempt on that batch. The source-review coverage gap and
 both failed records remain preserved. No live configuration/deployment change is
 claimed until separately verified; full validation and normal push remain gates.
+
+## 2026-10-02 — Kanban active jobs panel
+
+The existing live Workboards Kanban now has an Active jobs panel beneath it.
+It polls authenticated, state-filtered task and submission pages every five
+seconds across the commander, independent of the selected board. Running
+submissions already represented by a running task are deduplicated. Finished
+jobs disappear after successful reconciliation; read failures retain the last
+list with an explicit stale notice. Pagination is bounded with an incomplete
+notice instead of silently claiming full coverage. No prompt content is exposed.
+
+Scope is commander-recorded running tasks and queued/running submissions.
+Remote-only work is not yet federated into this view, and the UI says so.
+Full validation, normal GitHub push and idle-boundary deployment remain pending.
+Focused race tests cover authentication, query rejection, failure handling,
+pagination, queued jobs and browser reconciliation.

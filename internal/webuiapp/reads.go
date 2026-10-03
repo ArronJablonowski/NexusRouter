@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 type ReadServices struct {
+	Submissions     func(context.Context, submissions.ListOptions) (submissions.Page, error)
+	Tasks           func(context.Context, sessions.TaskListOptions) (sessions.TaskPage, error)
 	Chats           func(context.Context, sessions.ChatListOptions) (sessions.ChatPage, error)
 	History         func(context.Context, string, contract.HistoryOptions) (contract.HistoryPage, error)
 	CommittedEvents func(context.Context, sessions.EventLogOptions) (sessions.CommittedEventPage, error)

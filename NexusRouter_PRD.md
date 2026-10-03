@@ -1647,3 +1647,11 @@ untrusted evidence and must not itself authorize actions or alter quality feedba
 The first implementation exports canonical runtime/evaluation events and the
 remote control-plane audit; additional non-runtime source stores require explicit
 export contracts before coverage can be claimed.
+
+### Live Kanban and active-job visibility
+
+The Workboards page presents the Kanban board followed by a live Active jobs
+list across boards. Show running tasks and queued/admitted work, remove terminal
+work on successful refresh, and label stale or incomplete reads explicitly.
+Remote-only work requires federation; commander-only coverage must be visible
+to the user until that integration is verified.

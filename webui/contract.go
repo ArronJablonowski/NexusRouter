@@ -806,6 +806,7 @@ var operationSpecs = []OperationSpec{
 	{Operation: "session.complete", Method: "POST", BrowserPath: "/app/api/v1/session", ServicePrimitive: "new approved challenge consumption", Security: ChallengeBound, Mutation: true},
 	{Operation: "session.csrf", Method: "POST", BrowserPath: "/app/api/v1/session/csrf", ServicePrimitive: "new same-origin session CSRF rotation", Security: SessionCSRFRefresh, Mutation: true},
 	{Operation: "session.logout", Method: "POST", BrowserPath: "/app/api/v1/session/logout", ServicePrimitive: "new browser-session revocation", Security: SessionCSRFMutation, Mutation: true},
+	{Operation: "job.list", Method: "GET", BrowserPath: "/app/api/v1/jobs", ServicePrimitive: "running task metadata projection", Security: SessionRead},
 	{Operation: "chat.list", Method: "GET", BrowserPath: "/app/api/v1/chats", ServicePrimitive: "new task/session presentation projection", Security: SessionRead},
 	{Operation: "chat.history", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/messages", ServicePrimitive: "new bounded presentation projection", Security: SessionRead},
 	{Operation: "chat.submit", Method: "POST", BrowserPath: "/app/api/v1/chats", ServicePrimitive: "POST /v1/submissions application primitive", Security: SessionCSRFMutation, PrimitiveExists: true, Mutation: true},

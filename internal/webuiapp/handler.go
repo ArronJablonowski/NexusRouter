@@ -128,7 +128,7 @@ func New(options Options) (*Handler, error) {
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	contract.ApplyBrowserSecurityHeaders(writer.Header())
 	chatListPath := h.basePath + "/api/v1/chats"
-	queryReadPath := request.URL != nil && (workboardBrowserQueryPath(h.basePath, request.URL.Path, request.Method) || request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || boardEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "" || inspectionQueryPath(h.basePath, request.URL.Path))
+	queryReadPath := request.URL != nil && (workboardBrowserQueryPath(h.basePath, request.URL.Path, request.Method) || request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/jobs" || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || boardEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "" || inspectionQueryPath(h.basePath, request.URL.Path))
 	if !h.hostAllowed(request.Host) || hasForwardedAuthority(request) || request.URL == nil || (request.URL.RawQuery != "" && !queryReadPath) || request.URL.RawPath != "" {
 		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
 		return
@@ -200,6 +200,8 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		h.rotateCSRF(writer, request)
 	case logoutPath:
 		h.logout(writer, request)
+	case h.basePath + "/api/v1/jobs":
+		h.serveActiveJobs(writer, request)
 	case chatListPath:
 		h.serveChatList(writer, request)
 	default:
