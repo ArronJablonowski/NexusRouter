@@ -2366,3 +2366,19 @@ application. Regression tests verify longest-path rewriting, preserved skills,
 private configuration and service environment migration. Live application and
 full validation status are tracked in the deployment evidence; no completed
 migration is inferred from the dry run.
+
+
+### Local consolidation applied, 2026-10-03
+
+Paused dispatch and preserved successful Muse0105 before stopping the Mac
+service. Verified zero Mac queued/running submissions and both hosts' active
+reservations. Moved the primary checkout, 29 associated worktrees, skill store,
+pairing configuration and runtime data under ~/.NexusRouter; moved356 related
+review/resource artifacts into resources/. Verified159 non-configuration live
+data files retain both SHA256 and inode identity. Installed the existing fully
+validated runtime executable at bin/nexus without changing its bytes; canonical
+service restarted healthy and mTLS receipt lookup passed. CLI preferences in
+this source change still await the normal validation rollout. Legacy locations
+are compatibility aliases, not separate stores. Interrupted validation logs
+were preserved, gates restarted, and review resumed at Muse0106 with Qwen0004
+still blocked. Full check/push for these source changes remains queued.
