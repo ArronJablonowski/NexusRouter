@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -72,5 +74,45 @@ func TestFeedbackRevisionStatusAndCapacity(t *testing.T) {
 		if w.Code != 413 {
 			t.Fatal(w.Code)
 		}
+	}
+}
+
+func TestFeedbackHistoryErrorsAndCapacityHeaders(t *testing.T) {
+	for _, tc := range []struct {
+		err    error
+		status int
+		code   string
+	}{
+		{app.ErrAdmission, 404, "feedback_unavailable"},
+		{errors.New("private storage detail"), 500, "feedback_failed"},
+	} {
+		s := services()
+		s.FeedbackHistory = func(context.Context, string) ([]evaluation.Record, error) { return nil, tc.err }
+		h, _ := New(token, 1, s)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, request("GET", "/v1/feedback/task", ""))
+		if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.code) || strings.Contains(w.Body.String(), "private storage detail") {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	for _, method := range []string{"GET", "POST"} {
+		s := services()
+		s.FeedbackHistory = func(context.Context, string) ([]evaluation.Record, error) {
+			t.Fatal("capacity bypass")
+			return nil, nil
+		}
+		s.ReviseFeedback = func(context.Context, string, string, bool) error { t.Fatal("capacity bypass"); return nil }
+		h, _ := New(token, 1, s)
+		h.slots <- struct{}{}
+		path := "/v1/feedback/task"
+		if method == "POST" {
+			path = "/v1/feedback/revisions"
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, request(method, path, `{}`))
+		if w.Code != 503 || w.Header().Get("Retry-After") != "1" {
+			t.Fatal(w.Code, w.Header())
+		}
+		<-h.slots
 	}
 }

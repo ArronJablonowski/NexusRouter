@@ -2323,3 +2323,8 @@ normal GitHub push and safe idle deployment remain required.
 
 Renamed the routing-grid heading from Commander / brain to Router Commander.
 This label change awaits the same validated idle-boundary UI rollout.
+
+
+## 2026-10-03 — Feedback API error and capacity responses
+
+Spark source-review batch0056 identified missing retry hints and masked history-service failures. Feedback history and revision capacity responses now include Retry-After: 1. History retains404 for app.ErrAdmission but returns sanitized500 feedback_failed for unexpected service errors. Regression tests verify both capacity paths avoid service invocation and storage details do not leak. Focused API feedback race tests and vet pass. Full make check and normal push are serialized behind Router Commander label validation; this change is not deployed. Full source review and remote-only federation remain incomplete.

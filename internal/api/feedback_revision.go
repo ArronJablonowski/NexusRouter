@@ -25,11 +25,16 @@ func (h *Handler) serveFeedbackHistory(w http.ResponseWriter, r *http.Request) {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
 	default:
+		w.Header().Set("Retry-After", "1")
 		failure(w, 503, "capacity")
 		return
 	}
 	history, err := h.services.FeedbackHistory(r.Context(), task)
 	if err != nil {
+		if !errors.Is(err, app.ErrAdmission) {
+			failure(w, 500, "feedback_failed")
+			return
+		}
 		failure(w, 404, "feedback_unavailable")
 		return
 	}
@@ -50,6 +55,7 @@ func (h *Handler) serveFeedbackRevision(w http.ResponseWriter, r *http.Request) 
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
 	default:
+		w.Header().Set("Retry-After", "1")
 		failure(w, 503, "capacity")
 		return
 	}
