@@ -67,7 +67,7 @@ func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
 			status, code, kind = 422, "admission_denied", "invalid_request_error"
 		}
 		if errors.Is(err, context.DeadlineExceeded) || r.Context().Err() == context.DeadlineExceeded {
-			status, code = 504, "deadline_exceeded"
+			status, code, kind = 504, "deadline_exceeded", "server_error"
 		}
 		chatFailure(w, status, kind, code)
 		return

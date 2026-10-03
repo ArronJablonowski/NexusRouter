@@ -376,3 +376,18 @@ func TestChatStreamWriterFailureStopsDelivery(t *testing.T) {
 		})
 	}
 }
+
+func TestChatDeadlineOverridesAdmissionErrorType(t *testing.T) {
+	for _, admission := range []error{app.ErrAdmission, app.ErrHarnessUnsupported} {
+		s := services()
+		s.Run = func(context.Context, app.Request) (app.Result, error) {
+			return app.Result{}, errors.Join(admission, context.DeadlineExceeded)
+		}
+		h, _ := New(token, 1, s)
+		w := httptest.NewRecorder()
+		h.serveChatCompletions(w, request("POST", "/v1/chat/completions", chatFixture))
+		if w.Code != 504 || !strings.Contains(w.Body.String(), `"type":"server_error"`) || !strings.Contains(w.Body.String(), `"code":"deadline_exceeded"`) {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+}

@@ -2328,3 +2328,8 @@ This label change awaits the same validated idle-boundary UI rollout.
 ## 2026-10-03 — Feedback API error and capacity responses
 
 Spark source-review batch0056 identified missing retry hints and masked history-service failures. Feedback history and revision capacity responses now include Retry-After: 1. History retains404 for app.ErrAdmission but returns sanitized500 feedback_failed for unexpected service errors. Regression tests verify both capacity paths avoid service invocation and storage details do not leak. Focused API feedback race tests and vet pass. Full make check and normal push are serialized behind Router Commander label validation; this change is not deployed. Full source review and remote-only federation remain incomplete.
+
+
+## 2026-10-03 — OpenAI deadline error classification
+
+When an admission/unsupported-harness error also matches an expired deadline, the nonstreaming API already prioritized HTTP504/deadline_exceeded but retained invalid_request_error. Reset its type to server_error consistently. A regression covers joined deadline/admission and deadline/unsupported errors. Focused race tests, vet and source checks are required; full make check/normal push are queued behind feedback-api-capacity. Not deployed; broader source review remains incomplete.
