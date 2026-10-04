@@ -22,5 +22,6 @@ func (s *Service) ListJobTasks(ctx context.Context, options sessions.TaskListOpt
 	if err = db.ObserveTaskExecution(ctx, &page, time.Now()); err != nil || !selectionValueClean(page, memorySecrets(s.settings, s.secret)) {
 		return sessions.TaskPage{}, ErrInspection
 	}
+	applyJobDismissals(&page, s.settings.Telemetry.Database)
 	return page, nil
 }

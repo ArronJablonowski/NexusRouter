@@ -133,6 +133,7 @@
       item.current_state=kind==="queued"?"queued":raw.lease_expired?"unknown":"running";
       item.status_evidence=kind==="queued"?"queued_submission":raw.lease_expired?"expired_submission_lease":"submission_running";
      }
+     if(kind==="running"&&raw.execution?.dismissed===true&&item.current_state==="unknown")continue;
      items.set(kind+":"+item.task_id,item);
     }
     if(!page.has_more){finished=true;break;}
