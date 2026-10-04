@@ -450,3 +450,5 @@ input, select { padding: .55rem .7rem; }
 @media(max-width:760px){.chat-view{grid-template-columns:minmax(0,1fr);}}
 
 #cron-view[hidden]{display:none}.os-schedules-panel{margin-top:2rem;padding:1.4rem;border:1px solid #3d4d6d;border-radius:1rem;background:#10192b}#cron-view section{min-width:0}#cron-view li{overflow-wrap:anywhere}#remote-model-hosts details{padding:.8rem}#remote-model-hosts summary{cursor:pointer}
+
+#cron-os-hosts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}#cron-os-hosts .inspector-list{max-height:24rem;overflow:auto;scrollbar-gutter:stable}#cron-os-hosts section{padding:1rem;border:1px solid #34415d;border-radius:.65rem}@media(max-width:850px){#cron-os-hosts{grid-template-columns:1fr}}
