@@ -57,7 +57,7 @@
 	}
 
 	function showNotice(node, message, failed) {
-		node.textContent = message;
+		setText(node, message);
 		node.classList.toggle("error", Boolean(failed));
 		node.hidden = false;
 	}
@@ -73,9 +73,29 @@
 		return typeof value === "string" && (allowEmpty || value.length > 0) && textBytes(value) <= max && !/[\u0000-\u001f\u007f-\u009f]/u.test(value);
 	}
 
-	function detail(list, label, value) {
-		list.append(element("dt", "", label), element("dd", "", value));
-	}
+	// Retain row and text-node identities; only changed values touch the DOM.
+ function setText(node, value) {
+  if(node.textContent===value)return;
+  if(node.childNodes.length===1&&node.firstChild.nodeType===3)node.firstChild.nodeValue=value;
+  else node.textContent=value;
+ }
+ const detailKeys=new Map();
+ function beginDetails(list){detailKeys.set(list,new Set());}
+ function finishDetails(list){const keys=detailKeys.get(list);for(const term of Array.from(list.children)){if(term.tagName==="DT"&&!keys.has(term.textContent)){term.nextElementSibling?.remove();term.remove();}}detailKeys.delete(list);}
+ function detail(list,label,value){
+  detailKeys.get(list)?.add(label);
+  const term=Array.from(list.children).find(node=>node.tagName==="DT"&&node.textContent===label);
+  if(term)setText(term.nextElementSibling,value);
+  else list.append(element("dt","",label),element("dd","",value));
+ }
+ function reconcileItems(list,rows){
+  const existing=new Map(Array.from(list.children,node=>[node.dataset.key,node]));
+  const keep=new Set();
+  rows.forEach(([key,value],index)=>{let node=existing.get(key);if(!node){node=element("li","");node.dataset.key=key;}setText(node,value);keep.add(node);if(list.children[index]!==node)list.insertBefore(node,list.children[index]||null);});
+  for(const node of Array.from(list.children))if(!keep.has(node))node.remove();
+ }
+ const initializedStates=new WeakSet();
+ function loading(state,list,message){if(!initializedStates.has(state)){initializedStates.add(state);showNotice(state,message,false);}}
 
 	function knownNumber(value) {
 		return typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -132,7 +152,7 @@
 	}
 
 	function renderUsage(usage) {
-		usageDetails.replaceChildren();
+		beginDetails(usageDetails);
 		detail(usageDetails, "Coverage", stateLabel(usage.coverage));
 		detail(usageDetails, "Unaccounted routed operations", String(usage.unaccounted_routed_operations));
 		const groups = [["Routed total", "routed"], ["Primary routed", "primary"], ["Fallback routed", "fallback"],
@@ -145,18 +165,16 @@
 			detail(usageDetails, label, String(total.records) + " records · " + tokens + " · " + cost);
 		}
 		detail(usageDetails, "Calculated", formatTime(usage.calculated_at));
-		usageState.hidden = true;
+		finishDetails(usageDetails);usageState.hidden = true;
 	}
 
 	function loadModels() {
-		modelList.replaceChildren();
-		modelCount.textContent = "";
-		showNotice(modelsState, "Loading models…", false);
+		loading(modelsState,modelList,"Loading models…");
 		return requestJSON("/api/v1/models").then(body => {
 			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability) || !Array.isArray(body.models) || body.models.length > maxInspectedModels ||
 				(body.availability === "available") !== printable(body.config_id, 128, false) || body.availability === "available" &&
 				(!Number.isFinite(Date.parse(body.refreshed_at)) || !integer(body.local_total_bytes) || body.local_total_kind !== "logical_deduplicated" || !integer(body.local_unknown_size_count))) throw new Error("invalid models");
-			const seen = new Set();
+			const seen = new Set(), rows=[];
 			for (const item of body.models) {
 				if (!item || !printable(item.id, 128, false) || seen.has(item.id) || !printable(item.provider, 128, false) || !printable(item.model, 512, false) ||
 					!["local", "cloud"].includes(item.locality) || ["configured", "enabled", "installed", "usable"].some(key => typeof item[key] !== "boolean") || !Array.isArray(item.capabilities) || item.capabilities.length > 128 ||
@@ -171,9 +189,10 @@
 					"RAM / VRAM: " + formatBytes(item.ram_bytes) + " / " + formatBytes(item.vram_bytes),
 					"Installed size: " + formatBytes(item.size_bytes),
 					"Failure domain: " + (item.failure_domain || "Unknown")];
-				modelList.append(element("li", "", lines.join("\n")));
+				rows.push([item.id,lines.join("\n")]);
 			}
-			modelCount.textContent = String(body.models.length);
+			reconcileItems(modelList,rows);
+			setText(modelCount,String(body.models.length));
 			if (body.availability === "unavailable") showNotice(modelsState, "Models unavailable.", false);
 			else if (!body.models.length) showNotice(modelsState, "No configured models.", false);
 			else modelsState.hidden = true;
@@ -181,8 +200,7 @@
 	}
 
 	function loadHealth() {
-		healthDetails.replaceChildren();
-		showNotice(healthState, "Loading health…", false);
+		loading(healthState,healthDetails,"Loading health…");
 		return requestJSON("/api/v1/health").then(body => {
 			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability) || !Array.isArray(body.checks) || body.checks.length > maxHealthChecks) throw new Error("invalid health");
 			if (body.availability === "unavailable") {
@@ -191,20 +209,21 @@
 				return;
 			}
 			if (typeof body.ready !== "boolean" || !Number.isFinite(Date.parse(body.checked_at)) || !printable(body.status || "", 128, true)) throw new Error("invalid health");
-			detail(healthDetails, "Status", body.status || "Unknown");
+			for(const check of body.checks)if(!check || !printable(check.component,128,false) || !printable(check.id||"",128,true) || !printable(check.status,64,false) || !printable(check.code,128,false))throw Error("invalid health check");
+   beginDetails(healthDetails);
+   detail(healthDetails, "Status", body.status || "Unknown");
 			detail(healthDetails, "Ready", body.ready ? "Yes" : "No");
 			detail(healthDetails, "Checked", formatTime(body.checked_at));
 			for (const check of body.checks) {
 				if (!check || !printable(check.component, 128, false) || !printable(check.id || "", 128, true) || !printable(check.status, 64, false) || !printable(check.code, 128, false)) throw new Error("invalid health check");
 				detail(healthDetails, check.component + (check.id ? " · " + check.id : ""), stateLabel(check.status) + " · " + stateLabel(check.code));
 			}
-			healthState.hidden = true;
+			finishDetails(healthDetails);healthState.hidden = true;
 		}).catch(() => showNotice(healthState, "Health unavailable.", true));
 	}
 
 	function loadResources() {
-		resourcesDetails.replaceChildren();
-		showNotice(resourcesState, "Loading resources…", false);
+		loading(resourcesState,resourcesDetails,"Loading resources…");
 		return requestJSON("/api/v1/resources").then(body => {
 			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability)) throw new Error("invalid resources");
 			const fields = ["cpus", "total_ram_bytes", "available_ram_bytes", "swap_used_bytes", "vram_total_bytes", "vram_available_bytes"];
@@ -218,6 +237,7 @@
 				(body.total_ram_bytes !== undefined && body.available_ram_bytes > body.total_ram_bytes) || (body.vram_total_bytes !== undefined && body.vram_available_bytes > body.vram_total_bytes) ||
 				(body.cpus !== undefined && body.cpus < 1) || (body.unified_memory !== undefined && typeof body.unified_memory !== "boolean") ||
 				(body.thermal_pressure !== undefined && typeof body.thermal_pressure !== "boolean")) throw new Error("invalid resources");
+			beginDetails(resourcesDetails);
 			detail(resourcesDetails, "Observed", formatTime(body.observed_at));
 			detail(resourcesDetails, "CPUs", body.cpus === undefined ? "Unknown" : String(body.cpus));
 			detail(resourcesDetails, "RAM total / available", formatBytes(body.total_ram_bytes) + " / " + formatBytes(body.available_ram_bytes));
@@ -225,7 +245,7 @@
 			detail(resourcesDetails, "VRAM total / available", formatBytes(body.vram_total_bytes) + " / " + formatBytes(body.vram_available_bytes));
 			detail(resourcesDetails, "Unified memory", body.unified_memory === undefined ? "Unknown" : body.unified_memory ? "Yes" : "No");
 			detail(resourcesDetails, "Thermal pressure", body.thermal_pressure === undefined ? "Unknown" : body.thermal_pressure ? "Present" : "Not observed");
-			resourcesState.hidden = true;
+			finishDetails(resourcesDetails);resourcesState.hidden = true;
 		}).catch(() => showNotice(resourcesState, "Resources unavailable.", true));
 	}
 
@@ -239,8 +259,6 @@
 	}
 
 	function renderRoute(body) {
-		routeDetails.replaceChildren();
-		routeCandidates.replaceChildren();
 		if (!body || body.version !== 1 || body.task_id !== selectedTaskID || !["available", "unavailable"].includes(body.availability) ||
 			!Array.isArray(body.candidates) || body.candidates.length > maxRouteCandidates) throw new Error("invalid route");
 		if (body.availability === "unavailable") {
@@ -250,21 +268,21 @@
 		}
 		if (!printable(body.route_id, 128, false) || !printable(body.domain, 128, false) || !printable(body.profile, 128, false) || typeof body.explored !== "boolean" ||
 			!body.candidates.length || body.candidates.some(item => !validCandidate(item)) || !validUsage(body.usage) || body.candidates.filter(item => item.disposition === "selected").length !== 1) throw new Error("invalid route");
+		beginDetails(routeDetails);
+		const rows=[];
 		detail(routeDetails, "Route", body.route_id);
 		detail(routeDetails, "Domain / profile", body.domain + " / " + body.profile);
 		detail(routeDetails, "Exploration", body.explored ? "Explored" : "Not explored");
 		for (const item of body.candidates) {
 			const evidence = item.disposition === "excluded" ? "Constraints: " + item.constraint_codes.join(", ") :
 				"Score " + String(item.score) + " · confidence " + String(item.confidence) + " · samples " + String(item.samples);
-			routeCandidates.append(element("li", "", item.provider + " / " + item.model + "\n" + stateLabel(item.disposition) + " · " + evidence + "\nFailure domain: " + (item.failure_domain || "Unknown")));
+			rows.push([JSON.stringify([item.provider,item.model]), item.provider + " / " + item.model + "\n" + stateLabel(item.disposition) + " · " + evidence + "\nFailure domain: " + (item.failure_domain || "Unknown")]);
 		}
-		routeState.hidden = true;
+		finishDetails(routeDetails);reconcileItems(routeCandidates,rows);routeState.hidden = true;
 	}
 
 	function loadRoute(taskID, requestID) {
-		routeDetails.replaceChildren();
-		routeCandidates.replaceChildren();
-		showNotice(routeState, "Loading route…", false);
+		loading(routeState,routeDetails,"Loading route…");
 		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/route").then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			renderRoute(body);
@@ -274,8 +292,7 @@
 	}
 
 	function loadUsage(taskID, requestID) {
-		usageDetails.replaceChildren();
-		showNotice(usageState, "Loading usage…", false);
+		loading(usageState,usageDetails,"Loading usage…");
 		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/usage").then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			if (!body || body.version !== 1 || body.task_id !== taskID || !["available", "unavailable"].includes(body.availability) ||
@@ -301,29 +318,29 @@
 	}
 
 	function loadTools(taskID, after, reset, requestID) {
-		if (reset) {
-			toolList.replaceChildren(); toolIDs.clear(); toolCursors.clear(); toolTotal = 0; toolPages = 0; toolCursor = "";
-			loadMoreTools.hidden = true;
-			showNotice(toolsState, "Loading tool lifecycle…", false);
-		}
+		if(reset)loading(toolsState,toolList,"Loading tool lifecycle…");
 		loadMoreTools.disabled = true;
-		const limit = Math.min(inspectionPageLimit, maxInspectionItems - toolTotal);
+		const limit = Math.min(inspectionPageLimit, maxInspectionItems - (reset ? 0 : toolTotal));
 		const query = new URLSearchParams({limit: String(limit)});
 		if (after) query.set("after", after);
 		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/tools?" + query.toString()).then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			if (!body || body.version !== 1 || body.task_id !== taskID || !Array.isArray(body.tools) || body.tools.length > limit ||
-				!printable(body.next_cursor || "", 512, true) || body.next_cursor && toolCursors.has(body.next_cursor)) throw new Error("invalid tools");
-			for (const item of body.tools) {
-				if (!validTool(item) || toolIDs.has(item.call_id)) throw new Error("invalid tool");
+				!printable(body.next_cursor || "", 512, true) || !reset && body.next_cursor && toolCursors.has(body.next_cursor)) throw new Error("invalid tools");
+			const incoming=new Set();
+   for(const item of body.tools){if(!validTool(item)||incoming.has(item.call_id)||!reset&&toolIDs.has(item.call_id))throw Error("invalid tool");incoming.add(item.call_id);}
+   if(reset){toolIDs.clear();toolCursors.clear();toolTotal=0;toolPages=0;toolCursor="";}
+   const rows=reset?[]:Array.from(toolList.children,node=>[node.dataset.key,node.textContent]);
+   for (const item of body.tools) {
 				toolIDs.add(item.call_id); toolTotal++;
 				const completion = item.completed_at === undefined ? "Completion: pending / unknown" : "Completed: " + formatTime(item.completed_at);
-				toolList.append(element("li", "", item.name + "\n" + stateLabel(item.state) + " · " + stateLabel(item.behavior) + " · permission " + stateLabel(item.permission) + " · effect " + stateLabel(item.effect) + (item.code ? " · code " + item.code : "") + "\nStarted: " + formatTime(item.started_at) + " · " + completion));
+				rows.push([item.call_id, item.name + "\n" + stateLabel(item.state) + " · " + stateLabel(item.behavior) + " · permission " + stateLabel(item.permission) + " · effect " + stateLabel(item.effect) + (item.code ? " · code " + item.code : "") + "\nStarted: " + formatTime(item.started_at) + " · " + completion]);
 			}
+			reconcileItems(toolList,rows);
 			toolPages++;
 			if (body.next_cursor) toolCursors.add(body.next_cursor);
 			toolCursor = toolTotal < maxInspectionItems && toolPages < maxInspectionPages ? body.next_cursor || "" : "";
-			toolCount.textContent = String(toolTotal);
+			setText(toolCount,String(toolTotal));
 			loadMoreTools.hidden = !toolCursor;
 			if (!toolTotal) showNotice(toolsState, "No tool activity recorded.", false);
 			else if (body.next_cursor && !toolCursor) showNotice(toolsState, "Tool pagination limit reached.", false);
@@ -351,31 +368,31 @@
 	}
 
 	function loadAudits(taskID, after, reset, requestID) {
-		if (reset) {
-			auditList.replaceChildren(); auditIDs.clear(); auditCursors.clear(); auditTotal = 0; auditPages = 0; auditCursor = "";
-			loadMoreAudits.hidden = true;
-			showNotice(auditsState, "Loading audits…", false);
-		}
+		if(reset)loading(auditsState,auditList,"Loading audits…");
 		loadMoreAudits.disabled = true;
-		const limit = Math.min(inspectionPageLimit, maxInspectionItems - auditTotal);
+		const limit = Math.min(inspectionPageLimit, maxInspectionItems - (reset ? 0 : auditTotal));
 		const query = new URLSearchParams({limit: String(limit)});
 		if (after) query.set("after", after);
 		return requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/audits?" + query.toString()).then(body => {
 			if (requestID !== inspectorRequest || selectedTaskID !== taskID) return;
 			if (!body || body.version !== 1 || body.task_id !== taskID || !Array.isArray(body.audits) || body.audits.length > limit ||
-				!printable(body.next_cursor || "", 512, true) || body.next_cursor && auditCursors.has(body.next_cursor)) throw new Error("invalid audits");
-			for (const item of body.audits) {
-				if (!validAudit(item) || auditIDs.has(item.id)) throw new Error("invalid audit");
+				!printable(body.next_cursor || "", 512, true) || !reset && body.next_cursor && auditCursors.has(body.next_cursor)) throw new Error("invalid audits");
+			const incoming=new Set();
+   for(const item of body.audits){if(!validAudit(item)||incoming.has(item.id)||!reset&&auditIDs.has(item.id))throw Error("invalid audit");incoming.add(item.id);}
+   if(reset){auditIDs.clear();auditCursors.clear();auditTotal=0;auditPages=0;auditCursor="";}
+   const rows=reset?[]:Array.from(auditList.children,node=>[node.dataset.key,node.textContent]);
+   for (const item of body.audits) {
 				auditIDs.add(item.id); auditTotal++;
 				const findings = item.findings.length ? item.findings.map(finding => finding.summary + " [evidence: " + (finding.evidence_refs.length ? finding.evidence_refs.join(", ") : "none") + "]").join("\n") : "No sanitized findings.";
 				const usage = item.usage === undefined ? "Auxiliary usage: Unknown" : "Auxiliary usage: " + (item.usage.normalized_cost === undefined ? "cost unknown" : "normalized cost " + String(item.usage.normalized_cost));
 				const precedence = "Evidence precedence: " + (item.evidence_precedence.length ? item.evidence_precedence.join(" → ") : "None");
-				auditList.append(element("li", "", item.evaluator_provider + " / " + item.evaluator_model + "\n" + stateLabel(item.status) + " · reviewer " + item.reviewer_id + " · domain " + (item.domain || "Unknown") + "\nRubric version: " + (item.rubric_version || "Unknown") + "\n" + precedence + "\n" + usage + "\n" + findings));
+				rows.push([item.id, item.evaluator_provider + " / " + item.evaluator_model + "\n" + stateLabel(item.status) + " · reviewer " + item.reviewer_id + " · domain " + (item.domain || "Unknown") + "\nRubric version: " + (item.rubric_version || "Unknown") + "\n" + precedence + "\n" + usage + "\n" + findings]);
 			}
+			reconcileItems(auditList,rows);
 			auditPages++;
 			if (body.next_cursor) auditCursors.add(body.next_cursor);
 			auditCursor = auditTotal < maxInspectionItems && auditPages < maxInspectionPages ? body.next_cursor || "" : "";
-			auditCount.textContent = String(auditTotal);
+			setText(auditCount,String(auditTotal));
 			loadMoreAudits.hidden = !auditCursor;
 			if (!auditTotal) showNotice(auditsState, "No audits recorded.", false);
 			else if (body.next_cursor && !auditCursor) showNotice(auditsState, "Audit pagination limit reached.", false);
@@ -386,6 +403,7 @@
 	}
 
 	function loadTask(taskID) {
+		if(selectedTaskID!==taskID){for(const list of [routeDetails,routeCandidates,usageDetails,toolList,auditList])list.replaceChildren();}
 		selectedTaskID = taskID;
 		taskInspector.hidden = false;
 		const requestID = ++inspectorRequest;
@@ -401,7 +419,8 @@
 		taskInspector.hidden = true;
 	}
 
-	function loadGlobals() { return Promise.all([loadModels(),loadHealth(),loadResources()]); }
+	let globalsPending=null;
+	function loadGlobals() { if(!globalsPending)globalsPending=Promise.all([loadModels(),loadHealth(),loadResources()]).finally(()=>{globalsPending=null;});return globalsPending; }
 
 	loadMoreTools.addEventListener("click", () => { if (selectedTaskID && toolCursor) loadTools(selectedTaskID, toolCursor, false, inspectorRequest); });
 	loadMoreAudits.addEventListener("click", () => { if (selectedTaskID && auditCursor) loadAudits(selectedTaskID, auditCursor, false, inspectorRequest); });
