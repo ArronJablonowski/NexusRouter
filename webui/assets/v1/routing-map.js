@@ -82,17 +82,13 @@
 		const compact = window.matchMedia("(max-width: 42rem)").matches;
 		const targets = cards.map(card => {
 			const target = card.getBoundingClientRect(), left = target.left - box.left, top = target.top - box.top, center = left + target.width / 2;
-			if (card.classList.contains("remote-route-card")) return {x:center, y:top, remote:true};
 			return compact ? {x:center, y:top} : {x:center < rootX ? left + target.width : left, y:top + Math.min(52, target.height * .3)};
 		});
-		const remoteTargets = targets.filter(target => target.remote);
-		const trunkY = remoteTargets.length ? Math.min(...remoteTargets.map(target => target.y)) : Math.max(...targets.map(target => target.y));
+		const trunkY = Math.max(...targets.map(target => target.y));
 		circuitPath(svg, `M ${rootX} ${rootY} L ${rootX} ${trunkY}`, "routing-trunk");
 		for (const target of targets) {
 			const shoulderY = Math.max(rootY + 26, target.y - (compact ? 42 : 74)), bendX = rootX + (target.x - rootX) * .58;
-			if (target.remote) {
-				if (Math.abs(target.x - rootX) > 1 || target.y !== trunkY) circuitPath(svg, `M ${target.x} ${Math.max(rootY, target.y - 42)} L ${target.x} ${target.y}`, "routing-branch routing-remote-vertical");
-			} else circuitPath(svg, `M ${rootX} ${shoulderY} L ${bendX} ${target.y} L ${target.x} ${target.y}`, "routing-branch");
+			circuitPath(svg, `M ${rootX} ${shoulderY} L ${bendX} ${target.y} L ${target.x} ${target.y}`, "routing-branch");
 			const node = document.createElementNS(svg.namespaceURI, "rect");
 			node.setAttribute("x", String(target.x - 5)); node.setAttribute("y", String(target.y - 5)); node.setAttribute("width", "10"); node.setAttribute("height", "10"); node.setAttribute("class", "routing-terminal"); svg.append(node);
 		}

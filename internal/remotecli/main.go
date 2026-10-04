@@ -393,7 +393,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{ReadStatus: service.SubmissionStatus, Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
+	backend := &remote.SDKBackend{RunnerModelID: cfg.VLLM.ModelID, ControlRunner: vllmController(cfg, service), Routing: service.RemoteRoutingInspection, ReadStatus: service.SubmissionStatus, Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
 	}

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 	"math"
 	"strings"
 	"time"
@@ -93,11 +94,13 @@ type Model struct {
 	Local         bool     `json:"local"`
 }
 type Info struct {
-	Harnesses []Harness            `json:"harnesses,omitempty"`
-	Resources *ResourceObservation `json:"resources,omitempty"`
-	Version   int                  `json:"version"`
-	Instance  string               `json:"instance"`
-	Models    []Model              `json:"models"`
+	Routing   *webui.RoutingInspection `json:"routing,omitempty"`
+	Hostname  string                   `json:"hostname,omitempty"`
+	Harnesses []Harness                `json:"harnesses,omitempty"`
+	Resources *ResourceObservation     `json:"resources,omitempty"`
+	Version   int                      `json:"version"`
+	Instance  string                   `json:"instance"`
+	Models    []Model                  `json:"models"`
 	// Availability is advisory; Submit and the destination dispatcher recheck.
 	Available bool `json:"available"`
 }
@@ -126,4 +129,35 @@ func hash(v any) string {
 	b, _ := json.Marshal(v)
 	d := sha256.Sum256(b)
 	return hex.EncodeToString(d[:])
+}
+
+// validHostname accepts bounded host metadata, never control characters or paths.
+func validHostname(s string) bool {
+	if len(s) > 253 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func (i Info) ValidateRouting() error {
+	if i.Routing == nil {
+		return nil
+	}
+	models := make([]webui.ModelInspection, 0, len(i.Models))
+	for _, m := range i.Models {
+		locality := "cloud"
+		if m.Local {
+			locality = "local"
+		}
+		models = append(models, webui.ModelInspection{ID: m.ID, Locality: locality})
+	}
+	if i.Routing.Validate(models) != nil {
+		return ErrInvalid
+	}
+	return nil
 }

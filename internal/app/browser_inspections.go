@@ -31,6 +31,12 @@ const browserInspectionTimeout = 5 * time.Second
 // Invalid health input does not make configuration disappear; it leaves each
 // model explicitly unknown.
 func (s *Service) BrowserModels(ctx context.Context, report health.Report) (contract.ModelInspectionPage, error) {
+	return s.browserModelsScoped(ctx, report, nil)
+}
+
+// browserModelsScoped filters candidates before discovery and ranking. A nil
+// permission map retains the local inventory; an empty map allows no models.
+func (s *Service) browserModelsScoped(ctx context.Context, report health.Report, allowed map[string]bool) (contract.ModelInspectionPage, error) {
 	zero := contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, LocalProviders: []contract.LocalProviderInspection{}, Models: []contract.ModelInspection{}, Fitness: []contract.ModelFitnessInspection{}}
 	if s == nil || ctx == nil || ctx.Err() != nil {
 		return zero, ErrAdmission
@@ -38,6 +44,30 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 	catalog, err := s.ConfiguredModelCatalog(ctx)
 	if err != nil || len(catalog.Models) > contract.MaxInspectionModels {
 		return zero, nil
+	}
+	commanderID, commanderSource := browserCommander(s.settings.WebUI.DefaultModel, catalog.Models)
+	fallbackID := s.settings.WebUI.CommanderFallbackModel
+	var inventoryScope map[string]map[string]bool
+	if allowed != nil {
+		inventoryScope = map[string]map[string]bool{}
+		models := make([]routing.ConfiguredModel, 0, len(catalog.Models))
+		for _, model := range catalog.Models {
+			if !allowed[model.ID] {
+				continue
+			}
+			models = append(models, model)
+			if inventoryScope[model.Provider] == nil {
+				inventoryScope[model.Provider] = map[string]bool{}
+			}
+			inventoryScope[model.Provider][model.Model] = true
+		}
+		catalog.Models = models
+		if !allowed[commanderID] {
+			commanderID, commanderSource, fallbackID = "", "", ""
+		}
+		if !allowed[fallbackID] {
+			fallbackID = ""
+		}
 	}
 	type healthFact struct{ status, code string }
 	modelHealth, providerHealth := map[string]healthFact{}, map[string]healthFact{}
@@ -61,8 +91,8 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: refreshInterval.Milliseconds(),
 		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models)), Fitness: []contract.ModelFitnessInspection{}, LocalConcurrency: s.settings.Hardware.Concurrent,
 		LocalPressurePolicy: s.settings.Hardware.LocalPressurePolicy, LocalRAMLimitPct: s.settings.Hardware.MaxRAM, LocalVRAMLimitPct: s.settings.Hardware.MaxVRAM}
-	out.CommanderID, out.CommanderSource = browserCommander(s.settings.WebUI.DefaultModel, catalog.Models)
-	out.CommanderFallbackID = s.settings.WebUI.CommanderFallbackModel
+	out.CommanderID, out.CommanderSource = commanderID, commanderSource
+	out.CommanderFallbackID = fallbackID
 	out.SpecialistsAllowCloud = s.settings.WebUI.SpecialistsAllowCloud
 	for _, fallback := range s.settings.Routing.EvidenceFallbacks {
 		out.EvidenceFallbacks = append(out.EvidenceFallbacks, contract.RoutingEvidenceFallbackInspection{Domain: fallback.Domain, Profile: fallback.Profile, SourceDomain: fallback.SourceDomain, SourceProfile: fallback.SourceProfile})
@@ -87,7 +117,7 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		out.Models[i].Usable, out.Models[i].StatusCode = enabled && fact.status == "healthy", fact.code
 		configured[model.Provider+"\x00"+model.Model] = i
 	}
-	inventories := s.localModelInventory(ctx)
+	inventories := s.scopedLocalModelInventory(ctx, inventoryScope)
 	counted := map[string]bool{}
 	for _, configuredProvider := range s.settings.Providers {
 		provider := configuredProvider.ID
@@ -163,9 +193,15 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		out.Fitness = []contract.ModelFitnessInspection{}
 	}
 	s.markBrowserFallbackFitness(ctx, out.Fitness, catalog.Models)
-	contextModels := append([]config.Model(nil), s.settings.Models...)
-	for i := range contextModels {
-		contextModels[i].ContextTokens = catalog.Models[i].ContextTokens
+	contextModels := make([]config.Model, 0, len(catalog.Models))
+	for _, model := range catalog.Models {
+		for _, configuredModel := range s.settings.Models {
+			if configuredModel.ID == model.ID {
+				configuredModel.ContextTokens = model.ContextTokens
+				contextModels = append(contextModels, configuredModel)
+				break
+			}
+		}
 	}
 	if selected, selectErr := browserSelectedContexts(ctx, s.settings.Telemetry.Database, contextModels, s.settings.Routing.MinSamples); selectErr == nil {
 		for index := range out.Models {

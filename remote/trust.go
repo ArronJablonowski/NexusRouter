@@ -113,7 +113,7 @@ func (p Peer) Validate() error {
 	default:
 		return ErrInvalid
 	}
-	if !id(p.ID) || len(p.Pins) < 1 || len(p.Pins) > 2 || len(p.Operations) < 1 || len(p.Operations) > 5 || len(p.Models) > 128 || !name(p.ServerName) || p.MaxContextTokens < 1 || p.MaxCost < 0 || math.IsNaN(p.MaxCost) || math.IsInf(p.MaxCost, 0) {
+	if !id(p.ID) || len(p.Pins) < 1 || len(p.Pins) > 2 || len(p.Operations) < 1 || len(p.Operations) > 6 || len(p.Models) > 128 || !name(p.ServerName) || p.MaxContextTokens < 1 || p.MaxCost < 0 || math.IsNaN(p.MaxCost) || math.IsInf(p.MaxCost, 0) {
 		return ErrInvalid
 	}
 	if _, err := p.address(); err != nil {
@@ -127,7 +127,7 @@ func (p Peer) Validate() error {
 	}
 	ops := map[string]bool{}
 	for _, op := range p.Operations {
-		if !slices.Contains([]string{"info", "dispatch", "inspect", "cancel", "logs"}, op) || ops[op] {
+		if !slices.Contains([]string{"info", "dispatch", "inspect", "cancel", "logs", "runner"}, op) || ops[op] {
 			return ErrInvalid
 		}
 		ops[op] = true

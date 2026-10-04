@@ -184,6 +184,15 @@ func TestBrowserModelsKeepsHealthyProviderWhenAnotherInventoryFails(t *testing.T
 	if marshalErr != nil || strings.Contains(string(body), "private provider failure") {
 		t.Fatal("private provider response escaped", string(body), marshalErr)
 	}
+	scoped, err := service.browserModelsScoped(context.Background(), report, map[string]bool{"healthy-model": true})
+	if err != nil || scoped.Validate() != nil || len(scoped.Models) != 1 || scoped.Models[0].ID != "healthy-model" || len(scoped.LocalProviders) != 1 {
+		t.Fatal("permission-scoped model projection failed", err)
+	}
+	empty, err := service.browserModelsScoped(context.Background(), report, map[string]bool{})
+	if err != nil || empty.Validate() != nil || len(empty.Models) != 0 || len(empty.LocalProviders) != 0 || empty.CommanderID != "" || empty.CommanderFallbackID != "" {
+		t.Fatal("empty permission scope leaked metadata", err)
+	}
+
 }
 
 func TestBrowserModelsDiscoversInstalledLocalModelsAndDeduplicatesAliases(t *testing.T) {

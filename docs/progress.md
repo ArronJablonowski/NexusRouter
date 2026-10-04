@@ -2406,3 +2406,10 @@ Remote inventory first page took 15.21 seconds on Spark, beyond the browser's 10
 
 ### 2026-10-04 — Scoped inventory prerequisite for remote rankings
 Local inventory now has a scoped collection path that avoids unpermitted providers and removes unpermitted model names. An empty scope makes no discovery requests; the existing local path retains unrestricted local inventory behavior. A focused race test verifies traffic isolation, output filtering, and local compatibility. Remote ranking/Commander wiring and parity are not yet implemented. Full validation is pending; no runtime deployment is needed for this unused prerequisite.
+
+### Pending implementation batch — validation explicitly stopped
+Remote policy preview now scopes health and inventory discovery before scoring, transports bounded rankings and Commander identifiers, and renders them in the remote modal. Connected-system hostnames refresh with authenticated info; connectors share specialist branch geometry.
+
+Managed vLLM adds explicit runner trust permission, fixed systemd-unit start/stop/status, idle submission/task/reservation checks, start-time RAM/thermal admission, and Settings controls. It reuses the OpenAI-compatible provider. Spark unit/config fragments are prepared separately; no unit or runtime configuration has been installed or started. The unit is operator-owned and must match the configured model/memory policy. Focused tests for new contracts are authored but not run, per user instruction. Full tests, build, push, deployment and live verification remain stopped.
+
+Historical reconciliation remains unresolved. One historical task has an unreleased writer lease and uncertain effects; the existing read-only recovery contract cannot prove a safe terminal outcome. No runtime history was altered or deleted. Two terminal-submission/task mismatches and the other historical heads still require supported reconciliation. Do not label the rollout complete.

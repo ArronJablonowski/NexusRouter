@@ -409,3 +409,5 @@ input, select { padding: .55rem .7rem; }
 #active-jobs-list { list-style: none; padding: 0; display: grid; gap: .75rem; }
 #active-jobs-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; padding: .85rem; background: #0a2630; border-left: 3px solid #00e5e5; overflow-wrap: anywhere; }
 #active-jobs-list a { color: #70ffff; }
+
+.remote-route-card h3 { text-transform:none; }

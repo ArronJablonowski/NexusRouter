@@ -22,6 +22,7 @@ import (
 )
 
 type Settings struct {
+	VLLM                     VLLMSettings               `yaml:"vllm" json:"vllm"`
 	RemoteAdvertisement      remoteconfig.Advertisement `yaml:"remote_advertisement" json:"remote_advertisement"`
 	NativeHarnessEvidenceDir string                     `yaml:"native_harness_evidence_dir,omitempty" json:"native_harness_evidence_dir,omitempty"`
 	NativeHarnesses          []NativeHarness            `yaml:"native_harnesses,omitempty" json:"native_harnesses,omitempty"`
@@ -300,6 +301,9 @@ func Duration(value string) (time.Duration, error) {
 }
 
 func (s Settings) Validate() error {
+	if err := s.validateVLLM(); err != nil {
+		return err
+	}
 	if err := s.RemoteAdvertisement.Validate(); err != nil {
 		return err
 	}

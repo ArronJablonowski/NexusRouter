@@ -9,16 +9,19 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"reflect"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 type Server struct {
+	runnerMu sync.RWMutex
 	instance string
 	trust    TrustFile
 	journal  *Journal
@@ -126,6 +129,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/v1/remote/logs" && r.Method == http.MethodGet {
 		op = "logs"
 	}
+	if strings.HasPrefix(r.URL.Path, "/v1/remote/runner/") && r.Method == http.MethodPost {
+		op = "runner"
+	}
 	if op == "" {
 		s.fail(w, 404)
 		return
@@ -153,8 +159,27 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, 503)
 		return
 	}
+	if op == "runner" {
+		s.runnerMu.Lock()
+		defer s.runnerMu.Unlock()
+	} else {
+		s.runnerMu.RLock()
+		defer s.runnerMu.RUnlock()
+	}
 	var result any
-	if op == "logs" {
+	if op == "runner" {
+		action := strings.TrimPrefix(r.URL.Path, "/v1/remote/runner/")
+		backend, ok := s.backend.(interface {
+			Runner(context.Context, string) (RunnerStatus, error)
+		})
+		if !ok {
+			err = ErrUnavailable
+		} else if action != "status" && action != "start" && action != "stop" {
+			err = ErrInvalid
+		} else {
+			result, err = backend.Runner(ctx, action)
+		}
+	} else if op == "logs" {
 		result, err = s.logPage(ctx, r)
 	} else if r.URL.Path == "/v1/remote/catalogue" {
 		result, err = s.catalogue(ctx, peer)
@@ -182,6 +207,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			info.Version = Version
 			info.Instance = s.instance
+			info.Hostname = ""
+			if hostname, hostErr := os.Hostname(); hostErr == nil && validHostname(hostname) {
+				info.Hostname = hostname
+			}
 			filtered := []Model{}
 			for _, m := range info.Models {
 				if slices.Contains(peer.Models, m.ID) && (peer.AllowCloudInference || m.Local) {
@@ -189,6 +218,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			info.Models = filtered
+			if info.ValidateRouting() != nil {
+				s.finish(w, ctx, peer.ID, op, key, nil, ErrInvalid)
+				return
+			}
 			info.Harnesses = filterHarnesses(info.Harnesses, filtered, peer.Harnesses, false)
 			result = info
 		}

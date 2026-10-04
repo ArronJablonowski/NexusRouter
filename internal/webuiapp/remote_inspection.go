@@ -59,7 +59,7 @@ func (h *Handler) serveRemoteInspection(w http.ResponseWriter, r *http.Request) 
 	if input.View == "info" {
 		var info remote.Info
 		info, err = safeCall(func() (remote.Info, error) { return h.remoteInspector.Info(ctx, input.Instance) })
-		if err == nil && (info.Version != 1 || info.Instance != input.Instance || len(info.Models) > 4096 || len(info.Harnesses) > 256) {
+		if err == nil && (info.ValidateRouting() != nil || info.Version != 1 || info.Instance != input.Instance || len(info.Models) > 4096 || len(info.Harnesses) > 256) {
 			err = remote.ErrInvalid
 		}
 		page.Info = &info

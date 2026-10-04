@@ -326,3 +326,27 @@ func TestHealthReportCodexDiscovery(t *testing.T) {
 		})
 	}
 }
+
+func TestScopedHealthDoesNotProbeUnpermittedModels(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		fmt.Fprintln(w, `{"models":[{"name":"fixture"}]}`)
+	}))
+	defer server.Close()
+	s := submissionService(t)
+	s.settings.Mode = "local_only"
+	s.settings.Providers = []config.Provider{{ID: "provider", Kind: "ollama", Endpoint: server.URL}}
+	s.settings.Models = []config.Model{{ID: "model", Provider: "provider", Model: "fixture", Locality: "local", RAMBytes: 1}}
+	s.profile = healthProfile
+	for _, scope := range []map[string]bool{{}, {"model": false}, {"other": true}} {
+		report, err := s.healthReportScoped(context.Background(), healthySupervisor(), scope)
+		if err != nil || report.Validate() != nil || calls.Load() != 0 {
+			t.Fatal("unpermitted provider probed", err, calls.Load())
+		}
+	}
+	_, err := s.healthReportScoped(context.Background(), healthySupervisor(), map[string]bool{"model": true})
+	if err != nil || calls.Load() != 1 {
+		t.Fatal("permitted provider not probed", err, calls.Load())
+	}
+}

@@ -108,3 +108,24 @@
 		return response.json();
 	}).then(value => { if (!value || value.version !== 1 || typeof value.csrf_token !== "string" || !value.csrf_token) throw new Error("invalid session"); csrf = value.csrf_token; window.NexusRemoteMembership.mount(base, csrf); connection.textContent = "Connected"; return load(); }).catch(() => { connection.textContent = "Session needs attention"; setBusy(false); setStatus("The browser session needs attention before settings can be changed.", true); });
 })();
+
+(() => {
+ const base=document.body.dataset.basePath||'';
+ if(!window.NexusRoutes?.settings(window.location.pathname.slice(base.length)))return;
+ const select=document.querySelector('#vllm-instance'),status=document.querySelector('#vllm-status');
+ const buttons=['refresh','start','stop'].map(x=>document.querySelector('#vllm-'+x));let busy=false;
+ async function action(name){if(busy||!select.value)return;busy=true;buttons.forEach(b=>b.disabled=true);
+  try{const session=await fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!session.ok)throw Error();const csrf=await session.json();
+   const response=await fetch(base+'/api/v1/remote-runner',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-Darwin-CSRF':csrf.csrf_token},body:JSON.stringify({version:1,instance:select.value,action:name})});if(!response.ok)throw Error();const value=await response.json();
+   if(value.version!==1||typeof value.enabled!=='boolean'||!['disabled','active','inactive','activating','deactivating','failed','unavailable'].includes(value.state))throw Error();
+   status.textContent='vLLM: '+value.state+(value.model_id?' · '+value.model_id:'');
+  }catch{status.textContent='Runner unavailable, access denied, or host busy. No automatic retry of start/stop.';}
+  finally{busy=false;buttons.forEach(b=>b.disabled=!select.value);}
+ }
+ buttons[0].addEventListener('click',()=>action('status'));buttons[1].addEventListener('click',()=>action('start'));buttons[2].addEventListener('click',()=>action('stop'));select.addEventListener('change',()=>action('status'));
+ async function load(){try{const response=await fetch(base+'/api/v1/remote-membership',{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error();const page=await response.json();if(page.version!==1||!Array.isArray(page.registry?.peers))throw Error();
+  select.replaceChildren();for(const peer of page.registry.peers){if(!peer.operations?.includes('runner'))continue;const option=document.createElement('option');option.value=peer.id;option.textContent=peer.id;select.append(option);}
+  buttons.forEach(b=>b.disabled=!select.value);if(select.value)await action('status');else status.textContent='No paired host grants runner control. Enable runner permission in the host trust configuration.';
+ }catch{status.textContent='Runner connections could not be loaded.';buttons.forEach(b=>b.disabled=true);}}
+ load();
+})();

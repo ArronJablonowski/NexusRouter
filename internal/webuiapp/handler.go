@@ -160,6 +160,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if h.serveRemoteTaskControl(writer, request) {
 		return
 	}
+	if h.serveRemoteRunner(writer, request) {
+		return
+	}
 	if h.serveRemoteInspection(writer, request) {
 		return
 	}

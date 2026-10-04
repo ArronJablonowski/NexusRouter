@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"os"
 	"testing"
 	"time"
 )
@@ -49,6 +50,10 @@ func TestAuthenticatedInfoUsesScopedObserver(t *testing.T) {
 	}
 	f.server.backend = b
 	info, err := f.client.Info(context.Background(), "node-a")
+	hostname, hostErr := os.Hostname()
+	if hostErr != nil || info.Hostname != hostname {
+		t.Fatal("remote hostname not reported", hostErr)
+	}
 	if err != nil || len(info.Models) != 1 || info.Models[0].Observation == nil || info.Models[0].Observation.State != "present" {
 		t.Fatal(info, err)
 	}

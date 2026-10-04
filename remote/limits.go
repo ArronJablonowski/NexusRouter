@@ -24,6 +24,8 @@ func (l RequestLimits) valid() bool {
 }
 func (l RequestLimits) count(op string) int {
 	switch op {
+	case "runner":
+		return 6
 	case "logs":
 		return l.Info // separate bucket, same conservative configured allowance
 	case "info":

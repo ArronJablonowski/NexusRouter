@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 	"math"
 	"slices"
 	"time"
@@ -18,6 +19,9 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	RunnerModelID string
+	ControlRunner func(context.Context, string) (RunnerStatus, error)
+	Routing       func(context.Context, []string) (webui.ModelInspectionPage, error)
 	// ReadStatus borrows the serving dispatcher store when available.
 	ReadStatus func(context.Context, string) (submissions.Status, error)
 
@@ -107,10 +111,29 @@ func (b *SDKBackend) info(ctx context.Context, configured []Model) (Info, error)
 			out.Resources = &copy
 		}
 	}
+	if b.Routing != nil {
+		ids := make([]string, 0, len(models))
+		for _, m := range models {
+			ids = append(ids, m.ID)
+		}
+		page, err := b.Routing(ctx, ids)
+		if err == nil && page.Availability == webui.Available && page.Rankings != nil {
+			out.Routing = &webui.RoutingInspection{Rankings: page.Rankings, CommanderID: page.CommanderID, CommanderSource: page.CommanderSource, CommanderFallbackID: page.CommanderFallbackID}
+			if out.ValidateRouting() != nil {
+				return Info{}, ErrInvalid
+			}
+		}
+	}
 	return out, nil
 }
 
 func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submissions.Status, error) {
+	if b != nil && b.RunnerModelID != "" && t.ModelID == b.RunnerModelID {
+		state, err := b.Runner(ctx, "status")
+		if err != nil || !state.Enabled || state.State != "active" {
+			return submissions.Status{}, ErrUnavailable
+		}
+	}
 	if b == nil || b.Client == nil || t.Validate() != nil {
 		return submissions.Status{}, ErrInvalid
 	}

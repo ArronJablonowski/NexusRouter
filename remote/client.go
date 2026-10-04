@@ -27,7 +27,7 @@ type Client struct {
 func (c *Client) Info(ctx context.Context, destination string) (Info, error) {
 	var out Info
 	err := c.call(ctx, destination, "info", "GET", "/v1/remote/info", nil, nil, &out)
-	if err == nil && (out.Version != Version || out.Instance != destination) {
+	if err == nil && (out.Version != Version || out.Instance != destination || !validHostname(out.Hostname) || out.ValidateRouting() != nil) {
 		err = ErrInvalid
 	}
 	return out, err
