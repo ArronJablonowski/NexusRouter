@@ -285,7 +285,7 @@
 	function loadBoards(after, reset) {
 		const current = ++boardRequestVersion;
 		if (reset) {
-			list.replaceChildren(); boardTotal = 0; boardCursor = ""; boardIDs.clear(); boardCursors.clear();
+			// Keep the last complete list until a replacement response is validated.
 			notice(listState, "Loading workboards…", false);
 		}
 		loadMoreBoards.disabled = true;
@@ -295,10 +295,11 @@
 		if (after) query.set("after", after);
 		return requestJSON("/api/v1/workboards?" + query.toString()).then(page => {
 			if (!client.current(current, boardRequestVersion)) return;
-			if (!validBoardPage(page) || boardTotal + page.items.length > maxBoards || after && boardCursors.has(after) || page.has_more && (page.next_cursor === after || boardCursors.has(page.next_cursor))) throw new Error("invalid workboard page");
+			if (!validBoardPage(page) || (reset ? 0 : boardTotal) + page.items.length > maxBoards || after && boardCursors.has(after) || page.has_more && (page.next_cursor === after || (!reset && boardCursors.has(page.next_cursor)))) throw new Error("invalid workboard page");
 			const incoming = new Set();
-			for (const board of page.items) if (boardIDs.has(board.id) || incoming.has(board.id)) throw new Error("duplicate board"); else incoming.add(board.id);
+			for (const board of page.items) if ((!reset && boardIDs.has(board.id)) || incoming.has(board.id)) throw new Error("duplicate board"); else incoming.add(board.id);
 			const nodes = page.items.map(boardLink);
+			if(reset){list.replaceChildren();boardTotal=0;boardCursor="";boardIDs.clear();boardCursors.clear();}
 			if (after) boardCursors.add(after);
 			for (let index = 0; index < page.items.length; index++) { boardIDs.add(page.items[index].id); list.append(nodes[index]); }
 			boardTotal += page.items.length; boardCursor = page.next_cursor || "";
@@ -536,8 +537,9 @@
 		const current = ++cardRequestVersion;
 		if (reset) {
 			pendingFocusAnchor = focusAnchor; pendingFocusVersion = current;
-			selectedCardAnchor = viewTransition ? viewTransition.anchor : null; clearCardState();
-			selectedTitle.textContent = "Loading workboard…"; selectedMeta.textContent = "";
+			selectedCardAnchor = viewTransition ? viewTransition.anchor : null;
+			if(!currentBoard || currentBoard.id!==boardID) clearCardState();
+			if(!currentBoard){selectedTitle.textContent = "Loading workboard…"; selectedMeta.textContent = "";}
 			notice(stateNode, "Loading cards and lanes…", false);
 		}
 		kanban.setAttribute("aria-busy", "true"); cardList.setAttribute("aria-busy", "true"); loadMoreCards.disabled = true;
@@ -546,13 +548,14 @@
 		if (after) query.set("after", after);
 		requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID) + "?" + query.toString()).then(snapshot => {
 			if (!client.current(current, cardRequestVersion, boardID, selectedID)) return;
-			if (!validSnapshot(snapshot, boardID) || cardTotal + snapshot.cards.length > maxCards || after && cardCursors.has(after) || snapshot.has_more && (snapshot.next_cursor === after || cardCursors.has(snapshot.next_cursor))) throw new Error("invalid workboard snapshot");
+			if (!validSnapshot(snapshot, boardID) || (reset ? 0 : cardTotal) + snapshot.cards.length > maxCards || after && cardCursors.has(after) || snapshot.has_more && (snapshot.next_cursor === after || (!reset && cardCursors.has(snapshot.next_cursor)))) throw new Error("invalid workboard snapshot");
 			const lifecycle = validLifecycleBatch(snapshot, reset), supervision = validSupervisionBatch(snapshot, reset); if (!lifecycle || !supervision) throw new Error("invalid workboard lifecycle");
 			const ranks = validateCardBatch(snapshot.cards, reset); if (!ranks) throw new Error("invalid card order");
 			const columnSignature = snapshot.columns.map(column => [column.id, column.state, column.title, column.rank].join("\u0000")).join("\u0001");
 			const filterSignature = [appliedFilters.state, appliedFilters.assignee, appliedFilters.owner, appliedFilters.claim].join("\u0000");
 			const fence = JSON.stringify([snapshot.board.revision, snapshot.board.layout_revision, snapshot.board.event_sequence, snapshot.graph_revision, snapshot.graph_digest, columnSignature, filterSignature]);
-			if (snapshotFence && snapshotFence !== fence) throw new Error("workboard changed during pagination");
+			if (!reset && snapshotFence && snapshotFence !== fence) throw new Error("workboard changed during pagination");
+			if(reset) clearCardState();
 			if (!snapshotFence) snapshotFence = fence;
 			snapshotGraphRevision = snapshot.graph_revision; snapshotGraphDigest = snapshot.graph_digest;
 			streamRevision = Math.max(streamRevision, snapshot.board.event_sequence);
@@ -575,8 +578,8 @@
 			loadMoreCards.disabled = false;
 		}).catch(() => {
 			if (current !== cardRequestVersion) return;
-			kanban.setAttribute("aria-busy", "false"); cardList.setAttribute("aria-busy", "false"); kanban.hidden = true; cardList.hidden = true;
-			notice(stateNode, "This workboard could not be loaded. Use Refresh to try again.", true);
+			kanban.setAttribute("aria-busy", "false"); cardList.setAttribute("aria-busy", "false"); if(!currentBoard){kanban.hidden = true; cardList.hidden = true;}
+			notice(stateNode, "This workboard could not be loaded. Previously displayed cards may be stale. Use Refresh to try again.", true);
 			loadMoreCards.hidden = true;
 			if (reset && pendingFocusVersion === current) { client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body); pendingFocusAnchor = null; pendingFocusVersion = 0; }
 		});

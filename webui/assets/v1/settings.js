@@ -48,13 +48,15 @@
 		syncDependency(); validation.hidden = true;
 		setStatus(value.restart_required ? "Settings are saved. Restart the owning service to activate them; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
 	}
-	function load() {
+	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==projection.saved[key]);}
+ function load() {
+  if(dirty()){setStatus("Your unsaved edits are preserved. Use Reset changes before refreshing saved settings.",false);return Promise.resolve();}
 		setBusy(true); setStatus("Loading settings…", false);
-		return fetch(base + "/api/v1/settings", {credentials: "same-origin", cache: "no-store", headers: {Accept: "application/json"}}).then(response => {
+		return window.NexusLive.fetch(base + "/api/v1/settings", {credentials: "same-origin", cache: "no-store", headers: {Accept: "application/json"}}).then(response => {
 			if (!response.ok) throw new Error("settings unavailable");
 			return response.json();
 		}).then(value => { if (!validProjection(value)) throw new Error("invalid settings"); render(value); }).catch(() => {
-			projection = null; setStatus("Settings could not be loaded.", true);
+			setStatus("Settings could not be loaded. Previously loaded values and edits are preserved.", true);
 		}).finally(() => setBusy(false));
 	}
 	function formValue() { return {remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
@@ -72,12 +74,12 @@
 		const settings = formValue();
 		if (!validate(settings)) return;
 		setBusy(true); setStatus("Saving validated configuration…", false);
-		fetch(base + "/api/v1/settings", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", Accept: "application/json", "X-Darwin-CSRF": csrf}, body: JSON.stringify({version: 1, expected_digest: projection.digest, settings})}).then(response => {
+		window.NexusLive.fetch(base + "/api/v1/settings", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", Accept: "application/json", "X-Darwin-CSRF": csrf}, body: JSON.stringify({version: 1, expected_digest: projection.digest, settings})}).then(response => {
 			if (response.status === 409) throw new Error("conflict");
 			if (!response.ok) throw new Error("save failed");
 			return response.json();
 		}).then(value => { if (!validProjection(value)) throw new Error("invalid settings"); render(value); }).catch(error => {
-			if (error.message === "conflict") { setStatus("The configuration changed elsewhere. Reloading the latest values…", true); return load(); }
+			if (error.message === "conflict") { setStatus("The configuration changed elsewhere. Your edits are preserved. Reset changes, then Refresh to load the latest values before saving again.", true); }
 			else setStatus("Settings were not saved. Review the values and try again.", true);
 		}).finally(() => setBusy(false));
 	}
@@ -103,7 +105,7 @@
 	reset.addEventListener("click", () => { if (projection) render(projection); });
 	refresh.addEventListener("click", load);
 	setBusy(true);
-	fetch(base + "/api/v1/session/csrf", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json"}, body: JSON.stringify({version: 1})}).then(response => {
+	window.NexusLive.fetch(base + "/api/v1/session/csrf", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json"}, body: JSON.stringify({version: 1})}).then(response => {
 		if (!response.ok) throw new Error("session unavailable");
 		return response.json();
 	}).then(value => { if (!value || value.version !== 1 || typeof value.csrf_token !== "string" || !value.csrf_token) throw new Error("invalid session"); csrf = value.csrf_token; window.NexusRemoteMembership.mount(base, csrf); connection.textContent = "Connected"; return load(); }).catch(() => { connection.textContent = "Session needs attention"; setBusy(false); setStatus("The browser session needs attention before settings can be changed.", true); });
@@ -114,16 +116,16 @@
  if(!window.NexusRoutes?.settings(window.location.pathname.slice(base.length)))return;
  const select=document.querySelector('#vllm-instance'),status=document.querySelector('#vllm-status');
  const buttons=['refresh','start','stop'].map(x=>document.querySelector('#vllm-'+x));let busy=false;
- async function action(name){if(busy||!select.value)return;busy=true;buttons.forEach(b=>b.disabled=true);
-  try{const session=await fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!session.ok)throw Error();const csrf=await session.json();
-   const response=await fetch(base+'/api/v1/remote-runner',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-Darwin-CSRF':csrf.csrf_token},body:JSON.stringify({version:1,instance:select.value,action:name})});if(!response.ok)throw Error();const value=await response.json();
+ async function action(name){if(busy||!select.value)return;busy=true;select.disabled=true;buttons.forEach(b=>b.disabled=true);
+  try{const session=await window.NexusLive.fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!session.ok)throw Error();const csrf=await session.json();
+   const response=await window.NexusLive.fetch(base+'/api/v1/remote-runner',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-Darwin-CSRF':csrf.csrf_token},body:JSON.stringify({version:1,instance:select.value,action:name})});if(!response.ok)throw Error();const value=await response.json();
    if(value.version!==1||typeof value.enabled!=='boolean'||!['disabled','active','inactive','activating','deactivating','failed','unavailable'].includes(value.state))throw Error();
    status.textContent='vLLM: '+value.state+(value.model_id?' · '+value.model_id:'');
   }catch{status.textContent='Runner unavailable, access denied, or host busy. No automatic retry of start/stop.';}
-  finally{busy=false;buttons.forEach(b=>b.disabled=!select.value);}
+  finally{busy=false;select.disabled=false;buttons.forEach(b=>b.disabled=!select.value);}
  }
  buttons[0].addEventListener('click',()=>action('status'));buttons[1].addEventListener('click',()=>action('start'));buttons[2].addEventListener('click',()=>action('stop'));select.addEventListener('change',()=>action('status'));
- async function load(){try{const response=await fetch(base+'/api/v1/remote-membership',{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error();const page=await response.json();if(page.version!==1||!Array.isArray(page.registry?.peers))throw Error();
+ async function load(){try{const response=await window.NexusLive.fetch(base+'/api/v1/remote-membership',{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error();const page=await response.json();if(page.version!==1||!Array.isArray(page.registry?.peers))throw Error();
   select.replaceChildren();for(const peer of page.registry.peers){if(!peer.operations?.includes('runner'))continue;const option=document.createElement('option');option.value=peer.id;option.textContent=peer.id;select.append(option);}
   buttons.forEach(b=>b.disabled=!select.value);if(select.value)await action('status');else status.textContent='No paired host grants runner control. Enable runner permission in the host trust configuration.';
  }catch{status.textContent='Runner connections could not be loaded.';buttons.forEach(b=>b.disabled=true);}}

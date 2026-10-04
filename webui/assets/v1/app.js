@@ -338,25 +338,7 @@
 	}
 	function formatTime(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString(); }
 	function stateLabel(value) { return typeof value === "string" && value ? value.replaceAll("_", " ") : "unknown"; }
-	const chatDescriptions = new Map(), descriptionQueue = [];
- let descriptionReaders = 0;
- function chatDescription(chatID) {
-  if (chatDescriptions.has(chatID)) return chatDescriptions.get(chatID);
-  const promise = new Promise(resolve => {descriptionQueue.push({chatID,resolve});});
-  if (chatDescriptions.size >= 500) chatDescriptions.delete(chatDescriptions.keys().next().value);
-  chatDescriptions.set(chatID,promise);readChatDescriptions();return promise;
- }
- function readChatDescriptions() {
-  while(descriptionReaders<4 && descriptionQueue.length){
-   const {chatID,resolve}=descriptionQueue.shift();descriptionReaders++;
-   requestJSON("/api/v1/chats/"+encodeURIComponent(chatID)+"/messages?limit=1").then(page=>{
-    if(!page||page.version!==1||page.chat_id!==chatID||!Array.isArray(page.messages)||page.messages.length>1)throw Error();
-    const message=page.messages.find(m=>m.role==="user"&&typeof m.text==="string");
-    const text=message?message.text.replace(/\s+/g," ").trim():"";
-    resolve(text?(text.length>100?text.slice(0,97)+"…":text):"Description unavailable");
-   }).catch(()=>{chatDescriptions.delete(chatID);resolve("Description unavailable");}).finally(()=>{descriptionReaders--;readChatDescriptions();});
-  }
- }
+	const chatDescription = id => window.NexusChatDescriptions.get(id);
 	function renderChat(item) {
 		if (!item || item.version !== 1 || typeof item.chat_id !== "string" || !item.chat_id || item.chat_id.length > 512) return false;
 		const row = element("li");
@@ -364,21 +346,15 @@
 		button.type = "button";
 		button.dataset.chatId = item.chat_id;
 		button.setAttribute("aria-current", item.chat_id === selectedChat ? "true" : "false");
-		const name = element("span", "chat-name", "Loading description…");
-  button.title = "Chat ID: " + item.chat_id;
-  button.append(name);
-  chatDescription(item.chat_id).then(description=>{if(button.isConnected){name.textContent=description;button.title=description+" — Chat ID: "+item.chat_id;}});
-		const meta = element("span", "chat-meta");
-		meta.append(element("span", "", stateLabel(item.state)), element("time", "", formatTime(item.started_at)));
-		button.append(meta);
+		window.NexusChatDescriptions.decorate(button, item);
 		if (item.chat_id === selectedChat) setTaskState(item.state);
 		button.addEventListener("click", () => selectChat(item.chat_id, item.state));
 		row.append(button);
 		list.append(row);
 		return true;
 	}
-	function loadChats(after) {
-		if (loadingPage || chatTotal >= maxChats) return;
+	function loadChats(after, reset = false) {
+		if (loadingPage || !reset && chatTotal >= maxChats) return;
 		loadingPage = true;
 		loadMore.disabled = true;
 		if (!after) showNotice(listState, "Loading chats…", false);
@@ -386,6 +362,7 @@
 		if (after) query.set("after", after);
 		requestJSON("/api/v1/chats?" + query.toString()).then(page => {
 			if (!page || page.version !== 1 || !Array.isArray(page.items) || page.items.length > pageLimit) throw new Error("invalid chat page");
+			if (reset) { list.replaceChildren(); chatTotal = 0; nextCursor = ""; }
 			let added = 0;
 			for (const item of page.items.slice(0, maxChats - chatTotal)) if (renderChat(item)) added++;
 			chatTotal += added;
@@ -837,10 +814,7 @@
 	}
 	function refreshChats() {
 		if (loadingPage) return;
-		list.replaceChildren();
-		chatTotal = 0;
-		nextCursor = "";
-		loadChats("");
+		loadChats("", true);
 	}
 	function reconcileCurrent(successMessage) {
 		showMutation(successMessage || "Checking committed state…", Boolean(pendingIntent), false);

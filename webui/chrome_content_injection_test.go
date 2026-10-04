@@ -113,6 +113,12 @@ await cdp('Page.navigate', {url:origin + '/app/chats/chat-xss'});
 await eventually('document.querySelectorAll("#transcript .message").length === 2', 'hostile chat messages did not render');
 let result = await evaluate('({executed:window.__darwinXSS, injected:document.querySelector("[data-darwin-xss]") !== null, count:Array.from(document.querySelectorAll("#transcript .message p"), node => node.textContent).filter(text => text === ' + JSON.stringify(hostile) + ').length})');
 if (result.executed !== undefined || result.injected || result.count !== 2) throw new Error('hostile chat content became active: ' + JSON.stringify(result));
+for(const width of [1440,1024,390,319]) {
+ await cdp('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+ if(!await evaluate('document.documentElement.scrollWidth<=innerWidth+1'))throw Error('chat horizontal overflow at '+width);
+ if(!await evaluate('document.querySelector("#transcript").getBoundingClientRect().height>=250'))throw Error('transcript collapsed at '+width);
+}
+await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
 await cdp('Page.navigate', {url:origin + '/app/workboards/board-xss'});
 await eventually('document.querySelector("[data-card-id=card-xss]") && document.querySelector("#selected-board-title").textContent.length > 0', 'hostile workboard did not render');
 await evaluate('document.querySelector("[data-card-id=card-xss] .card-toggle").click()');

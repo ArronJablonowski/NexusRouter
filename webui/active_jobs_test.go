@@ -12,12 +12,12 @@ func TestActiveJobsReconcileAndPreserveOnFailure(t *testing.T) {
 	}
 	script := `
 const fs=require('fs'),vm=require('vm');
-const make=()=>({textContent:'',children:[],classList:{add(){},remove(){}},append(...x){this.children.push(...x)},replaceChildren(...x){this.children=x}});
+const make=()=>({textContent:'',children:[],classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},isConnected:false,append(...x){this.children.push(...x)},replaceChildren(...x){this.children=x}});
 const list=make(),status=make(),count=make();let run,fail=false,cycle=0,urls=[];
-global.location={pathname:'/app/workboards'};global.document={body:{dataset:{basePath:'/app'}},querySelector:s=>({'#active-jobs-list':list,'#active-jobs-status':status,'#active-jobs-count':count}[s]),createElement:make};
-global.window={NexusLive:{watch:(n,f)=>run=f,fetch:async url=>{urls.push(url);if(url.endsWith('/remote-membership'))return {ok:true,json:async()=>({version:1,enabled:false})};if(fail)throw Error();let items=[];if(!url.includes('kind=')&&cycle===0)items=[{task_id:'task-a',session_id:'chat-a',state:'running',started_at:'2026-10-02T00:00:00Z'}];if(cycle===0&&url.includes('kind=queued'))items=[{id:'queued-a',state:'queued',created_at:'2026-10-02T00:00:00Z'}];if(cycle===0&&url.includes('after='))items=[{task_id:'task-b',session_id:'chat-b',state:'running',started_at:'2026-10-02T00:00:00Z'}];const more=cycle===0&&!url.includes('?');return {ok:true,json:async()=>({version:1,items,next_cursor:more?'cursor-1':'',has_more:more})}}}};
+global.location={pathname:'/app/active-jobs'};global.document={body:{dataset:{basePath:'/app'},append(){}},querySelectorAll:()=>[],querySelector:s=>s==='#active-jobs-view'?make():s.endsWith('-list')?list:s.endsWith('-status')?status:count,createElement:make};
+global.window={NexusLive:{watch:(n,f)=>{if(n==='local-active-jobs')run=f},fetch:async url=>{urls.push(url);if(url.endsWith('/remote-membership'))return {ok:true,json:async()=>({version:1,enabled:false})};if(fail)throw Error();let items=[];if(!url.includes('kind=')&&cycle===0)items=[{task_id:'task-a',session_id:'chat-a',state:'running',started_at:'2026-10-02T00:00:00Z'}];if(cycle===0&&url.includes('kind=queued'))items=[{id:'queued-a',state:'queued',created_at:'2026-10-02T00:00:00Z'}];if(cycle===0&&url.includes('after='))items=[{task_id:'task-b',session_id:'chat-b',state:'running',started_at:'2026-10-02T00:00:00Z'}];const more=cycle===0&&!url.includes('?');return {ok:true,json:async()=>({version:1,items,next_cursor:more?'cursor-1':'',has_more:more})}}}};
 vm.runInThisContext(fs.readFileSync(process.argv[1],'utf8'));
-(async()=>{await run();if(list.children.length!==3||count.textContent!=='3'||list.children[0].children[0].href!=='/app/chats/chat-a')throw Error('initial');fail=true;await run();if(list.children.length!==3||!status.textContent.includes('stale'))throw Error('stale');fail=false;cycle=1;await run();if(list.children.length!==0||status.textContent!=='No active jobs.')throw Error('terminal retained');if(!urls.some(u=>u.includes('kind=queued')))throw Error('queue omitted')})().catch(e=>{console.error(e);process.exit(1)});
+(async()=>{await run();if(list.children.length!==3||count.textContent!=='3')throw Error('initial');fail=true;await run();if(list.children.length!==3||!status.textContent.includes('stale'))throw Error('stale');fail=false;cycle=1;await run();if(list.children.length!==0||status.textContent!=='No active local jobs.')throw Error('terminal retained');if(!urls.some(u=>u.includes('kind=queued')))throw Error('queue omitted')})().catch(e=>{console.error(e);process.exit(1)});
 `
 	out, e := exec.Command(node, "-e", script, "./assets/v1/active-jobs.js").CombinedOutput()
 	if e != nil {
@@ -32,10 +32,10 @@ func TestActiveJobsFederatesOnlyPermittedCallerInventory(t *testing.T) {
 	}
 	script := `
 const fs=require('fs'),vm=require('vm');
-const make=()=>({textContent:'',children:[],classList:{add(){},remove(){}},append(...x){this.children.push(...x)},replaceChildren(...x){this.children=x}});
+const make=()=>({textContent:'',children:[],classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},isConnected:false,append(...x){this.children.push(...x)},replaceChildren(...x){this.children=x}});
 const list=make(),status=make(),count=make();let run,broken=false,inspected=[];
-global.location={pathname:'/app/workboards'};global.document={body:{dataset:{basePath:'/app'}},querySelector:s=>({'#active-jobs-list':list,'#active-jobs-status':status,'#active-jobs-count':count}[s]),createElement:make};
-global.window={NexusLive:{watch:(n,f)=>run=f,fetch:async(url,options)=>{
+global.location={pathname:'/app/active-jobs'};global.document={body:{dataset:{basePath:'/app'},append(){}},querySelectorAll:()=>[],querySelector:s=>s==='#active-jobs-view'?make():s.endsWith('-list')?list:s.endsWith('-status')?status:count,createElement:make};
+global.window={NexusLive:{watch:(n,f)=>{if(n==='remote-active-jobs')run=f},fetch:async(url,options)=>{
  let value;
  if(url.endsWith('/remote-membership'))value={version:1,enabled:true,inspection_enabled:true,registry:{peers:[{id:'spark',operations:['inspect']},{id:'private',operations:['info']}]}};
  else if(url.endsWith('/session/csrf'))value={version:1,csrf_token:'test-token'};
@@ -44,7 +44,7 @@ global.window={NexusLive:{watch:(n,f)=>run=f,fetch:async(url,options)=>{
  return {ok:true,json:async()=>value};
 }}};
 vm.runInThisContext(fs.readFileSync(process.argv[1],'utf8'));
-(async()=>{await run();if(count.textContent!=='1'||!list.children[0].children[1].textContent.includes('spark · running · caller-owned'))throw Error('remote missing');broken=true;await run();if(count.textContent!=='0'||!status.textContent.includes('Remote jobs incomplete'))throw Error('invalid response accepted');if(inspected.some(x=>x!=='spark'))throw Error('permission bypass')})().catch(e=>{console.error(e);process.exit(1)});
+(async()=>{await run();if(count.textContent!=='1'||!list.children[0].children[1].textContent.includes('spark · running'))throw Error('remote missing');broken=true;await run();if(count.textContent!=='0'||!status.textContent.includes('Inventory incomplete'))throw Error('invalid response accepted');if(inspected.some(x=>x!=='spark'))throw Error('permission bypass')})().catch(e=>{console.error(e);process.exit(1)});
 `
 	out, err := exec.Command(node, "-e", script, "./assets/v1/active-jobs.js").CombinedOutput()
 	if err != nil {

@@ -80,6 +80,14 @@ func TestChromeLiveSettingsPreservesDirtyDraft(t *testing.T) {
 			writeChromeJSON(w, map[string]any{"version": 1, "csrf_token": "fixture"})
 			return
 		case "/app/api/v1/settings":
+			if r.Method == http.MethodPost {
+				http.Error(w, "conflict", http.StatusConflict)
+				return
+			}
+			if stage.Load() == 2 {
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+				return
+			}
 			access := map[string]any{"tools_enabled": false, "delegate_read_tools": false, "specialists_allow_cloud": false, "read_root": fmt.Sprintf("/fixture/%d", stage.Load()), "skills_enabled": false, "skills_auto_draft": false, "skills_root": "", "skills_scope": "project", "remote_advertisement": map[string]any{"enabled": false, "interface": "", "name": "", "ssh_port": 0}}
 			writeChromeJSON(w, map[string]any{"version": 1, "digest": fmt.Sprintf("%064d", stage.Load()), "active": access, "saved": access, "restart_required": false})
 			return
@@ -100,6 +108,19 @@ func TestChromeLiveSettingsPreservesDirtyDraft(t *testing.T) {
  if(!await evaluate('document.querySelector("#tools-read-root").value==="/my-unsaved-draft"'))throw Error('draft overwritten');
  await evaluate('document.querySelector("#tools-read-root").value="/fixture/0";window.NexusLive.wake()');
  await eventually('document.querySelector("#tools-read-root").value==="/fixture/1"','clean settings not reconciled');
+ await evaluate('document.querySelector("#tools-read-root").value="/draft-keep";document.querySelector("#refresh-settings").click()');
+ if(!await evaluate('document.querySelector("#tools-read-root").value==="/draft-keep"'))throw Error('manual refresh erased draft');
+ await evaluate('document.querySelector("#save-settings").click()');
+ await eventually('document.querySelector("#settings-status").textContent.includes("changed elsewhere")','conflict not displayed');
+ if(!await evaluate('document.querySelector("#tools-read-root").value==="/draft-keep"'))throw Error('conflict erased draft');
+ await evaluate('document.querySelector("#reset-settings").click();fetch("/fixture/advance")');
+ await evaluate('document.querySelector("#refresh-settings").click()');
+ await eventually('document.querySelector("#settings-status").textContent.includes("could not be loaded")','failed refresh absent');
+ if(!await evaluate('document.querySelector("#tools-read-root").value==="/fixture/1"&&!document.querySelector("#save-settings").disabled'))throw Error('failed refresh discarded settings');
+ for(const width of [1440,1024,390,319]) {
+  await cdp('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+  if(!await evaluate('document.documentElement.scrollWidth<=innerWidth+1'))throw Error('settings horizontal overflow at '+width);
+ }
  socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", script, strconv.Itoa(port), server.URL).CombinedOutput()
 	if e != nil {

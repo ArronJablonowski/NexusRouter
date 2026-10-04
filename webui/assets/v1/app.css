@@ -425,3 +425,11 @@ input, select { padding: .55rem .7rem; }
 
 .chat-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 #chat-title { overflow-wrap: anywhere; }
+
+/* Keep conversation content usable when approvals and composer grow. */
+.transcript-panel { overflow-y: auto; }
+.transcript { flex: 1 0 18rem; min-height: 18rem; }
+.settings-view form, .settings-view fieldset, .settings-view label, #remote-peers section { min-width: 0; max-width: 100%; }
+.settings-view input, .settings-view select, .settings-view textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.settings-view p, .settings-view summary { overflow-wrap: anywhere; }
+.settings-view pre { white-space: pre-wrap; overflow-wrap: anywhere; }
