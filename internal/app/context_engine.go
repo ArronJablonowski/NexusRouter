@@ -81,7 +81,9 @@ func prepareTaskContext(ctx context.Context, r *Request, secrets []string) ([]pr
 	if contract := responseContract(*r); contract.Active() {
 		// Public format reminders carry user-level authority and are assembled
 		// before token estimation/admission. The original request stays intact.
-		parts.Current = append(append([]providers.Message(nil), parts.Current...), providers.Message{Role: "user", Content: contract.Instructions()})
+		parts.Current = append([]providers.Message(nil), parts.Current...)
+		last := len(parts.Current) - 1
+		parts.Current[last].Content += "\n\n" + contract.Instructions()
 	}
 	if contextengine.CheckMessages(parts.History, parts.Memory, parts.Skills, parts.Current) != nil {
 		return nil, ErrAdmission

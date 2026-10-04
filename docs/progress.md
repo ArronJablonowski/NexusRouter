@@ -2445,3 +2445,7 @@ Rows and open detail-card status/evidence now update in place. Confirmed-running
 
 ## Dismiss unresolved historical jobs (2026-10-04)
 User requested removing the three unresolved historical jobs from the jobs board. Added host/database-scoped, exact-task-sequence dismissal metadata under canonical resources; only unknown execution observations are hidden. A new event or renewed execution makes them visible again. No task events, submissions or leases are modified. Focused dismissal/active-jobs/asset tests passed; no full validation or push.
+
+### 2026-10-04 browser chat smoke QA
+
+A real browser exact-response chat exposed admission rejection: response-contract reminders introduced a second initial user message, which the Codex coordinator correctly rejects. Keep the reminder inside the current user message without mutating the original request. Focused response-contract race tests include coordinator admission without launching inference. Live retest pending. Full make check and push remain stopped by user.
