@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/internal/scheduleview"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"io"
 	"net"
@@ -187,4 +188,13 @@ func (c *Client) callPinned(ctx context.Context, destination, op, method, path s
 		}
 	}
 	return nil
+}
+
+func (c *Client) OSSchedules(ctx context.Context, destination string) (scheduleview.Page, error) {
+	var out scheduleview.Page
+	err := c.call(ctx, destination, "inspect", "GET", "/v1/remote/os-schedules", nil, nil, &out)
+	if err == nil {
+		err = out.Validate()
+	}
+	return out, err
 }

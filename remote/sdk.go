@@ -21,6 +21,7 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	Schedules     func(context.Context) (webui.SchedulePage, error)
 	JobHistory    func(context.Context, string, webui.HistoryOptions) (webui.HistoryPage, error)
 	RunnerModelID string
 	ControlRunner func(context.Context, string) (RunnerStatus, error)
@@ -76,6 +77,13 @@ func (b *SDKBackend) info(ctx context.Context, configured []Model) (Info, error)
 	}
 	models := cloneModels(configured)
 	out := Info{HybridVersion: 1, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
+	if b.Schedules != nil {
+		page, err := b.Schedules(ctx)
+		if err != nil || page.Validate() != nil {
+			return Info{}, ErrUnavailable
+		}
+		out.Schedules = &page
+	}
 	if b.Observe != nil {
 		observations, resources, err := b.Observe(ctx, cloneModels(models))
 		if err != nil || ctx.Err() != nil || len(observations) != len(models) {

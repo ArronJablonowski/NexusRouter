@@ -23,6 +23,10 @@ func TestChromeRemoteModelsAndStatusSeparation(t *testing.T) {
 		switch r.URL.Path {
 		case "/fixture/advance":
 			stage.Add(1)
+		case "/app/api/v1/schedules":
+			w.Write([]byte(`{"version":1,"observed_at":"2026-10-04T18:00:00Z","items":[{"id":"health","description":"Record provider health","enabled":true,"interval":"30s"}]}`))
+		case "/app/api/v1/os-schedules":
+			w.Write([]byte(`{"version":1,"observed_at":"2026-10-04T18:00:00Z","items":[{"id":"timer","name":"Example timer","source":"system timer","schedule":"Every 5m","state":"Configured"}],"limitations":[]}`))
 		case "/app/api/v1/models":
 			w.Write([]byte(chromeModelsPopulatedFixture))
 		case "/app/api/v1/session/csrf":
@@ -66,6 +70,9 @@ func TestChromeRemoteModelsAndStatusSeparation(t *testing.T) {
  await cdp('Page.navigate',{url:origin+'/app/status'});
  await eventually('!document.querySelector("#status-view").hidden','status absent');
  if(!await evaluate('document.querySelector("#chat-view").hidden&&document.querySelector("#models-view").hidden&&document.querySelector("#status-view #inspector")!==null&&document.querySelector("[data-view=status]").getAttribute("aria-current")==="page"'))throw Error('status navigation');
+ await cdp('Page.navigate',{url:origin+'/app/cron'});
+ await eventually('document.querySelector("#cron-local-list").textContent.includes("Record provider health")&&document.querySelector("#cron-os-hosts").textContent.includes("Example timer")','cron records missing');
+ if(!await evaluate('document.querySelector("#chat-view").hidden&&!document.querySelector("#cron-view").hidden&&document.querySelector("#status-view").hidden&&document.querySelector("#cron-view").textContent.includes("Local scheduled tasks")&&document.querySelector("#cron-view").textContent.includes("Remote scheduled tasks")&&document.querySelector(".os-schedules-panel").getBoundingClientRect().top>document.querySelector("#cron-remote-hosts").getBoundingClientRect().top'))throw Error('cron separation');
  socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", script, strconv.Itoa(port), server.URL).CombinedOutput()
 	if e != nil {

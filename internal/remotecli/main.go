@@ -21,6 +21,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/resources"
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 const Usage = "Usage: nexus remote collect-logs|logs-status|logs-read|service-template|discover|auto-dispatch-review-job|enqueue-review|enqueue-auto-review|run-review-jobs|review-job-status|dispatch-evaluate|auto-dispatch-evaluate|watch-evaluate|auto-watch-evaluate|peers|pair|revoke|evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|recorded-status|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
@@ -393,7 +394,9 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{JobHistory: service.ChatHistory, RunnerModelID: cfg.VLLM.ModelID, ControlRunner: vllmController(cfg, service), Routing: service.RemoteRoutingInspection, ReadStatus: service.SubmissionStatus, Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
+	backend := &remote.SDKBackend{Schedules: func(context.Context) (webui.SchedulePage, error) {
+		return webui.SchedulePage{Version: 1, ObservedAt: time.Now().UTC(), Items: []webui.Schedule{}}, nil
+	}, JobHistory: service.ChatHistory, RunnerModelID: cfg.VLLM.ModelID, ControlRunner: vllmController(cfg, service), Routing: service.RemoteRoutingInspection, ReadStatus: service.SubmissionStatus, Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
 	}

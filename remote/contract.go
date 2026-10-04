@@ -106,6 +106,7 @@ type Model struct {
 	Local         bool     `json:"local"`
 }
 type Info struct {
+	Schedules     *webui.SchedulePage      `json:"schedules,omitempty"`
 	HybridVersion int                      `json:"hybrid_version,omitempty"`
 	Routing       *webui.RoutingInspection `json:"routing,omitempty"`
 	Hostname      string                   `json:"hostname,omitempty"`
@@ -158,6 +159,9 @@ func validHostname(s string) bool {
 }
 
 func (i Info) ValidateRouting() error {
+	if i.Schedules != nil && i.Schedules.Validate() != nil {
+		return ErrInvalid
+	}
 	if i.Routing == nil {
 		return nil
 	}

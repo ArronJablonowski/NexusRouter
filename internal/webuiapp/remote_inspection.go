@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/internal/scheduleview"
 	"github.com/ArronJablonowski/NexusRouter/remote"
 )
 
@@ -21,10 +22,11 @@ type remoteInspectionRequest struct {
 	After    string `json:"after,omitempty"`
 }
 type remoteInspectionPage struct {
-	Version    int              `json:"version"`
-	ObservedAt time.Time        `json:"observed_at"`
-	Info       *remote.Info     `json:"info,omitempty"`
-	Tasks      *remote.TaskPage `json:"tasks,omitempty"`
+	OSSchedules *scheduleview.Page `json:"os_schedules,omitempty"`
+	Version     int                `json:"version"`
+	ObservedAt  time.Time          `json:"observed_at"`
+	Info        *remote.Info       `json:"info,omitempty"`
+	Tasks       *remote.TaskPage   `json:"tasks,omitempty"`
 }
 
 func (h *Handler) serveRemoteInspection(w http.ResponseWriter, r *http.Request) bool {
@@ -44,7 +46,7 @@ func (h *Handler) serveRemoteInspection(w http.ResponseWriter, r *http.Request) 
 	}
 	defer releaseMutationSlot(h, false)
 	var input remoteInspectionRequest
-	if decodeMutationJSON(r, &input, 4096) != nil || input.Version != 1 || input.Instance == "" || len(input.Instance) > 64 || (input.View != "info" && input.View != "tasks") || (input.View == "info" && input.After != "") || len(input.After) > 64 {
+	if decodeMutationJSON(r, &input, 4096) != nil || input.Version != 1 || input.Instance == "" || len(input.Instance) > 64 || (input.View != "info" && input.View != "tasks" && input.View != "os_schedules") || (input.View != "tasks" && input.After != "") || len(input.After) > 64 {
 		h.writeError(w, r, http.StatusBadRequest, "invalid_request")
 		return true
 	}
@@ -56,7 +58,21 @@ func (h *Handler) serveRemoteInspection(w http.ResponseWriter, r *http.Request) 
 	defer cancel()
 	page := remoteInspectionPage{Version: 1}
 	var err error
-	if input.View == "info" {
+	if input.View == "os_schedules" {
+		reader, ok := h.remoteInspector.(interface {
+			OSSchedules(context.Context, string) (scheduleview.Page, error)
+		})
+		if !ok {
+			err = remote.ErrUnavailable
+		} else {
+			var result scheduleview.Page
+			result, err = safeCall(func() (scheduleview.Page, error) { return reader.OSSchedules(ctx, input.Instance) })
+			if err == nil {
+				err = result.Validate()
+			}
+			page.OSSchedules = &result
+		}
+	} else if input.View == "info" {
 		var info remote.Info
 		info, err = safeCall(func() (remote.Info, error) { return h.remoteInspector.Info(ctx, input.Instance) })
 		if err == nil && (info.ValidateRouting() != nil || info.Version != 1 || info.Instance != input.Instance || len(info.Models) > 4096 || len(info.Harnesses) > 256) {

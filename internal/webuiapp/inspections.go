@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/scheduleview"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"net/http"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 )
 
 type InspectionServices struct {
+	Schedules   func(context.Context) (contract.SchedulePage, error)
 	Skills      func(context.Context) (app.BrowserSkillPage, error)
 	Stats       func(context.Context, *usagestats.Reset) (usagestats.Snapshot, error)
 	Models      func(context.Context) (contract.ModelInspectionPage, error)
@@ -35,6 +37,15 @@ func inspectionQueryPath(base, path string) bool {
 func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.Request) bool {
 	base, path := h.basePath+"/api/v1", request.URL.Path
 	switch {
+	case path == base+"/os-schedules":
+		serveInspection(h, writer, request, "schedules_unavailable", func(ctx context.Context) (scheduleview.Page, error) { return scheduleview.Read(ctx), nil })
+	case path == base+"/schedules":
+		serveInspection(h, writer, request, "schedules_unavailable", func(ctx context.Context) (contract.SchedulePage, error) {
+			if h.inspections.Schedules == nil {
+				return contract.SchedulePage{}, errors.New("unavailable")
+			}
+			return h.inspections.Schedules(ctx)
+		})
 	case path == base+"/skills":
 		h.serveSkills(writer, request)
 	case path == base+"/stats":
@@ -170,7 +181,7 @@ func canonicalToolCursor(value string) bool {
 }
 
 type inspectionResponse interface {
-	contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
+	scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
 }
 
 func serveInspection[T inspectionResponse](h *Handler, writer http.ResponseWriter, request *http.Request, code string, read func(context.Context) (T, error)) {
@@ -210,6 +221,10 @@ func safeInspection[T inspectionResponse](ctx context.Context, read func(context
 
 func inspectionInvalid[T inspectionResponse](value T) bool {
 	switch typed := any(value).(type) {
+	case scheduleview.Page:
+		return typed.Validate() != nil
+	case contract.SchedulePage:
+		return typed.Validate() != nil
 	case contract.ModelInspectionPage:
 		return typed.Validate() != nil
 	case contract.RouteInspection:
