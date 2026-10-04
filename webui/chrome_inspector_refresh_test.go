@@ -58,7 +58,7 @@ func TestChromeInspectorUpdatesValuesInPlace(t *testing.T) {
 	defer stop()
 	script := strings.Split(chromeRemoteDiscoveryCDP, "await cdp('Page.navigate'")[0] + `
  await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
- await cdp('Page.navigate',{url:origin+'/app/chats'});
+ await cdp('Page.navigate',{url:origin+'/app/status'});
  await eventually('document.querySelectorAll("#health-details dd").length===33','health rows absent');
  await evaluate('window.rows=Array.from(document.querySelector("#health-details").children);window.valueNode=rows[1].firstChild;window.changes=0;window.observer=new MutationObserver(records=>{changes+=records.filter(r=>r.type==="childList").length});observer.observe(document.querySelector("#health-details"),{childList:true,subtree:true});document.querySelector("#inspector").scrollTop=200;window.savedScroll=document.querySelector("#inspector").scrollTop');
  await evaluate('fetch("/fixture/advance")');

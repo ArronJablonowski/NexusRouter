@@ -70,7 +70,10 @@
 		if (item.locality === "local") detail(details, "Size on disk", bytes(item.size_bytes));
 		detail(details, "Health", item.health + (item.status_code ? " · " + item.status_code.replaceAll("_", " ") : ""));
 		if (item.health_checked_at) detail(details, "Health checked", time(item.health_checked_at));
-		detail(details, "Capabilities", item.capabilities.length ? item.capabilities.join(", ") : "None declared");
+		detail(details, "Estimated cost", item.estimated_cost === undefined ? "Unknown" : String(item.estimated_cost));
+  detail(details, "RAM / VRAM", bytes(item.ram_bytes) + " / " + bytes(item.vram_bytes));
+  detail(details, "Failure domain", item.failure_domain || "Unknown");
+  detail(details, "Capabilities", item.capabilities.length ? item.capabilities.join(", ") : "None declared");
 		if (item.context_tokens !== undefined) detail(details, "Context", item.context_tokens.toLocaleString() + " tokens");
 		if (item.parameter_size) detail(details, "Parameters", item.parameter_size);
 		if (item.quantization) detail(details, "Quantization", item.quantization);

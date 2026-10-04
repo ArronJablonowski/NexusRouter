@@ -440,3 +440,11 @@ input, select { padding: .55rem .7rem; }
 .transcript-heading > div { min-width: 0; }
 .transcript-heading h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; min-height: 2.5em; line-height: 1.25; }
 .chat-list { scrollbar-gutter: stable; }
+
+/* Chats have no inspector sidebar; status owns the read-only detail panels. */
+.chat-view { grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr); }
+#status-view[hidden] { display:none; }
+#status-view .inspector { display:block; max-width:75rem; margin:auto; overflow:visible; }
+#status-view #task-inspector { display:block; }
+#remote-model-hosts > section { margin-top:1rem; }
+@media(max-width:760px){.chat-view{grid-template-columns:minmax(0,1fr);}}

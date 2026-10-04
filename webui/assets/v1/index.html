@@ -18,6 +18,7 @@
       <a href="__DARWIN_BASE_PATH__/chats" data-view="chats" aria-current="page">Chats</a>
       <a href="__DARWIN_BASE_PATH__/workboards" data-view="workboards">Workboards</a>
       <a href="__DARWIN_BASE_PATH__/active-jobs" data-view="jobs">Active jobs</a>
+      <a href="__DARWIN_BASE_PATH__/status" data-view="status">Status</a>
       <a href="__DARWIN_BASE_PATH__/models" data-view="models">Models</a>
       <a href="__DARWIN_BASE_PATH__/routing-map" data-view="routing">Command grid</a>
       <a href="__DARWIN_BASE_PATH__/model-elimination" data-view="elimination">Elimination</a>
@@ -112,9 +113,12 @@
             <button id="acknowledge-unresolved" class="danger" type="button" hidden>Acknowledge unresolved outcome</button>
           </div>
         </section>
+
+      </section>
+      <section id="status-view" hidden>
         <aside id="inspector" class="inspector" aria-labelledby="inspector-title">
           <div class="inspector-heading">
-            <div><p class="eyebrow">Read-only</p><h2 id="inspector-title">Inspector</h2></div>
+            <div><p class="eyebrow">Read-only</p><h1 id="inspector-title">Status</h1></div>
             <button id="refresh-inspector" class="secondary" type="button">Refresh</button>
           </div>
           <section class="inspector-section" aria-labelledby="health-title">
@@ -126,11 +130,6 @@
             <h3 id="resources-title">Resources</h3>
             <div id="resources-state" class="notice compact" role="status">Loading resources…</div>
             <dl id="resources-details" class="inspector-details"></dl>
-          </section>
-          <section class="inspector-section" aria-labelledby="models-title">
-            <div class="control-heading"><h3 id="models-title">Models</h3><output id="model-count" class="count"></output></div>
-            <div id="models-state" class="notice compact" role="status">Loading models…</div>
-            <ul id="model-list" class="inspector-list" aria-label="Configured models"></ul>
           </section>
           <div id="task-inspector" hidden>
             <section class="inspector-section" aria-labelledby="route-title">
@@ -164,7 +163,7 @@
       </section>
       <section id="models-view" class="models-view" aria-labelledby="models-page-title" hidden>
         <header class="models-heading">
-          <div><p class="eyebrow">Live inventory</p><h1 id="models-page-title">LLM inventory</h1></div>
+          <div><p class="eyebrow">Live inventory</p><h1 id="models-page-title">Models</h1></div>
           <button id="refresh-models" class="secondary" type="button">Refresh</button>
         </header>
         <output id="models-live-status" class="live-status models-live-status" role="status" aria-live="polite">Loading model inventory…</output>
@@ -185,6 +184,12 @@
             <ul id="cloud-model-list" class="model-cards" aria-label="Configured cloud models"></ul>
           </section>
         </div>
+        <section class="model-inventory-section" aria-labelledby="remote-models-title">
+          <h2 id="remote-models-title">Remote models</h2>
+          <p>Models shared by paired systems with this connection. Availability is checked again when a job starts.</p>
+          <output id="remote-models-state" role="status">Loading remote models…</output>
+          <div id="remote-model-hosts"></div>
+        </section>
       </section>
       <section id="skills-view" class="stats-view" hidden><header class="stats-heading"><div><p class="eyebrow">Skill library</p><h1>Skills</h1><p>Stored skills and versions, including drafts and active skills.</p></div><button id="skills-refresh" type="button" class="secondary">Refresh</button></header><p id="skills-status" role="status"></p><div id="skills-list" class="stats-grid"></div></section>
       <section id="stats-view" class="stats-view" aria-labelledby="stats-title" hidden>
@@ -596,6 +601,8 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-membership.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/status.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/remote-models.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/routing-map.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/routing-remote.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/skills.js" defer></script>

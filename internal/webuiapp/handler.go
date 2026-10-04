@@ -229,7 +229,7 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 }
 
 func browserShellNavigation(base, requestPath string) bool {
-	if requestPath == base || requestPath == base+"/" || requestPath == base+"/chats" || requestPath == base+"/workboards" || requestPath == base+"/active-jobs" || requestPath == base+"/models" || requestPath == base+"/routing-map" || requestPath == base+"/model-elimination" || requestPath == base+"/settings" || requestPath == base+"/stats" || requestPath == base+"/skills" {
+	if requestPath == base || requestPath == base+"/" || requestPath == base+"/chats" || requestPath == base+"/workboards" || requestPath == base+"/active-jobs" || requestPath == base+"/status" || requestPath == base+"/models" || requestPath == base+"/routing-map" || requestPath == base+"/model-elimination" || requestPath == base+"/settings" || requestPath == base+"/stats" || requestPath == base+"/skills" {
 		return true
 	}
 	for _, prefix := range []string{base + "/chats/", base + "/workboards/"} {

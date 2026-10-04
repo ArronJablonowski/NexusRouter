@@ -4,7 +4,7 @@
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
 	window.NexusRoutes = window.NexusRoutes || Object.freeze({
 		workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path),
-		jobs: path => path === "/active-jobs", models: path => path === "/models", routing: path => path === "/routing-map",
+		status: path => path === "/status", jobs: path => path === "/active-jobs", models: path => path === "/models", routing: path => path === "/routing-map",
 		elimination: path => path === "/model-elimination", settings: path => path === "/settings", skills: path => path === "/skills", stats: path => path === "/stats"
 	});
 	const route = window.NexusRoutes.workboards(relative) ? relative.match(/^\/workboards(?:\/([^/]+))?$/) : null;

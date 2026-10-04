@@ -2,14 +2,12 @@
 
 (() => {
 	const base = document.body.dataset.basePath || "";
+ const isStatus = window.location.pathname === base + "/status";
 	const taskInspector = document.querySelector("#task-inspector");
 	const healthState = document.querySelector("#health-state");
 	const healthDetails = document.querySelector("#health-details");
 	const resourcesState = document.querySelector("#resources-state");
 	const resourcesDetails = document.querySelector("#resources-details");
-	const modelsState = document.querySelector("#models-state");
-	const modelList = document.querySelector("#model-list");
-	const modelCount = document.querySelector("#model-count");
 	const routeState = document.querySelector("#route-state");
 	const routeDetails = document.querySelector("#route-details");
 	const routeCandidates = document.querySelector("#route-candidates");
@@ -26,7 +24,6 @@
 	const refreshInspector = document.querySelector("#refresh-inspector");
 	const inspectionPageLimit = 25;
 	const maxInspectionItems = 100;
-	const maxInspectedModels = 256;
 	const maxRouteCandidates = 256;
 	const maxHealthChecks = 512;
 	const maxInspectionText = 4096;
@@ -168,36 +165,6 @@
 		finishDetails(usageDetails);usageState.hidden = true;
 	}
 
-	function loadModels() {
-		loading(modelsState,modelList,"Loading models…");
-		return requestJSON("/api/v1/models").then(body => {
-			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability) || !Array.isArray(body.models) || body.models.length > maxInspectedModels ||
-				(body.availability === "available") !== printable(body.config_id, 128, false) || body.availability === "available" &&
-				(!Number.isFinite(Date.parse(body.refreshed_at)) || !integer(body.local_total_bytes) || body.local_total_kind !== "logical_deduplicated" || !integer(body.local_unknown_size_count))) throw new Error("invalid models");
-			const seen = new Set(), rows=[];
-			for (const item of body.models) {
-				if (!item || !printable(item.id, 128, false) || seen.has(item.id) || !printable(item.provider, 128, false) || !printable(item.model, 512, false) ||
-					!["local", "cloud"].includes(item.locality) || ["configured", "enabled", "installed", "usable"].some(key => typeof item[key] !== "boolean") || !Array.isArray(item.capabilities) || item.capabilities.length > 128 ||
-					item.capabilities.some(value => !printable(value, 128, false)) || !["healthy", "degraded", "unavailable", "disabled", "unknown"].includes(item.health) ||
-					!optionalInteger(item.context_tokens) || !optionalNumber(item.estimated_cost) || !optionalInteger(item.ram_bytes) || !optionalInteger(item.vram_bytes) ||
-					!optionalInteger(item.size_bytes) || !printable(item.failure_domain || "", 128, true) || !printable(item.status_code || "", 128, true)) throw new Error("invalid model");
-				seen.add(item.id);
-				const lines = [item.provider + " / " + item.model, stateLabel(item.locality) + " · health " + stateLabel(item.health),
-					"Capabilities: " + (item.capabilities.length ? item.capabilities.join(", ") : "None declared"),
-					"Context: " + (item.context_tokens === undefined ? "Unknown" : String(item.context_tokens)),
-					"Estimated cost: " + (item.estimated_cost === undefined ? "Unknown" : String(item.estimated_cost)),
-					"RAM / VRAM: " + formatBytes(item.ram_bytes) + " / " + formatBytes(item.vram_bytes),
-					"Installed size: " + formatBytes(item.size_bytes),
-					"Failure domain: " + (item.failure_domain || "Unknown")];
-				rows.push([item.id,lines.join("\n")]);
-			}
-			reconcileItems(modelList,rows);
-			setText(modelCount,String(body.models.length));
-			if (body.availability === "unavailable") showNotice(modelsState, "Models unavailable.", false);
-			else if (!body.models.length) showNotice(modelsState, "No configured models.", false);
-			else modelsState.hidden = true;
-		}).catch(() => showNotice(modelsState, "Models unavailable.", true));
-	}
 
 	function loadHealth() {
 		loading(healthState,healthDetails,"Loading health…");
@@ -214,7 +181,7 @@
    detail(healthDetails, "Status", body.status || "Unknown");
 			detail(healthDetails, "Ready", body.ready ? "Yes" : "No");
 			detail(healthDetails, "Checked", formatTime(body.checked_at));
-			for (const check of body.checks) {
+			for (const check of body.checks.filter(check => check.component !== "model")) {
 				if (!check || !printable(check.component, 128, false) || !printable(check.id || "", 128, true) || !printable(check.status, 64, false) || !printable(check.code, 128, false)) throw new Error("invalid health check");
 				detail(healthDetails, check.component + (check.id ? " · " + check.id : ""), stateLabel(check.status) + " · " + stateLabel(check.code));
 			}
@@ -403,6 +370,8 @@
 	}
 
 	function loadTask(taskID) {
+  const link=document.querySelector('[data-view="status"]');if(link)link.href=base+"/status?task="+encodeURIComponent(taskID);
+  if(!isStatus)return;
 		if(selectedTaskID!==taskID){for(const list of [routeDetails,routeCandidates,usageDetails,toolList,auditList])list.replaceChildren();}
 		selectedTaskID = taskID;
 		taskInspector.hidden = false;
@@ -420,7 +389,7 @@
 	}
 
 	let globalsPending=null;
-	function loadGlobals() { if(!globalsPending)globalsPending=Promise.all([loadModels(),loadHealth(),loadResources()]).finally(()=>{globalsPending=null;});return globalsPending; }
+	function loadGlobals() { if(!isStatus)return Promise.resolve(); if(!globalsPending)globalsPending=Promise.all([loadHealth(),loadResources()]).finally(()=>{globalsPending=null;});return globalsPending; }
 
 	loadMoreTools.addEventListener("click", () => { if (selectedTaskID && toolCursor) loadTools(selectedTaskID, toolCursor, false, inspectorRequest); });
 	loadMoreAudits.addEventListener("click", () => { if (selectedTaskID && auditCursor) loadAudits(selectedTaskID, auditCursor, false, inspectorRequest); });
@@ -433,7 +402,7 @@
 		clearTask,
 		loadGlobals,
 		loadTask,
-		modelChanged: loadModels,
+		modelChanged() {},
 		toolChanged(taskID) { if (taskID === selectedTaskID) loadTools(taskID, "", true, inspectorRequest); },
 		routeChanged(taskID) {
 			if (taskID !== selectedTaskID) return;

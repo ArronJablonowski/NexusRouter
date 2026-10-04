@@ -139,10 +139,10 @@ func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	// Reviewed v1 assets: explicit bounded remote Commander dispatch controls.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "cea6fd6566f9c064564a21c168bc58d28beda4bd56648fcff4b5bd36f8f01bc9" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "dd404cf449c3041a3e969a25bc571b6ecf446d2658e0ef6337a7745bb4dc241f" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/chat-render.js", "assets/v1/chat-descriptions.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/status.js", "assets/v1/remote-models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/chat-render.js", "assets/v1/chat-descriptions.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -227,9 +227,9 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 	}
 	body := string(script)
 	for _, required := range []string{
-		`requestJSON("/api/v1/models")`, `requestJSON("/api/v1/health")`, `requestJSON("/api/v1/resources")`,
+		`requestJSON("/api/v1/health")`, `requestJSON("/api/v1/resources")`,
 		`+ "/route")`, `+ "/usage")`, `+ "/tools?" + query.toString())`, `+ "/audits?" + query.toString())`,
-		"const maxInspectedModels = 256", "const maxRouteCandidates = 256", "const maxHealthChecks = 512", "const maxInspectionItems = 100", "const maxInspectionPages = 8",
+		"const maxRouteCandidates = 256", "const maxHealthChecks = 512", "const maxInspectionItems = 100", "const maxInspectionPages = 8",
 		`toolIDs.has(item.call_id)`, `auditIDs.has(item.id)`, `toolCursors.has(body.next_cursor)`, `auditCursors.has(body.next_cursor)`,
 		`["Routed total", "routed"]`, `["Auxiliary total", "auxiliary"]`, `["Orchestrator audit (auxiliary)", "orchestrator_audit"]`,
 		`"Completion: pending / unknown"`, `Rubric version: " + (item.rubric_version || "Unknown")`,
@@ -255,7 +255,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 			t.Fatalf("inspector safety label missing %q", required)
 		}
 	}
-	for _, required := range []string{`id="inspector"`, `id="refresh-inspector"`, `id="health-state"`, `id="resources-state"`, `id="model-list"`,
+	for _, required := range []string{`id="inspector"`, `id="refresh-inspector"`, `id="health-state"`, `id="resources-state"`, `id="status-view"`,
 		`id="task-inspector"`, `id="route-candidates"`, `id="usage-details"`, `id="tool-list"`, `id="load-more-tools"`, `id="audit-list"`, `id="load-more-audits"`} {
 		if !strings.Contains(markup, required) {
 			t.Fatalf("inspector markup missing %q", required)
@@ -264,7 +264,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/chat-render.js", "assets/v1/chat-descriptions.js", "assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/chat-render.js", "assets/v1/chat-descriptions.js", "assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/status.js", "assets/v1/remote-models.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
