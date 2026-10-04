@@ -6,18 +6,50 @@
  if(!view||!window.NexusLive)return;
  for(const section of document.querySelectorAll("#main > section"))section.hidden=section!==view;
  document.title="Active jobs · NexusRouter";
+ const descriptions=new Map();
+ function brief(text){const clean=text.replace(/\s+/g," ").trim();return clean.length>150?clean.slice(0,147)+"…":clean;}
+ async function describe(item){
+  if(!item.session_id)return item.description?{description:item.description,instructions:item.description}:null;
+  const key=item.session_id+":"+item.task_id;
+  if(descriptions.has(key))return descriptions.get(key);
+  const response=await window.NexusLive.fetch(base+"/api/v1/chats/"+encodeURIComponent(item.session_id)+"/messages?limit=100",{credentials:"same-origin",cache:"no-store"});
+  if(!response.ok)throw Error();const page=await response.json();
+  if(page.version!==1||page.chat_id!==item.session_id||page.task_id!==item.task_id||!Array.isArray(page.messages)||page.messages.length>100)throw Error();
+  const first=page.messages.find(m=>m.role==="user"&&typeof m.text==="string"&&m.text.trim());
+  const detail=first?{description:brief(first.text),instructions:first.text.slice(0,16000)}:null;
+  if(descriptions.size>=200)descriptions.delete(descriptions.keys().next().value);
+  descriptions.set(key,detail);return detail;
+ }
+ const dialog=document.createElement("dialog"),heading=document.createElement("h2"),close=document.createElement("button"),content=document.createElement("div");
+ heading.id="job-card-title";heading.textContent="Job details";dialog.setAttribute("aria-labelledby",heading.id);dialog.className="job-detail-dialog";
+ close.type="button";close.textContent="Close";close.addEventListener("click",()=>dialog.close());dialog.append(heading,close,content);document.body.append(dialog);
+ let cardGeneration=0;
+ dialog.addEventListener("close",()=>{cardGeneration++;content.replaceChildren();});
+ async function showJob(item){
+  const generation=++cardGeneration;content.replaceChildren();heading.textContent="Job details";
+  const fields=document.createElement("dl"),instructions=document.createElement("p");instructions.textContent="Loading recorded instructions…";
+  for(const [label,value] of [["Host",item.remote||"Local host"],["Recorded state",item.state],["Job ID",item.task_id],["Session",item.session_id],["Started / submitted",item.started_at],["Last observed",item.observed_at],["Task IDs",(item.task_ids||[]).join(", ")]]){if(!value)continue;const term=document.createElement("dt"),description=document.createElement("dd");term.textContent=label;description.textContent=value;fields.append(term,description);}
+  content.append(fields,instructions);
+  if(item.session_id){const link=document.createElement("a");link.href=base+"/chats/"+encodeURIComponent(item.session_id);link.textContent="Open full conversation";content.append(link);}
+  if(!dialog.open)dialog.showModal();close.focus();
+  try{const detail=await describe(item);if(generation!==cardGeneration)return;heading.textContent=detail?.description||"Job details";instructions.textContent=detail?.instructions||"Recorded instructions are unavailable for this job.";instructions.className="job-instructions";}catch{if(generation===cardGeneration)instructions.textContent="Recorded instructions could not be loaded.";}
+  if(item.remote&&generation===cardGeneration){
+   try{const response=await window.NexusLive.fetch(base+"/api/v1/session/csrf",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({version:1})});if(!response.ok)throw Error();const session=await response.json();if(session.version!==1||typeof session.csrf_token!=="string"||!session.csrf_token)throw Error();if(generation!==cardGeneration)return;
+    const controls=document.createElement("details"),summary=document.createElement("summary");summary.textContent="Live status, results and controls";controls.open=true;controls.append(summary);content.append(controls);window.NexusRemoteTaskControls.attach(controls,{id:item.remote},{request_id:item.task_id},base,session.csrf_token);
+   }catch{if(generation===cardGeneration){const error=document.createElement("p");error.textContent="Remote details are unavailable. No work was changed.";content.append(error);}}
+  }
+ }
+ async function labelJobs(entries){let index=0;await Promise.all(Array.from({length:Math.min(4,entries.length)},async()=>{while(index<entries.length){const {item,button}=entries[index++];if(!button.isConnected)continue;try{const detail=await describe(item);if(button.isConnected&&detail)button.textContent=detail.description;}catch{if(button.isConnected)button.textContent="Job description unavailable";}}}));}
  function render(source,items,incomplete){
   const list=document.querySelector("#"+source+"-jobs-list"),status=document.querySelector("#"+source+"-jobs-status"),count=document.querySelector("#"+source+"-jobs-count");
-  const nodes=[];
+  const nodes=[],labels=[];
   for(const item of items){
-   const row=document.createElement("li"),link=document.createElement(item.session_id||item.remote?"a":"strong"),meta=document.createElement("span");
-   if(item.session_id)link.href=base+"/chats/"+encodeURIComponent(item.session_id);
-   if(item.remote)link.href=base+"/settings#"+new URLSearchParams({remote_peer:item.remote,remote_request:item.task_id}).toString();
-   link.textContent=item.task_id;
+   const row=document.createElement("li"),link=document.createElement("button"),meta=document.createElement("span");
+   link.type="button";link.className="job-summary-button";link.textContent=item.description|| (item.session_id?"Loading job description…":"Job description unavailable");link.addEventListener("click",()=>showJob(item));
    meta.textContent=item.remote?item.remote+" · "+item.state+" · checked "+new Date(item.observed_at).toLocaleTimeString():(item.state==="queued"?"Queued · submitted ":"Running · started ")+new Date(item.started_at).toLocaleString();
-   row.append(link,meta);nodes.push(row);
+   row.append(link,meta);nodes.push(row);if(item.session_id)labels.push({item,button:link});
   }
-  list.replaceChildren(...nodes);count.textContent=String(items.length);
+  list.replaceChildren(...nodes);count.textContent=String(items.length);labelJobs(labels);
   status.textContent=incomplete?"Inventory incomplete; some jobs may be missing.":items.length?"Updated "+new Date().toLocaleTimeString():"No active "+source+" jobs.";
   status.classList.toggle("error",incomplete);
  }
@@ -42,7 +74,7 @@
     if(value.version!==1||!Number.isFinite(Date.parse(value.observed_at))||!page||page.version!==1||page.instance!==peer.id||page.after!==after||!Array.isArray(page.tasks)||page.tasks.length>100||typeof page.has_more!=="boolean"||typeof page.next!=="string")throw Error();
     let last=after;
     for(const task of page.tasks){if(!task||!id.test(task.request_id)||task.request_id<=last||!["unknown","queued","running","succeeded","failed","canceled"].includes(task.state))throw Error();last=task.request_id;
-     if(task.state==="queued"||task.state==="running")found.push({task_id:task.request_id,state:task.state,remote:peer.id,observed_at:value.observed_at});
+     if(task.state==="queued"||task.state==="running")found.push({task_id:task.request_id,state:task.state,remote:peer.id,description:typeof task.description==="string"?brief(task.description):"",task_ids:Array.isArray(task.task_ids)?task.task_ids.filter(x=>typeof x==="string"&&id.test(x)):[],observed_at:value.observed_at});
     }
     if(page.next!==last||page.has_more&&page.tasks.length!==100)throw Error();
     if(!page.has_more){finished=true;break;}after=page.next;

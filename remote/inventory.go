@@ -5,12 +5,14 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"net/http"
 	"slices"
+	"unicode/utf8"
 )
 
-// TaskSummary exposes caller-owned lifecycle metadata, never prompts or results.
+// TaskSummary exposes caller-owned metadata and a bounded redacted instruction excerpt.
 // Unknown status grants no retry authority; recover using the original request.
 type TaskSummary struct {
-	Usage *usagestats.RemoteUsage `json:"usage,omitempty"`
+	Description string                  `json:"description,omitempty"`
+	Usage       *usagestats.RemoteUsage `json:"usage,omitempty"`
 
 	RequestID       string   `json:"request_id"`
 	State           string   `json:"state"`
@@ -51,6 +53,9 @@ func (p TaskPage) valid() bool {
 	}
 	previous := p.After
 	for _, t := range p.Tasks {
+		if !utf8.ValidString(t.Description) || utf8.RuneCountInString(t.Description) > 150 {
+			return false
+		}
 		if t.Usage != nil && !t.Usage.Valid() {
 			return false
 		}
@@ -112,6 +117,13 @@ func (s *Server) taskPage(ctx context.Context, caller, after string) (TaskPage, 
 					t.State = status.State
 					t.TaskIDs = slices.Clone(status.TaskIDs)
 					t.CancelRequested = status.CancelRequested
+					if status.State == "running" {
+						if b, ok := s.backend.(interface {
+							JobDescription(context.Context, []string) string
+						}); ok {
+							t.Description = b.JobDescription(ctx, status.TaskIDs)
+						}
+					}
 					if b, ok := s.backend.(interface {
 						RemoteUsage(context.Context, []string) (usagestats.RemoteUsage, error)
 					}); ok {

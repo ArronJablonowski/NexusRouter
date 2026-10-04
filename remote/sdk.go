@@ -7,6 +7,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"math"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
@@ -20,6 +21,7 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	JobHistory    func(context.Context, string, webui.HistoryOptions) (webui.HistoryPage, error)
 	RunnerModelID string
 	ControlRunner func(context.Context, string) (RunnerStatus, error)
 	Routing       func(context.Context, []string) (webui.ModelInspectionPage, error)
@@ -210,4 +212,30 @@ func (b *SDKBackend) CommittedLogs(ctx context.Context, o sessions.EventLogOptio
 		return sessions.CommittedEventPage{}, ErrUnavailable
 	}
 	return b.LogEvents(ctx, o)
+}
+
+// JobDescription uses the redacted browser presentation, never raw system/tool events.
+func (b *SDKBackend) JobDescription(ctx context.Context, ids []string) string {
+	if b.JobHistory == nil || len(ids) == 0 {
+		return ""
+	}
+	page, err := b.Client.ReadEvents(ctx, ids[0], 0, 1)
+	if err != nil {
+		return ""
+	}
+	history, err := b.JobHistory(ctx, page.SessionID, webui.HistoryOptions{Limit: 1})
+	if err != nil || history.TaskID != ids[0] {
+		return ""
+	}
+	for _, m := range history.Messages {
+		if m.Role == "user" {
+			text := strings.Join(strings.Fields(m.Text), " ")
+			runes := []rune(text)
+			if len(runes) > 150 {
+				return string(runes[:147]) + "…"
+			}
+			return text
+		}
+	}
+	return ""
 }

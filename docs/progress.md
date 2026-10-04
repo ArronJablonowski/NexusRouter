@@ -2421,3 +2421,7 @@ Implemented explicit bounded local Commander delegation alongside default direct
 
 ## Dedicated Active Jobs page (2026-10-04)
 Moved Active Jobs from Workboards to /app/active-jobs with primary navigation. Local and caller-owned remote jobs have separate counts, empty/error states and independent refresh loops; remote rows identify their host and link to existing Settings request controls. Validation remains stopped; not tested or deployed.
+
+
+## Active job descriptions and detail cards (2026-10-04)
+Job rows use bounded recorded user-instruction excerpts from the redacted presentation API, with metadata fallback when unavailable. Native dialog shows host/state/IDs/timestamps/instructions, full-conversation link for local jobs and existing authenticated status/result/cancellation controls for remote jobs. Remote inventory supplies only caller-owned bounded presentation excerpts; no raw tool/system content. Queued submissions without task history cannot yet supply descriptions. No tests or deployment performed; validation remains stopped.

@@ -415,3 +415,10 @@ input, select { padding: .55rem .7rem; }
 .active-jobs-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
 .active-jobs-panel { min-width: 0; }
 @media (max-width: 850px) { .active-jobs-columns { grid-template-columns: 1fr; } }
+
+.job-summary-button { background: transparent; color: #70ffff; border: 0; padding: 0; text-align: left; font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; overflow-wrap: anywhere; }
+.job-detail-dialog { width: min(720px, 90vw); max-height: 85vh; overflow: auto; padding: 1.5rem; }
+.job-detail-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.job-detail-dialog dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .5rem 1rem; }
+.job-detail-dialog dd { margin: 0; overflow-wrap: anywhere; }
+.job-instructions { white-space: pre-wrap; overflow-wrap: anywhere; }
