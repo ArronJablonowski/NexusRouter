@@ -619,12 +619,17 @@ func validApprovalProposalKey(value string) bool {
 }
 
 func (b *BrowserMutations) TaskControls(ctx context.Context, task string) (contract.TaskControlStatus, error) {
-	snapshot, err := InspectTask(ctx, b.service.settings.Telemetry.Database, task)
+	db, release, err := b.service.openTaskReadStore(ctx)
 	if err != nil {
 		return contract.TaskControlStatus{}, err
 	}
-	continuation, _ := InspectTaskContinuation(ctx, b.service.settings.Telemetry.Database, task)
-	cancellation, _ := b.service.CancellationStatus(ctx, task)
+	defer release()
+	snapshot, err := db.TaskSnapshot(ctx, task)
+	if err != nil {
+		return contract.TaskControlStatus{}, err
+	}
+	continuation, _ := db.TaskContinuation(ctx, task)
+	cancellation, _ := db.CancellationStatus(ctx, task)
 	cleanComplete := snapshot.State == "completed" && !snapshot.UncertainEffects && !snapshot.InterruptedTurn && len(snapshot.Pending) == 0
 	out := contract.TaskControlStatus{Version: 1, TaskID: task, Revision: snapshot.Sequence, CanResume: continuation.HistoryEligible, CanSteer: snapshot.State == "running" && !cancellation.Requested, CanCancel: snapshot.State == "running" && !cancellation.Requested, CanFeedback: cleanComplete}
 	if out.Validate() != nil {
@@ -634,7 +639,12 @@ func (b *BrowserMutations) TaskControls(ctx context.Context, task string) (contr
 }
 
 func (b *BrowserMutations) FeedbackContext(ctx context.Context, task string) (contract.FeedbackContext, error) {
-	snapshot, err := InspectTask(ctx, b.service.settings.Telemetry.Database, task)
+	db, release, err := b.service.openTaskReadStore(ctx)
+	if err != nil {
+		return contract.FeedbackContext{}, err
+	}
+	defer release()
+	snapshot, err := db.TaskSnapshot(ctx, task)
 	if err != nil {
 		return contract.FeedbackContext{}, err
 	}
@@ -651,7 +661,7 @@ func (b *BrowserMutations) FeedbackContext(ctx context.Context, task string) (co
 		return out, nil
 	}
 	out.FeedbackAllowed = true
-	history, historyErr := FeedbackHistory(ctx, b.service.settings.Telemetry.Database, task)
+	history, historyErr := FeedbackHistoryStore(ctx, db, task)
 	if historyErr != nil && !errors.Is(historyErr, sql.ErrNoRows) {
 		return contract.FeedbackContext{}, ErrBrowserMutation
 	}
@@ -678,12 +688,7 @@ func (b *BrowserMutations) FeedbackContext(ctx context.Context, task string) (co
 			}
 		}
 	}
-	db, openErr := telemetry.OpenReadOnly(ctx, b.service.settings.Telemetry.Database)
-	if openErr != nil {
-		return contract.FeedbackContext{}, ErrBrowserMutation
-	}
 	browserHistory, browserErr := db.BrowserFeedbackHistory(ctx, task)
-	db.Close()
 	if browserErr != nil {
 		return contract.FeedbackContext{}, ErrBrowserMutation
 	}

@@ -39,7 +39,7 @@
 	let chatTotal = 0, historyCursor = "", historyHead = 0, lastMessageRevision = 0, historyNeedsReset = false;
 	const messageIDs = new Set();
 	const provisionalTasks = new Map();
-	let provisionalTextSize = 0, selectedControls = null, selectedTaskID = "", feedbackContext = null;
+	let provisionalTextSize = 0, selectedControls = null, selectedTaskID = "", feedbackContext = null, taskContextUnavailable = false;
 	let queuedSubmissionID = "", queuedSubmissionCanCancel = false, pendingIntent = null, unresolvedOperations = [];
 	let operationsReady = false, operationReadFailed = false, activeApproval = null, approvalOpener = null;
 	let composing = false, announcementTimer = 0, submissionPollTimer = 0, submissionPollCount = 0;
@@ -71,7 +71,7 @@
 		updateControls();
 	}
 	function updateControls() {
-		const blocked = Boolean(pendingIntent) || unresolvedOperations.length > 0 || !operationsReady || !csrfToken;
+		const blocked = Boolean(pendingIntent) || unresolvedOperations.length > 0 || !operationsReady || !csrfToken || Boolean(selectedChat && taskContextUnavailable);
 		const followUp = selectedChat && selectedControls && selectedControls.canResume;
 		composerLabel.textContent = selectedChat ? "Follow up in this chat" : "Start a new chat";
 		sendMessage.textContent = selectedChat ? "Send follow-up" : "Start chat";
@@ -498,19 +498,21 @@
 		feedbackRejected.textContent = revise ? "Revise as rejected" : "Record rejected";
 	}
 	function loadTaskContext(taskID) {
-		selectedControls = null; feedbackContext = null; updateControls(); window.NexusInspector.loadTask(taskID);
+		window.NexusInspector.loadTask(taskID);
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/controls").then(body => {
 			if (selectedTaskID !== taskID) return;
 			const controls = validControls(body);
 			if (!controls || controls.taskID !== taskID) throw new Error("invalid task controls");
-			selectedControls = controls; updateControls(); loadApprovals();
-		}).catch(() => { if (selectedTaskID === taskID) { selectedControls = null; updateControls(); } });
+			taskContextUnavailable = false;
+			const changed = JSON.stringify(selectedControls) !== JSON.stringify(controls);
+			if (changed) { selectedControls = controls; loadApprovals(); } updateControls();
+		}).catch(() => { if (selectedTaskID === taskID) { taskContextUnavailable = true; updateControls(); } });
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/feedback").then(body => {
 			if (selectedTaskID !== taskID) return;
 			const context = parseFeedbackContext(body, taskID);
 			if (!context) throw new Error("invalid feedback context");
-			feedbackContext = context; renderFeedbackContext(context); updateControls();
-		}).catch(() => { if (selectedTaskID === taskID) { feedbackContext = null; updateControls(); } });
+			if (JSON.stringify(feedbackContext) !== JSON.stringify(context)) { feedbackContext = context; renderFeedbackContext(context); } updateControls();
+		}).catch(() => { if (selectedTaskID === taskID) { taskContextUnavailable = true; updateControls(); } });
 	}
 	function validApprovalProposal(value, toolName) {
 		if (!value || typeof value !== "object" || Array.isArray(value) || value.version !== 1 || !presentationID.test(value.board_id) || !presentationID.test(value.card_id) || !Number.isSafeInteger(value.expected_board_revision) || value.expected_board_revision < 1 || !Number.isSafeInteger(value.expected_card_revision) || value.expected_card_revision < 1) return "";
@@ -749,7 +751,7 @@
 		approvalDialog.hidden = true;
 		activeApproval = null;
 		approvalOpener = null;
-		selectedControls = null;
+		selectedControls = null; taskContextUnavailable = false;
 		selectedTaskID = "";
 		feedbackContext = null;
 		window.NexusInspector.clearTask();
@@ -789,7 +791,7 @@
 		approvalDialog.hidden = true;
 		activeApproval = null;
 		approvalOpener = null;
-		selectedControls = null;
+		selectedControls = null; taskContextUnavailable = false;
 		selectedTaskID = "";
 		feedbackContext = null;
 		window.NexusInspector.clearTask();
