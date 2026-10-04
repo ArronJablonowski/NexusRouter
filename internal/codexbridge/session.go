@@ -286,12 +286,21 @@ func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
 	if codexrpc.NewEncoder(io.Discard, codexrpc.DefaultMaxFrame).Write(request) != nil || s.closed.Load() || s.w.Write(request) != nil {
 		return nil, failure(s.emitted)
 	}
+	notices := 0
 	for {
 		e, err := s.receive()
 		if err != nil {
 			return nil, err
 		}
 		kind, _ := e.Kind()
+		if s.options.Model == "health-discovery" && (method == "account/read" || method == "model/list") && kind == codexrpc.Notification && e.Method == "account/updated" {
+			notices++
+			if notices > 16 || !validHealthAccountNotice(e.Params) {
+				return nil, failure(false)
+			}
+			continue
+		}
+
 		if s.allowDisabledStatus && kind == codexrpc.Notification && e.Method == "remoteControl/status/changed" && disabledRemoteControl(e.Params) {
 			continue
 		}

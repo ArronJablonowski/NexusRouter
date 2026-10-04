@@ -9,17 +9,26 @@ import (
 // launchProfile accepts only the pinned CLI metadata shape. It does not launch
 // a process or establish effective configuration/capability isolation.
 func launchProfile(version, inventory []byte) (features []string, args []string, err error) {
-	if len(version) > 128 || !utf8.Valid(version) || strings.TrimSpace(string(version)) != "codex-cli 0.153.4" || len(inventory) > 64<<10 || !utf8.Valid(inventory) {
+	if len(version) > 128 || !utf8.Valid(version) || len(inventory) > 64<<10 || !utf8.Valid(inventory) {
+		return nil, nil, ErrLaunchObservation
+	}
+	expectedRows := 0
+	switch strings.TrimSpace(string(version)) {
+	case "codex-cli 0.153.4":
+		expectedRows = 135
+	case "codex-cli 0.159.3":
+		expectedRows = 152
+	default:
 		return nil, nil, ErrLaunchObservation
 	}
 	rows := strings.Split(strings.TrimSpace(string(inventory)), "\n")
-	if len(rows) != 135 {
+	if len(rows) != expectedRows {
 		return nil, nil, ErrLaunchObservation
 	}
 	seen := make(map[string]bool, len(rows))
 	for _, row := range rows {
 		fields := strings.Fields(row)
-		if len(fields) < 2 || len(fields) > 4 || len(fields[0]) > 128 || !namePattern.MatchString(fields[0]) || seen[fields[0]] {
+		if len(fields) < 2 || len(fields) > 4 || len(fields[0]) > 128 || (!namePattern.MatchString(fields[0]) && !(expectedRows == 152 && fields[0] == "guardianv2.thread_context")) || seen[fields[0]] {
 			return nil, nil, ErrLaunchObservation
 		}
 		stage := strings.Join(fields[1:len(fields)-1], " ")
@@ -34,7 +43,7 @@ func launchProfile(version, inventory []byte) (features []string, args []string,
 		}
 		name := fields[0]
 		seen[name] = true
-		if name == "apps_mcp_path_override" {
+		if name == "apps_mcp_path_override" || name == "guardianv2.thread_context" {
 			if stage != "removed" || value != "false" {
 				return nil, nil, ErrLaunchObservation
 			}

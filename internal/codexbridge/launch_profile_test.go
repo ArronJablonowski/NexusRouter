@@ -64,3 +64,21 @@ func TestLaunchProfileRejectsMetadata(t *testing.T) {
 		})
 	}
 }
+
+func TestLaunchProfile01593(t *testing.T) {
+	rows := strings.Split(profileInventory(), "\n")
+	rows = append(rows, "guardianv2.thread_context removed false")
+	for len(rows) < 152 {
+		rows = append(rows, fmt.Sprintf("new_feature_%03d stable false", len(rows)))
+	}
+	inventory := strings.Join(rows, "\n")
+	features, args, err := launchProfile([]byte("codex-cli 0.159.3"), []byte(inventory))
+	if err != nil || len(features) != 150 || strings.Contains(args[5], "guardianv2.thread_context") || strings.Count(args[5], "=true") != 2 {
+		t.Fatal("invalid new profile", err)
+	}
+	for _, bad := range []string{strings.Replace(inventory, "guardianv2.thread_context removed false", "guardianv2.thread_context stable false", 1), strings.Replace(inventory, "guardianv2.thread_context removed false", "other.dotted removed false", 1), inventory + "\nextra stable false"} {
+		if _, _, err := launchProfile([]byte("codex-cli 0.159.3"), []byte(bad)); err == nil {
+			t.Fatal("malformed inventory accepted")
+		}
+	}
+}

@@ -2390,3 +2390,9 @@ Live rollout verification reproduced two read failures. Task summaries incorrect
 Both regression tests failed against b845532 and pass with these changes. Focused task-list/Skills race tests passed. Full make check/push and follow-up deployment remain pending. Remote-only jobs federation and exact remote ranking/Commander parity remain outstanding. Muse/Qwen review remains stopped by user.
 
 Full rollout-read validation caught a stale sessions contract test that rejected sequence 10001. Updated it to reject zero and added explicit 10871 acceptance coverage; the complete sessions race suite passed. Failed validation evidence is retained in resources; no push/deployment occurred. Full validation is restarted for the corrected commit.
+
+## 2026-10-04 Codex CLI compatibility
+
+Installed Codex CLI 0.159.3 differed from the 0.153.4 launch profile: 152 feature rows and a removed dotted guardianv2.thread_context feature. Added an exact version profile retaining the prior profile, all strict launch controls, and unchanged tool-name validation. Read-only health discovery now accepts bounded, structurally validated account/updated notices while account/read remains authoritative. No execution-path notification rules were relaxed.
+
+Live HealthModels and checked-launch probes pass without starting a thread, turn, or inference. Complete codexbridge/codexrpc race suites pass, including malformed and excessive notification cases and unsupported feature metadata. Full validation/push and deployment remain pending. Remote jobs/rankings parity and historic task reconciliation are still outstanding.

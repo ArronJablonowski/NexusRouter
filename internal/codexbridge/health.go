@@ -113,3 +113,26 @@ func healthModels(ctx context.Context, w Wire, dir string) ([]string, error) {
 	}
 	return nil, failure(false)
 }
+
+// Account updates are informational during read-only discovery. Never use the
+// notification as account authorization; account/read remains authoritative.
+func validHealthAccountNotice(raw json.RawMessage) bool {
+	var fields map[string]json.RawMessage
+	if len(raw) > 1024 || json.Unmarshal(raw, &fields) != nil || len(fields) != 2 {
+		return false
+	}
+	for _, key := range []string{"authMode", "planType"} {
+		value, ok := fields[key]
+		if !ok {
+			return false
+		}
+		if string(value) == "null" {
+			continue
+		}
+		var text string
+		if json.Unmarshal(value, &text) != nil || len(text) > 64 || !namePattern.MatchString(text) {
+			return false
+		}
+	}
+	return true
+}
