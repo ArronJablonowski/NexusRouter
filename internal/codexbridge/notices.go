@@ -24,6 +24,9 @@ func (s *Session) compatibilityNotice(e codexrpc.Envelope) bool {
 		return false
 	}
 	switch e.Method {
+	case "account/updated":
+		// Informational metadata never grants authorization or signals task success.
+		return validHealthAccountNotice(e.Params)
 	case "account/rateLimits/updated":
 		// A sparse account-wide snapshot is not task usage, permission, or
 		// evidence of success. Discard its bounded object without exposing

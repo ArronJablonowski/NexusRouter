@@ -160,3 +160,21 @@ func TestCompatibilityRateLimitsAreBoundedObjects(t *testing.T) {
 		})
 	}
 }
+
+func TestCompatibilityAccountUpdateIsInformational(t *testing.T) {
+	s := &Session{thread: "thread-1", launchFeatures: noticeFeatures()}
+	for _, raw := range []string{`{"authMode":"chatgpt","planType":"pro"}`, `{"authMode":null,"planType":null}`} {
+		if !s.compatibilityNotice(sessionNotice("account/updated", raw)) {
+			t.Fatal("bounded account notice rejected")
+		}
+	}
+	for _, raw := range []string{`{}`, `{"authMode":"chatgpt","planType":"pro","grant":true}`, `{"authMode":{},"planType":null}`} {
+		if s.compatibilityNotice(sessionNotice("account/updated", raw)) {
+			t.Fatal("invalid account notice accepted")
+		}
+	}
+	s.launchFeatures = nil
+	if s.compatibilityNotice(sessionNotice("account/updated", `{"authMode":null,"planType":null}`)) {
+		t.Fatal("unchecked notice admitted")
+	}
+}
