@@ -86,11 +86,16 @@ func (b *BrowserMutations) Chat(ctx context.Context, subject string, request con
 }
 
 func (b *BrowserMutations) followUp(ctx context.Context, key string, request contract.ChatRequest, input Request) (submissions.Status, error) {
-	snapshot, err := InspectTask(ctx, b.service.settings.Telemetry.Database, request.TaskID)
+	db, release, err := b.service.openTaskReadStore(ctx)
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	defer release()
+	snapshot, err := db.TaskSnapshot(ctx, request.TaskID)
 	if err != nil || snapshot.SessionID != request.ChatID || snapshot.Sequence != *request.ExpectedRevision {
 		return submissions.Status{}, browserops.ErrConflict
 	}
-	continuation, err := InspectTaskContinuation(ctx, b.service.settings.Telemetry.Database, request.TaskID)
+	continuation, err := db.TaskContinuation(ctx, request.TaskID)
 	if err != nil || !continuation.HistoryEligible || continuation.Sequence != snapshot.Sequence {
 		return submissions.Status{}, ErrAdmission
 	}

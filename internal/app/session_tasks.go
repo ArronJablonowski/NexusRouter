@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 
-	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
@@ -24,7 +23,7 @@ func (s *Service) ListSessionTasks(ctx context.Context, session string, options 
 	if !selectionValueClean([]any{session, options}, secrets) {
 		return zero, ErrAdmission
 	}
-	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskReadStore(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
 			return zero, ctx.Err()
@@ -38,7 +37,7 @@ func (s *Service) ListSessionTasks(ctx context.Context, session string, options 
 		}
 		return zero, ErrInspection
 	}
-	defer db.Close()
+	defer release()
 	page, err := db.ListSessionTasks(ctx, session, options)
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	if err != nil || ctx.Err() != nil || page.Validate() != nil || page.SessionID != session || len(page.Items) > options.Limit || !selectionValueClean(page, secrets) {

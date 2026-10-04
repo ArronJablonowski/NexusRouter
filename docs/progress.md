@@ -2453,3 +2453,7 @@ A real browser exact-response chat exposed admission rejection: response-contrac
 Browser smoke follow-up: coordinator execution failed on the observed transcript_v2 deprecation notice from the pinned Codex CLI. Admit only that exact notice when the feature was verified; retain rejection of unknown notices. New-chat navigation now clears prior submission navigation intent and stops its timer. Focused compatibility tests pass; browser regression and live retests pending.
 
 The live task protocol also emits account/updated during turns. Reuse bounded account-notice validation on checked sessions, discard informational metadata without granting authority. A bounded diagnostic now completed a real coordinator turn; final browser tests pending deployment.
+
+### 2026-10-04 stable chat refresh and follow-up latency
+
+Background history/snapshot reconciliation now reuses keyed message nodes and preserves reading position; chat-list rows retain descriptions and nodes. Loaded content no longer gains transient loading notices; chat titles reserve stable space. Completed task state clears stale submission-running text. Browser regression verifies node identity and scroll anchoring, including delayed/failed refresh. Browser follow-up and session-list reads now borrow the serving store rather than repeatedly opening/checking the full database under a five-second deadline. Focused backend race tests and full WebUI/API race tests with Chrome passed. Live verification pending; full make check/push remain stopped.

@@ -118,6 +118,7 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
 	script := strings.Split(chromeRemoteDiscoveryCDP, "await cdp('Page.navigate'")[0] + `
  await cdp('Page.navigate',{url:origin+'/app/chats/chat-fixture'});
  await eventually('document.querySelectorAll("#transcript .message").length===1&&document.querySelector(".chat-name")?.textContent==="A synthetic chat description"','chat failed to load');
+ await evaluate('window.messageBefore=document.querySelector("#transcript .message");window.chatBefore=document.querySelector("[data-chat-id]")');
  await evaluate('fetch("/fixture/fail")');
  await evaluate('window.NexusLive.wake()');
  await new Promise(resolve=>setTimeout(resolve,700));
@@ -126,6 +127,10 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
  await evaluate('window.NexusLive.wake()');
  await new Promise(resolve=>setTimeout(resolve,300));
  if(!await evaluate('document.querySelectorAll("#transcript .message").length===1&&document.querySelectorAll("[data-chat-id]").length===1'))throw Error('recovery duplicated content');
+ if(!await evaluate('document.querySelector("#transcript .message")===window.messageBefore&&document.querySelector("[data-chat-id]")===window.chatBefore'))throw Error('refresh replaced stable chat nodes');
+ await evaluate('window.fixtureMessages=Array.from({length:40},(_,i)=>({id:"synthetic-"+i,role:"assistant",text:"Synthetic scrolling message "+i+" text".repeat(80)}));window.NexusChatRender.messages(document.querySelector("#transcript"),fixtureMessages,true);document.querySelector("#transcript").style.height="300px";document.querySelector("#transcript").style.flex="none";document.querySelector("#transcript").scrollTop=350;window.savedTop=document.querySelector("#transcript").scrollTop;window.savedMessage=document.querySelector("#transcript").children[2]');
+ await evaluate('window.NexusChatRender.messages(document.querySelector("#transcript"),fixtureMessages.concat([{id:"new",role:"assistant",text:"New streamed result"}]),true)');
+ if(!await evaluate('Math.abs(document.querySelector("#transcript").scrollTop-savedTop)<2&&document.querySelector("#transcript").children[2]===savedMessage'))throw Error('background update moved reading position');
  socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", script, strconv.Itoa(port), server.URL).CombinedOutput()
 	if e != nil {

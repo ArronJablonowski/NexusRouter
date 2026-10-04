@@ -433,3 +433,10 @@ input, select { padding: .55rem .7rem; }
 .settings-view input, .settings-view select, .settings-view textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .settings-view p, .settings-view summary { overflow-wrap: anywhere; }
 .settings-view pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Stable background reconciliation: never animate scroll correction or resize titles. */
+.transcript { scroll-behavior: auto; overflow-anchor: none; scrollbar-gutter: stable; }
+.transcript-heading { flex: none; }
+.transcript-heading > div { min-width: 0; }
+.transcript-heading h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; min-height: 2.5em; line-height: 1.25; }
+.chat-list { scrollbar-gutter: stable; }

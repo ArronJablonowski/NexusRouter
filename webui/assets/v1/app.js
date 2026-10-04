@@ -341,14 +341,16 @@
 	const chatDescription = id => window.NexusChatDescriptions.get(id);
 	function renderChat(item) {
 		if (!item || item.version !== 1 || typeof item.chat_id !== "string" || !item.chat_id || item.chat_id.length > 512) return false;
-		const row = element("li");
-		const button = element("button");
+		const existing = [...list.children].find(row => row.firstElementChild?.dataset.chatId === item.chat_id);
+		const row = existing || element("li");
+		const button = existing ? row.firstElementChild : element("button");
 		button.type = "button";
 		button.dataset.chatId = item.chat_id;
 		button.setAttribute("aria-current", item.chat_id === selectedChat ? "true" : "false");
 		window.NexusChatDescriptions.decorate(button, item);
 		if (item.chat_id === selectedChat) setTaskState(item.state);
-		button.addEventListener("click", () => selectChat(item.chat_id, item.state));
+		button.dataset.state = item.state;
+		if (!existing) button.addEventListener("click", () => selectChat(item.chat_id, button.dataset.state));
 		row.append(button);
 		list.append(row);
 		return true;
@@ -357,15 +359,17 @@
 		if (loadingPage || !reset && chatTotal >= maxChats) return;
 		loadingPage = true;
 		loadMore.disabled = true;
-		if (!after) showNotice(listState, "Loading chats…", false);
+		if (!after && !list.children.length) showNotice(listState, "Loading chats…", false);
 		const query = new URLSearchParams({limit: String(pageLimit)});
 		if (after) query.set("after", after);
 		requestJSON("/api/v1/chats?" + query.toString()).then(page => {
 			if (!page || page.version !== 1 || !Array.isArray(page.items) || page.items.length > pageLimit) throw new Error("invalid chat page");
-			if (reset) { list.replaceChildren(); chatTotal = 0; nextCursor = ""; }
+			const oldScroll = list.scrollTop;
+			if (reset) { const ids = new Set(page.items.map(item => item.chat_id)); for (const row of [...list.children]) if (!ids.has(row.firstElementChild?.dataset.chatId)) row.remove(); chatTotal = 0; nextCursor = ""; }
 			let added = 0;
 			for (const item of page.items.slice(0, maxChats - chatTotal)) if (renderChat(item)) added++;
 			chatTotal += added;
+			list.scrollTop = oldScroll;
 			nextCursor = page.has_more && typeof page.next_cursor === "string" && chatTotal < maxChats ? page.next_cursor : "";
 			chatCount.textContent = String(chatTotal);
 			listState.hidden = chatTotal > 0;
@@ -386,15 +390,9 @@
 			message.source_revision > 0 && message.source_revision <= historyHead && !seen.has(message.id);
 	}
 	function appendMessage(message) {
-		if (!message || typeof message !== "object" || transcript.children.length >= maxMessages) return;
-		const role = message.role;
-		if (role !== "user" && role !== "assistant") return;
-		const row = element("li", "message " + role);
-		row.append(element("span", "message-label", message.role));
-		const content = messageText(message);
-		if (content) row.append(element("p", "", content));
-		transcript.append(row);
+		if (transcript.children.length < maxMessages) window.NexusChatRender.messages(transcript, [message], false);
 	}
+
 	function applyHistoryPage(body, reset) {
 		if (!body || body.version !== 1 || body.chat_id !== selectedChat || typeof body.task_id !== "string" || !body.task_id || !Array.isArray(body.messages) || body.messages.length > historyPageLimit ||
 			!Number.isSafeInteger(body.head_revision) || body.head_revision < 1 || typeof body.has_more !== "boolean" ||
@@ -414,14 +412,13 @@
 			seen.add(message.id);
 		}
 		if (reset) {
-			transcript.replaceChildren();
 			messageIDs.clear();
 			lastMessageRevision = 0;
 		}
-		const remaining = maxMessages - transcript.children.length;
+		const remaining = maxMessages - (reset ? 0 : transcript.children.length);
 		const truncatedPage = body.messages.length > remaining;
+		window.NexusChatRender.messages(transcript, body.messages.slice(0, remaining), reset);
 		for (const message of body.messages.slice(0, remaining)) {
-			appendMessage(message);
 			messageIDs.add(message.id);
 			lastMessageRevision = message.revision;
 		}
@@ -442,7 +439,7 @@
 		const requestID = ++historyRequest;
 		loadMoreMessages.disabled = true;
 		loadMoreMessages.textContent = "Loading…";
-		if (reset) showNotice(transcriptState, "Loading committed transcript…", false);
+		if (reset && !transcript.children.length) showNotice(transcriptState, "Loading committed transcript…", false);
 		const query = new URLSearchParams({limit: String(historyPageLimit)});
 		if (after) query.set("after", after);
 		requestJSON("/api/v1/chats/" + encodeURIComponent(chatID) + "/messages?" + query.toString()).then(body => {
@@ -466,7 +463,7 @@
 			}
 		});
 	}
-	function setTaskState(value) { const state = stateLabel(value); chatState.textContent = state; chatState.className = "state-pill state-" + state.replaceAll(" ", "-"); }
+	function setTaskState(value) { const state = stateLabel(value); chatState.textContent = state; chatState.className = "state-pill state-" + state.replaceAll(" ", "-"); if (!pendingIntent && ["completed", "failed", "canceled"].includes(value) && /^Submission /.test(mutationState.textContent)) showMutation("Task " + state + ".", false, false); }
 	function validEvidence(item, expectedClass) {
 		const sources = {objective: ["deterministic", "tool_result"], subjective: ["user_feedback"], advisory: ["llm_judge"]};
 		return item && typeof item === "object" && item.class === expectedClass && sources[expectedClass].includes(item.source) &&
@@ -682,12 +679,11 @@
 		}
 		if (payload.durability !== "committed" || !Number.isSafeInteger(payload.revision) || payload.revision <= eventRevision || typeof payload.cursor !== "string" || !payload.cursor) return;
 		if (payload.kind === "chat.snapshot" && payload.data.chat_id === selectedChat && Array.isArray(payload.data.messages) && payload.data.messages.length <= 100) {
-			transcript.replaceChildren();
 			messageIDs.clear();
 			lastMessageRevision = 0;
 			historyCursor = "";
 			loadMoreMessages.hidden = true;
-			for (const message of payload.data.messages) appendMessage(message);
+			window.NexusChatRender.messages(transcript, payload.data.messages, true);
 			transcriptState.hidden = payload.data.messages.length > 0;
 			clearAllProvisional();
 			eventRevision = payload.revision;

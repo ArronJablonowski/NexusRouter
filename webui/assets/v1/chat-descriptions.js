@@ -21,13 +21,13 @@ window.NexusChatDescriptions=(()=>{
   }
  }
  function decorate(button,item) {
-  const name=document.createElement("span"),meta=document.createElement("span"),state=document.createElement("span"),time=document.createElement("time");
-  name.className="chat-name";name.textContent="Loading description…";meta.className="chat-meta";
-  button.title="Chat ID: "+item.chat_id;button.append(name);
-  chatDescription(item.chat_id).then(description=>{if(button.isConnected){name.textContent=description;button.title=description+" — Chat ID: "+item.chat_id;}});
+  let name=button.querySelector('.chat-name'),meta=button.querySelector('.chat-meta');
+  if(!name){name=document.createElement('span');name.className='chat-name';name.textContent='Loading description…';meta=document.createElement('span');meta.className='chat-meta';meta.append(document.createElement('span'),document.createElement('time'));button.append(name,meta);chatDescription(item.chat_id).then(description=>{if(button.isConnected){name.textContent=description;button.title=description+' — Chat ID: '+item.chat_id;}});}
+  const state=meta.firstElementChild,time=meta.lastElementChild;
+
   state.textContent=typeof item.state==="string"&&item.state?item.state.replaceAll("_"," "):"unknown";
   const date=new Date(item.started_at);time.textContent=Number.isNaN(date.getTime())?"Unknown time":date.toLocaleString();
-  meta.append(state,time);button.append(meta);
+
  }
  return {get:chatDescription,decorate};
 })();
