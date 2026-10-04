@@ -42,6 +42,7 @@ func (s *Session) compatibilityNotice(e codexrpc.Envelope) bool {
 			return false
 		}
 		for name, summary := range map[string]string{
+			"transcript_v2":       "`[features].transcript_v2` is deprecated and ignored.",
 			"use_legacy_landlock": "`[features].use_legacy_landlock` is deprecated and will be removed soon.",
 			"web_search_cached":   "`[features].web_search_cached` is deprecated because web search is enabled by default.",
 			"web_search_request":  "`[features].web_search_request` is deprecated because web search is enabled by default.",

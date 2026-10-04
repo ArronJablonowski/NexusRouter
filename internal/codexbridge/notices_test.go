@@ -19,6 +19,7 @@ func knownNotices() []codexrpc.Envelope {
 		out = append(out, codexrpc.Envelope{Method: "warning", Params: marshal(map[string]any{"threadId": "thread-1", "message": message})})
 	}
 	for _, summary := range []string{
+		"`[features].transcript_v2` is deprecated and ignored.",
 		"`[features].use_legacy_landlock` is deprecated and will be removed soon.",
 		"`[features].web_search_cached` is deprecated because web search is enabled by default.",
 		"`[features].web_search_request` is deprecated because web search is enabled by default.",
@@ -29,7 +30,7 @@ func knownNotices() []codexrpc.Envelope {
 }
 
 func noticeFeatures() []string {
-	return []string{"code_mode_host", "skip_host_skill_discovery", "use_legacy_landlock", "web_search_cached", "web_search_request"}
+	return []string{"transcript_v2", "code_mode_host", "skip_host_skill_discovery", "use_legacy_landlock", "web_search_cached", "web_search_request"}
 }
 
 func TestCompatibilityNoticeRequiresCheckedProfile(t *testing.T) {

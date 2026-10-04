@@ -784,6 +784,7 @@
 	}
 	function startNewChat() {
 		if (pendingIntent) return;
+		stopSubmissionPolling(); submissionShouldNavigate = false;
 		if (source) {
 			source.close();
 			source = null;
