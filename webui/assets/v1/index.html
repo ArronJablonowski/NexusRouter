@@ -17,6 +17,7 @@
     <nav class="rail" aria-label="Primary">
       <a href="__DARWIN_BASE_PATH__/chats" data-view="chats" aria-current="page">Chats</a>
       <a href="__DARWIN_BASE_PATH__/workboards" data-view="workboards">Workboards</a>
+      <a href="__DARWIN_BASE_PATH__/active-jobs" data-view="jobs">Active jobs</a>
       <a href="__DARWIN_BASE_PATH__/models" data-view="models">Models</a>
       <a href="__DARWIN_BASE_PATH__/routing-map" data-view="routing">Command grid</a>
       <a href="__DARWIN_BASE_PATH__/model-elimination" data-view="elimination">Elimination</a>
@@ -25,6 +26,24 @@
       <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
+      <section id="active-jobs-view" aria-labelledby="active-jobs-title" hidden>
+        <header class="control-heading"><h1 id="active-jobs-title">Active jobs</h1></header>
+        <p>Running tasks and queued submissions. Refreshes automatically.</p>
+        <div class="active-jobs-columns">
+          <section class="active-jobs-panel" aria-labelledby="local-jobs-title">
+            <header class="control-heading"><h2 id="local-jobs-title">Local jobs</h2><output id="local-jobs-count" class="count" aria-label="Local job count">—</output></header>
+            <p>Jobs recorded on this host.</p>
+            <output id="local-jobs-status" role="status" aria-live="polite">Loading local jobs…</output>
+            <ul id="local-jobs-list" class="active-jobs-list" aria-label="Local jobs"></ul>
+          </section>
+          <section class="active-jobs-panel" aria-labelledby="remote-jobs-title">
+            <header class="control-heading"><h2 id="remote-jobs-title">Remote jobs</h2><output id="remote-jobs-count" class="count" aria-label="Remote job count">—</output></header>
+            <p>Caller-owned jobs on paired systems with inspection permission. Each row identifies its host.</p>
+            <output id="remote-jobs-status" role="status" aria-live="polite">Loading remote jobs…</output>
+            <ul id="remote-jobs-list" class="active-jobs-list" aria-label="Remote jobs"></ul>
+          </section>
+        </div>
+      </section>
       <section id="chat-view" class="chat-view" aria-labelledby="chat-title">
         <aside class="chat-index" aria-labelledby="chat-list-title">
           <div class="section-heading">
@@ -385,12 +404,7 @@
             <button id="load-more-cards" class="secondary kanban-more" type="button" hidden>Load more cards</button>
           </section>
         </div>
-        <section class="active-jobs-panel" aria-labelledby="active-jobs-title">
-          <header class="control-heading"><h2 id="active-jobs-title">Active jobs</h2><output id="active-jobs-count" class="count"></output></header>
-          <p>Running tasks and active submissions recorded on this commander, plus caller-owned jobs on paired systems with inspection permission. Refreshes automatically; remote inventory is a live traversal, not a snapshot.</p>
-          <output id="active-jobs-status" role="status" aria-live="polite">Loading active jobs…</output>
-          <ul id="active-jobs-list" aria-label="Active jobs"></ul>
-        </section>
+
         <div id="workboard-mutation-controls" class="workboard-mutation-controls" aria-label="Workboard actions" hidden>
           <button id="open-board-create" type="button">Create board</button>
           <button id="open-board-revise" class="secondary" type="button">Edit board</button>

@@ -406,8 +406,12 @@ input, select { padding: .55rem .7rem; }
 
 .active-jobs-panel { margin-top: 1.5rem; padding: 1.25rem; border: 1px solid #168b91; background: #071923; }
 .active-jobs-panel p, .active-jobs-panel li span { color: #90b8c5; }
-#active-jobs-list { list-style: none; padding: 0; display: grid; gap: .75rem; }
-#active-jobs-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; padding: .85rem; background: #0a2630; border-left: 3px solid #00e5e5; overflow-wrap: anywhere; }
-#active-jobs-list a { color: #70ffff; }
+.active-jobs-list { list-style: none; padding: 0; display: grid; gap: .75rem; }
+.active-jobs-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; padding: .85rem; background: #0a2630; border-left: 3px solid #00e5e5; overflow-wrap: anywhere; }
+.active-jobs-list a { color: #70ffff; }
 
 .remote-route-card h3 { text-transform:none; }
+
+.active-jobs-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.active-jobs-panel { min-width: 0; }
+@media (max-width: 850px) { .active-jobs-columns { grid-template-columns: 1fr; } }

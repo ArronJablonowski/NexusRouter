@@ -2417,3 +2417,7 @@ Historical reconciliation remains unresolved. One historical task has an unrelea
 
 ## Hybrid remote delegation (2026-10-04)
 Implemented explicit bounded local Commander delegation alongside default direct remote execution, permission-scoped specialist IDs, persisted deadline/call/depth bounds, and dispatch form controls. Reuses worker cancellation and durable result events. Cloud Commander assignments are intentionally unavailable pending enforceable aggregate spend accounting. Tests authored but not run; no validation, push, deployment or inference performed. See hybrid-remote-delegation.md.
+
+
+## Dedicated Active Jobs page (2026-10-04)
+Moved Active Jobs from Workboards to /app/active-jobs with primary navigation. Local and caller-owned remote jobs have separate counts, empty/error states and independent refresh loops; remote rows identify their host and link to existing Settings request controls. Validation remains stopped; not tested or deployed.

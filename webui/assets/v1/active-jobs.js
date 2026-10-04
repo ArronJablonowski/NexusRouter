@@ -1,9 +1,27 @@
 "use strict";
 (() => {
  const base=document.body.dataset.basePath||"";
- if(!/^\/workboards(?:\/[^/]+)?$/.test(location.pathname.slice(base.length)))return;
- const list=document.querySelector("#active-jobs-list"),status=document.querySelector("#active-jobs-status"),count=document.querySelector("#active-jobs-count");
- if(!list||!status||!count||!window.NexusLive)return;
+ if(location.pathname.slice(base.length)!=="/active-jobs")return;
+ const view=document.querySelector("#active-jobs-view");
+ if(!view||!window.NexusLive)return;
+ for(const section of document.querySelectorAll("#main > section"))section.hidden=section!==view;
+ document.title="Active jobs · NexusRouter";
+ function render(source,items,incomplete){
+  const list=document.querySelector("#"+source+"-jobs-list"),status=document.querySelector("#"+source+"-jobs-status"),count=document.querySelector("#"+source+"-jobs-count");
+  const nodes=[];
+  for(const item of items){
+   const row=document.createElement("li"),link=document.createElement(item.session_id||item.remote?"a":"strong"),meta=document.createElement("span");
+   if(item.session_id)link.href=base+"/chats/"+encodeURIComponent(item.session_id);
+   if(item.remote)link.href=base+"/settings#"+new URLSearchParams({remote_peer:item.remote,remote_request:item.task_id}).toString();
+   link.textContent=item.task_id;
+   meta.textContent=item.remote?item.remote+" · "+item.state+" · checked "+new Date(item.observed_at).toLocaleTimeString():(item.state==="queued"?"Queued · submitted ":"Running · started ")+new Date(item.started_at).toLocaleString();
+   row.append(link,meta);nodes.push(row);
+  }
+  list.replaceChildren(...nodes);count.textContent=String(items.length);
+  status.textContent=incomplete?"Inventory incomplete; some jobs may be missing.":items.length?"Updated "+new Date().toLocaleTimeString():"No active "+source+" jobs.";
+  status.classList.toggle("error",incomplete);
+ }
+ function unavailable(source){const status=document.querySelector("#"+source+"-jobs-status");status.textContent="Jobs unavailable. Previously displayed jobs may be stale; retrying automatically.";status.classList.add("error");}
  const id=/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
  async function remoteJobs(signal){
   const request=async(path,body)=>{const response=await window.NexusLive.fetch(base+path,{signal,credentials:"same-origin",cache:"no-store",...(body?{method:"POST",headers:{"Content-Type":"application/json",...(body.csrf?{"X-Darwin-CSRF":body.csrf}:{})},body:JSON.stringify(body.value||body)}:{})});if(!response.ok)throw Error();return response.json();};
@@ -34,7 +52,7 @@
   }}
   await Promise.all(Array.from({length:Math.min(4,permitted.length)},worker));return {items,incomplete:incomplete||signal.aborted};
  }
- async function load(){
+ async function loadLocal(){
   const items=new Map();let complete=true;
   try{
    for(const kind of ["running","queued","admitted"]){
@@ -56,21 +74,15 @@
    }
    complete=complete&&finished;
    }
-   let remoteIncomplete=false;
-   const remoteController=new AbortController(),remoteDeadline=setTimeout(()=>remoteController.abort(),15000);
-   try{const remote=await remoteJobs(remoteController.signal);remoteIncomplete=remote.incomplete;for(const item of remote.items)items.set("remote:"+item.remote+":"+item.task_id,item);}catch{remoteIncomplete=true;}finally{clearTimeout(remoteDeadline);}
-   const nodes=[];
-   for(const item of items.values()){
-    const row=document.createElement("li"),link=document.createElement(item.session_id?"a":"strong"),meta=document.createElement("span");
-    if(item.session_id)link.href=base+"/chats/"+encodeURIComponent(item.session_id);link.textContent=item.task_id;
-    meta.textContent=item.remote?item.remote+" · "+item.state+" · caller-owned · checked "+new Date(item.observed_at).toLocaleTimeString():(item.state==="queued"?"Queued · submitted ":"Running · started ")+new Date(item.started_at).toLocaleString();
-    row.append(link,meta);nodes.push(row);
-   }
-   list.replaceChildren(...nodes);count.textContent=String(items.size);
-   status.textContent=!complete?"Job limit reached; this list is incomplete.":items.size?"Updated "+new Date().toLocaleTimeString():"No active jobs.";
-   if(remoteIncomplete)status.textContent+=" Remote jobs incomplete or unavailable.";
-   status.classList.remove("error");return true;
-  }catch{status.textContent="Active jobs unavailable. Previously displayed jobs may be stale; retrying automatically.";status.classList.add("error");return false;}
+   render("local",Array.from(items.values()),!complete);return true;
+  }catch{unavailable("local");return false;}
  }
- window.NexusLive.watch("active-jobs",load,{interval:5000,immediate:true});
+ async function loadRemote(){
+  const controller=new AbortController(),deadline=setTimeout(()=>controller.abort(),15000);
+  try{const result=await remoteJobs(controller.signal);render("remote",result.items,result.incomplete);return !result.incomplete;}
+  catch{unavailable("remote");return false;}
+  finally{clearTimeout(deadline);}
+ }
+ window.NexusLive.watch("local-active-jobs",loadLocal,{interval:5000,immediate:true});
+ window.NexusLive.watch("remote-active-jobs",loadRemote,{interval:5000,immediate:true});
 })();
