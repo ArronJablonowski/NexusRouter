@@ -26,13 +26,23 @@ var errModelInventory = errors.New("model inventory unavailable")
 // provider residency. Provider failures remain isolated so one unavailable
 // runtime cannot hide the rest of the inventory.
 func (s *Service) localModelInventory(ctx context.Context) map[string]providerInventory {
+	return s.scopedLocalModelInventory(ctx, nil)
+}
+
+// scopedLocalModelInventory restricts provider traffic and returned model names.
+// A nil scope is the local inventory; an empty scope permits no discovery.
+func (s *Service) scopedLocalModelInventory(ctx context.Context, scope map[string]map[string]bool) map[string]providerInventory {
 	result := map[string]providerInventory{}
 	if s == nil || ctx == nil {
 		return result
 	}
 	indices := make([]int, 0, len(s.settings.Providers))
 	for index, provider := range s.settings.Providers {
-		if provider.Kind == "ollama" {
+		permitted := scope == nil
+		for _, allowed := range scope[provider.ID] {
+			permitted = permitted || allowed
+		}
+		if provider.Kind == "ollama" && permitted {
 			indices = append(indices, index)
 		}
 	}
@@ -84,6 +94,15 @@ func (s *Service) localModelInventory(ctx context.Context) map[string]providerIn
 				if err != nil || !validProviderInventory(entry.models) {
 					entry.models, entry.err = nil, errModelInventory
 				} else {
+					if scope != nil {
+						permitted := make([]providers.InstalledModel, 0, len(entry.models))
+						for _, model := range entry.models {
+							if scope[configured.ID][model.Name] {
+								permitted = append(permitted, model)
+							}
+						}
+						entry.models = permitted
+					}
 					sort.Slice(entry.models, func(i, j int) bool { return entry.models[i].Name < entry.models[j].Name })
 				}
 				mu.Lock()

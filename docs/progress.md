@@ -2403,3 +2403,6 @@ The Workboards Active jobs panel now reads paired remote task inventories using 
 
 ### 2026-10-04 — Remote inventory store reuse
 Remote inventory first page took 15.21 seconds on Spark, beyond the browser's 10-second inspection deadline. Remote SDK status calls used a distinct standalone service and ran a database open/quick_check for each request. The serving backend now binds status reads to the dispatcher-owning service, preserving its store identity validation and avoiding repeated full database checks. Callback errors propagate without fallback. Focused regression verification and full validation precede deployment; live latency improvement remains unverified. Remote ranking parity and historic task reconciliation remain outstanding.
+
+### 2026-10-04 — Scoped inventory prerequisite for remote rankings
+Local inventory now has a scoped collection path that avoids unpermitted providers and removes unpermitted model names. An empty scope makes no discovery requests; the existing local path retains unrestricted local inventory behavior. A focused race test verifies traffic isolation, output filtering, and local compatibility. Remote ranking/Commander wiring and parity are not yet implemented. Full validation is pending; no runtime deployment is needed for this unused prerequisite.
