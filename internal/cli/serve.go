@@ -352,7 +352,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			Operations: browserMutations.Operations, Submission: browserMutations.Submission,
 			UpdateSettings: updateSettings,
 		}, Reads: webuiapp.ReadServices{
-			Submissions: service.ListSubmissions, Tasks: service.ListTasks, Chats: service.ListChats, History: service.ChatHistory,
+			JobTasks: service.ListJobTasks, Submissions: service.ListSubmissions, Tasks: service.ListTasks, Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
 				return db.ReadCommittedEventPage(ctx, options)
 			},

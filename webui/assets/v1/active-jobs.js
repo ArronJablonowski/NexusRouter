@@ -23,12 +23,29 @@
  const dialog=document.createElement("dialog"),heading=document.createElement("h2"),close=document.createElement("button"),content=document.createElement("div");
  heading.id="job-card-title";heading.textContent="Job details";dialog.setAttribute("aria-labelledby",heading.id);dialog.className="job-detail-dialog";
  close.type="button";close.textContent="Close";close.addEventListener("click",()=>dialog.close());dialog.append(heading,close,content);document.body.append(dialog);
- let cardGeneration=0;
- dialog.addEventListener("close",()=>{cardGeneration++;content.replaceChildren();});
+ let cardGeneration=0,openJobKey="",openStatus=null,openEvidence=null,openObserved=null;
+ const jobKey=item=>(item.remote||"local")+":"+item.task_id;
+ const stateNames={running:"Running",queued:"Queued",failed:"Failed",canceled:"Canceled",succeeded:"Succeeded",completed:"Completed",unknown:"Needs attention — execution unconfirmed"};
+ const stateText=item=>stateNames[item.current_state||item.state]||"Status unavailable";
+ function text(node,value){if(node.textContent!==value)node.textContent=value;}
+ const jobRows={local:new Map(),remote:new Map()};
+ const streams=new Map();
+ function syncStreams(items){
+  if(!window.EventSource)return;
+  const sessions=new Set(items.filter(item=>item.session_id&&item.current_state==="running").slice(0,16).map(item=>item.session_id));
+  for(const [id,stream] of streams)if(!sessions.has(id)){stream.close();streams.delete(id);}
+  for(const id of sessions)if(!streams.has(id)){
+   const stream=new window.EventSource(base+"/api/v1/chats/"+encodeURIComponent(id)+"/events");
+   for(const event of ["task.terminal","lifecycle.event","worker.changed"])stream.addEventListener(event,()=>window.NexusLive.wake());
+   streams.set(id,stream);
+  }
+ }
+ if(window.addEventListener)window.addEventListener("pagehide",()=>{for(const stream of streams.values())stream.close();streams.clear();});
+ dialog.addEventListener("close",()=>{cardGeneration++;openJobKey="";openStatus=null;content.replaceChildren();});
  async function showJob(item){
-  const generation=++cardGeneration;content.replaceChildren();heading.textContent="Job details";
+  const generation=++cardGeneration;openJobKey=jobKey(item);openStatus=null;openEvidence=null;openObserved=null;content.replaceChildren();heading.textContent="Job details";
   const fields=document.createElement("dl"),instructions=document.createElement("p");instructions.textContent="Loading recorded instructions…";
-  for(const [label,value] of [["Host",item.remote||"Local host"],["Recorded state",item.state],["Job ID",item.task_id],["Session",item.session_id],["Started / submitted",item.started_at],["Last observed",item.observed_at],["Task IDs",(item.task_ids||[]).join(", ")]]){if(!value)continue;const term=document.createElement("dt"),description=document.createElement("dd");term.textContent=label;description.textContent=value;fields.append(term,description);}
+  for(const [label,value] of [["Host",item.remote||"Local host"],["Current status",stateText(item)],["Status evidence",item.status_evidence],["Recorded task state",item.state],["Job ID",item.task_id],["Session",item.session_id],["Started / submitted",item.started_at],["Last observed",item.observed_at],["Task IDs",(item.task_ids||[]).join(", ")]]){if(!value)continue;const term=document.createElement("dt"),description=document.createElement("dd");term.textContent=label;description.textContent=value;if(label==="Current status")openStatus=description;if(label==="Status evidence")openEvidence=description;if(label==="Last observed")openObserved=description;fields.append(term,description);}
   content.append(fields,instructions);
   if(item.session_id){const link=document.createElement("a");link.href=base+"/chats/"+encodeURIComponent(item.session_id);link.textContent="Open full conversation";content.append(link);}
   if(!dialog.open)dialog.showModal();close.focus();
@@ -42,15 +59,25 @@
  async function labelJobs(entries){let index=0;await Promise.all(Array.from({length:Math.min(4,entries.length)},async()=>{while(index<entries.length){const {item,button}=entries[index++];if(!button.isConnected)continue;try{const detail=await describe(item);if(button.isConnected&&detail)button.textContent=detail.description;}catch{if(button.isConnected)button.textContent="Job description unavailable";}}}));}
  function render(source,items,incomplete){
   const list=document.querySelector("#"+source+"-jobs-list"),status=document.querySelector("#"+source+"-jobs-status"),count=document.querySelector("#"+source+"-jobs-count");
-  const nodes=[],labels=[];
-  for(const item of items){
-   const row=document.createElement("li"),link=document.createElement("button"),meta=document.createElement("span");
-   link.type="button";link.className="job-summary-button";link.textContent=item.description|| (item.session_id?"Loading job description…":"Job description unavailable");link.addEventListener("click",()=>showJob(item));
-   meta.textContent=item.remote?item.remote+" · "+item.state+" · checked "+new Date(item.observed_at).toLocaleTimeString():(item.state==="queued"?"Queued · submitted ":"Running · started ")+new Date(item.started_at).toLocaleString();
-   row.append(link,meta);nodes.push(row);if(item.session_id)labels.push({item,button:link});
+  const labels=[],keep=new Set(),records=jobRows[source];
+  for(const [index,item] of items.entries()){
+   const key=jobKey(item);keep.add(key);let record=records.get(key);
+   if(!record){
+    const row=document.createElement("li"),link=document.createElement("button"),meta=document.createElement("span");
+    record={row,link,meta,item};records.set(key,record);
+    link.type="button";link.className="job-summary-button";link.textContent=item.description||(item.session_id?"Loading job description…":"Job description unavailable");link.addEventListener("click",()=>showJob(record.item));row.append(link,meta);
+    if(item.session_id)labels.push({item,button:link});
+   }
+   record.item=item;
+   const label=item.remote?item.remote+" · "+item.state+" · checked "+new Date(item.observed_at).toLocaleTimeString():stateText(item)+" · started "+new Date(item.started_at).toLocaleString();
+   text(record.meta,label);
+   if(list.children[index]!==record.row)list.insertBefore(record.row,list.children[index]||null);
+   if(openJobKey===key&&openStatus){text(openStatus,stateText(item));if(openEvidence)text(openEvidence,item.status_evidence||"Unavailable");if(openObserved)text(openObserved,item.observed_at||"Unavailable");}
   }
-  list.replaceChildren(...nodes);count.textContent=String(items.length);labelJobs(labels);
-  status.textContent=incomplete?"Inventory incomplete; some jobs may be missing.":items.length?"Updated "+new Date().toLocaleTimeString():"No active "+source+" jobs.";
+  for(const [key,record] of records)if(!keep.has(key)){list.removeChild(record.row);records.delete(key);if(openJobKey===key&&openStatus)text(openStatus,"No longer listed as active");}
+  text(count,String(items.length));labelJobs(labels);
+  if(source==="local")syncStreams(items);
+  status.textContent=incomplete?"Inventory incomplete; some jobs may be missing.":items.length?(source==="local"?items.filter(item=>["running","queued"].includes(item.current_state)).length+" active · ":"")+"Updated "+new Date().toLocaleTimeString():"No active "+source+" jobs.";
   status.classList.toggle("error",incomplete);
  }
  function unavailable(source){const status=document.querySelector("#"+source+"-jobs-status");status.textContent="Jobs unavailable. Previously displayed jobs may be stale; retrying automatically.";status.classList.add("error");}
@@ -98,6 +125,14 @@
      if(kind==="admitted"&&Array.isArray(raw.task_ids)&&raw.task_ids.some(task=>items.has("running:"+task)))continue;
      const item=kind!=="running"?{task_id:raw.id,state:raw.state,started_at:raw.created_at}:raw;
      if(!id.test(item.task_id)||(kind==="running"&&!id.test(item.session_id))||item.state!==(kind==="admitted"?"running":kind)||!Number.isFinite(Date.parse(item.started_at)))throw Error();
+     if(kind==="running"){
+      const execution=raw.execution;
+      if(execution&&(!Object.hasOwn(stateNames,execution.state)||typeof execution.evidence!=="string"||!Number.isFinite(Date.parse(execution.observed_at))))throw Error();
+      item.current_state=execution?.state||"unknown";item.status_evidence=execution?.evidence||"Execution evidence unavailable";item.observed_at=execution?.observed_at;
+     }else{
+      item.current_state=kind==="queued"?"queued":raw.lease_expired?"unknown":"running";
+      item.status_evidence=kind==="queued"?"queued_submission":raw.lease_expired?"expired_submission_lease":"submission_running";
+     }
      items.set(kind+":"+item.task_id,item);
     }
     if(!page.has_more){finished=true;break;}
@@ -115,6 +150,6 @@
   catch{unavailable("remote");return false;}
   finally{clearTimeout(deadline);}
  }
- window.NexusLive.watch("local-active-jobs",loadLocal,{interval:5000,immediate:true});
- window.NexusLive.watch("remote-active-jobs",loadRemote,{interval:5000,immediate:true});
+ window.NexusLive.watch("local-active-jobs",loadLocal,{interval:2000,immediate:true});
+ window.NexusLive.watch("remote-active-jobs",loadRemote,{interval:2000,immediate:true});
 })();

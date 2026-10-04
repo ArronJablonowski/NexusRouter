@@ -12,7 +12,7 @@ func TestActiveJobsReconcileAndPreserveOnFailure(t *testing.T) {
 	}
 	script := `
 const fs=require('fs'),vm=require('vm');
-const make=()=>({textContent:'',children:[],classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},isConnected:false,append(...x){this.children.push(...x)},replaceChildren(...x){this.children=x}});
+const make=()=>({textContent:'',children:[],classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},isConnected:false,append(...x){this.children.push(...x)},insertBefore(n,b){const old=this.children.indexOf(n);if(old>=0)this.children.splice(old,1);const i=b?this.children.indexOf(b):this.children.length;this.children.splice(i,0,n)},removeChild(n){this.children.splice(this.children.indexOf(n),1)},replaceChildren(...x){this.children=x}});
 const list=make(),status=make(),count=make();let run,fail=false,cycle=0,urls=[];
 global.location={pathname:'/app/active-jobs'};global.document={body:{dataset:{basePath:'/app'},append(){}},querySelectorAll:()=>[],querySelector:s=>s==='#active-jobs-view'?make():s.endsWith('-list')?list:s.endsWith('-status')?status:count,createElement:make};
 global.window={NexusLive:{watch:(n,f)=>{if(n==='local-active-jobs')run=f},fetch:async url=>{urls.push(url);if(url.endsWith('/remote-membership'))return {ok:true,json:async()=>({version:1,enabled:false})};if(fail)throw Error();let items=[];if(!url.includes('kind=')&&cycle===0)items=[{task_id:'task-a',session_id:'chat-a',state:'running',started_at:'2026-10-02T00:00:00Z'}];if(cycle===0&&url.includes('kind=queued'))items=[{id:'queued-a',state:'queued',created_at:'2026-10-02T00:00:00Z'}];if(cycle===0&&url.includes('after='))items=[{task_id:'task-b',session_id:'chat-b',state:'running',started_at:'2026-10-02T00:00:00Z'}];const more=cycle===0&&!url.includes('?');return {ok:true,json:async()=>({version:1,items,next_cursor:more?'cursor-1':'',has_more:more})}}}};
@@ -32,7 +32,7 @@ func TestActiveJobsFederatesOnlyPermittedCallerInventory(t *testing.T) {
 	}
 	script := `
 const fs=require('fs'),vm=require('vm');
-const make=()=>({textContent:'',children:[],classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},isConnected:false,append(...x){this.children.push(...x)},replaceChildren(...x){this.children=x}});
+const make=()=>({textContent:'',children:[],classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(){},isConnected:false,append(...x){this.children.push(...x)},insertBefore(n,b){const old=this.children.indexOf(n);if(old>=0)this.children.splice(old,1);const i=b?this.children.indexOf(b):this.children.length;this.children.splice(i,0,n)},removeChild(n){this.children.splice(this.children.indexOf(n),1)},replaceChildren(...x){this.children=x}});
 const list=make(),status=make(),count=make();let run,broken=false,inspected=[];
 global.location={pathname:'/app/active-jobs'};global.document={body:{dataset:{basePath:'/app'},append(){}},querySelectorAll:()=>[],querySelector:s=>s==='#active-jobs-view'?make():s.endsWith('-list')?list:s.endsWith('-status')?status:count,createElement:make};
 global.window={NexusLive:{watch:(n,f)=>{if(n==='remote-active-jobs')run=f},fetch:async(url,options)=>{

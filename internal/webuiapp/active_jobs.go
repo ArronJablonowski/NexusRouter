@@ -48,7 +48,11 @@ func (h *Handler) serveActiveJobs(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	page, err := safeActiveJobs(ctx, h.reads.Tasks, options)
+	read := h.reads.JobTasks
+	if read == nil {
+		read = h.reads.Tasks
+	}
+	page, err := safeActiveJobs(ctx, read, options)
 	if err != nil || page.Validate() != nil || len(page.Items) > options.Limit {
 		h.writeError(w, r, 503, "jobs_unavailable")
 		return

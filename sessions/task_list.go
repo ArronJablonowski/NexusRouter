@@ -14,12 +14,13 @@ var ErrTaskList = errors.New("task list unavailable or invalid")
 // TaskSummary is content-free durable task-head metadata. It does not establish
 // continuation eligibility, owner liveness, route health, or retry authority.
 type TaskSummary struct {
-	Version   int       `json:"version"`
-	TaskID    string    `json:"task_id"`
-	SessionID string    `json:"session_id"`
-	State     string    `json:"state"`
-	Sequence  int64     `json:"sequence"`
-	StartedAt time.Time `json:"started_at"`
+	Execution *TaskExecution `json:"execution,omitempty"`
+	Version   int            `json:"version"`
+	TaskID    string         `json:"task_id"`
+	SessionID string         `json:"session_id"`
+	State     string         `json:"state"`
+	Sequence  int64          `json:"sequence"`
+	StartedAt time.Time      `json:"started_at"`
 }
 
 type TaskPage struct {
