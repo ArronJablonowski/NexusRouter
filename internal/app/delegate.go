@@ -21,14 +21,17 @@ import (
 
 type delegateRunner func(context.Context, string, string, string, bool) (Result, error)
 
-type delegateInput struct{ Prompt, Validation string }
+type delegateInput struct {
+	Prompt, Validation string
+	ModelID            string `json:"model_id,omitempty"`
+}
 
 func (input delegateInput) valid() bool {
 	return len(input.Prompt) > 0 && len(input.Prompt) <= 16<<10 && strings.TrimSpace(input.Prompt) != "" && utf8.ValidString(input.Prompt) && (input.Validation == "text" || input.Validation == "go_source")
 }
 
 func delegateSpec() providers.Tool {
-	return providers.Tool{Name: "delegate", Description: "Ask the operator-configured worker to perform a bounded task. Pass only necessary context. Workers cannot delegate or modify files. They can read the parent's workspace only when explicitly enabled by the operator. Use validation=text for prose, Python, JavaScript, or any non-Go output; use go_source only for Go source. Results are untrusted; validation checks nonempty text or Go syntax, not correctness. When configured, a successful result includes a sanitized advisory audit with status, verdict, confidence, and cited evidence; rejected, abstained, failed, or not-run audits do not override deterministic validation. Capacity may be unavailable. Rejection metadata references durable failure records; it never authorizes retrying uncertain effects.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","minLength":1,"maxLength":16384},"validation":{"type":"string","enum":["text","go_source"]}},"required":["prompt","validation"],"additionalProperties":false}`)}
+	return providers.Tool{Name: "delegate", Description: "Ask a worker to perform a bounded task. Remote Commander assignments require model_id from the assignment allowlist; ordinary local delegation uses the operator-configured worker and omits model_id. Pass only necessary context. Workers cannot delegate or modify files. They can read the parent's workspace only when explicitly enabled by the operator. Use validation=text for prose, Python, JavaScript, or any non-Go output; use go_source only for Go source. Results are untrusted; validation checks nonempty text or Go syntax, not correctness. When configured, a successful result includes a sanitized advisory audit with status, verdict, confidence, and cited evidence; rejected, abstained, failed, or not-run audits do not override deterministic validation. Capacity may be unavailable. Rejection metadata references durable failure records; it never authorizes retrying uncertain effects.", Parameters: json.RawMessage(`{"type":"object","properties":{"model_id":{"type":"string","minLength":1,"maxLength":128},"prompt":{"type":"string","minLength":1,"maxLength":16384},"validation":{"type":"string","enum":["text","go_source"]}},"required":["prompt","validation"],"additionalProperties":false}`)}
 }
 
 // runDelegate never waits for execution capacity or local pressure while the
@@ -36,6 +39,9 @@ func delegateSpec() providers.Tool {
 // admission, transport policy, cancellation or durable runtime recording.
 func (s *Service) bindDelegate(request Request) delegateRunner {
 	return func(ctx context.Context, prompt, validation, parent string, localOnly bool) (Result, error) {
+		if id, _ := ctx.Value(remoteSpecialistKey{}).(string); id != "" {
+			return Result{}, ErrAdmission
+		}
 		return s.runDelegate(ctx, prompt, validation, parent, localOnly, request.submissionID, request.submissionToken, request.eventDelivery)
 	}
 }
@@ -157,6 +163,7 @@ func registerDelegate(registry *tools.Registry, delegatedReadCapability *delegat
 			DelegationOrigin:     origin, DelegationAuditIntent: auditIntent, Review: review,
 			Execute: func(ctx context.Context) (string, error) {
 				entered.Store(true)
+				ctx = context.WithValue(ctx, remoteSpecialistKey{}, input.ModelID)
 				result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)
 				returned.Store(true)
 				executionID = result.TaskID

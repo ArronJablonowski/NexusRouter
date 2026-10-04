@@ -355,6 +355,9 @@ func RunAuto(ctx context.Context, s config.Settings, r Request, secret func(stri
 }
 
 func validateInput(r Request) error {
+	if r.RemoteExecution != nil && (r.RemoteExecution.Validate() != nil || r.ModelID == "" || r.ModelID == "auto" || (r.HarnessID != "" && r.RemoteExecution.Mode == "commander") || r.ContinueTaskID != "") {
+		return ErrAdmission
+	}
 	if r.SummaryAttemptID != "" && (r.ContinueTaskID == "" || r.Compaction != nil || len(r.SummaryAttemptID) > 128 || strings.TrimSpace(r.SummaryAttemptID) != r.SummaryAttemptID) {
 		return ErrAdmission
 	}

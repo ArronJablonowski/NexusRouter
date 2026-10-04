@@ -185,6 +185,13 @@ func (r Registry) authenticate(c *x509.Certificate) (Peer, error) {
 }
 func (p Peer) permits(op string) bool { return slices.Contains(p.Operations, op) }
 func (p Peer) permitsTask(t Task) bool {
+	if t.Execution != nil {
+		for _, id := range t.Execution.SpecialistIDs {
+			if !slices.Contains(p.Models, id) {
+				return false
+			}
+		}
+	}
 	if (t.HarnessID != "" && !slices.Contains(p.Harnesses, t.HarnessID)) || t.Validate() != nil || !p.permits("dispatch") || !slices.Contains(p.Models, t.ModelID) || t.MaxCost > p.MaxCost || t.ContextTokens > p.MaxContextTokens {
 		return false
 	}

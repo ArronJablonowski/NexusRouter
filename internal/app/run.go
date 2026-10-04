@@ -27,10 +27,11 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
-	ExpectedHarnessIdentity         *harness.Identity `json:"expected_harness_identity,omitempty"`
-	HarnessEvaluation               bool              `json:"harness_evaluation,omitempty"`
-	HarnessDifficulty               string            `json:"harness_difficulty,omitempty"`
-	HarnessID                       string            `json:"harness_id,omitempty"`
+	RemoteExecution                 *runtime.RemoteExecution `json:"remote_execution,omitempty"`
+	ExpectedHarnessIdentity         *harness.Identity        `json:"expected_harness_identity,omitempty"`
+	HarnessEvaluation               bool                     `json:"harness_evaluation,omitempty"`
+	HarnessDifficulty               string                   `json:"harness_difficulty,omitempty"`
+	HarnessID                       string                   `json:"harness_id,omitempty"`
 	nativeHarness                   *NativeHarness
 	nativeSelection                 *harness.Selection
 	openTaskStore                   func(context.Context) (*telemetry.Store, func(), error)
@@ -161,6 +162,17 @@ type Result struct {
 // dispatch retains its loopback-only transport even when cloud use is enabled.
 func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
+	s = remoteExecutionSettings(s, r)
+	if r.RemoteExecution != nil {
+		r.toolExtension = nil
+		r.toolReviewer = nil
+		r.toolPresenter = nil
+		r.memoryContext = nil
+		r.skillContext = nil
+		r.memoryPrepared = true
+		r.skillPrepared = true
+		r.delegateAudit = nil
+	}
 	configID, configErr := settingsConfigID(s)
 	if configErr != nil {
 		return result, ErrAdmission

@@ -2413,3 +2413,7 @@ Remote policy preview now scopes health and inventory discovery before scoring, 
 Managed vLLM adds explicit runner trust permission, fixed systemd-unit start/stop/status, idle submission/task/reservation checks, start-time RAM/thermal admission, and Settings controls. It reuses the OpenAI-compatible provider. Spark unit/config fragments are prepared separately; no unit or runtime configuration has been installed or started. The unit is operator-owned and must match the configured model/memory policy. Focused tests for new contracts are authored but not run, per user instruction. Full tests, build, push, deployment and live verification remain stopped.
 
 Historical reconciliation remains unresolved. One historical task has an unreleased writer lease and uncertain effects; the existing read-only recovery contract cannot prove a safe terminal outcome. No runtime history was altered or deleted. Two terminal-submission/task mismatches and the other historical heads still require supported reconciliation. Do not label the rollout complete.
+
+
+## Hybrid remote delegation (2026-10-04)
+Implemented explicit bounded local Commander delegation alongside default direct remote execution, permission-scoped specialist IDs, persisted deadline/call/depth bounds, and dispatch form controls. Reuses worker cancellation and durable result events. Cloud Commander assignments are intentionally unavailable pending enforceable aggregate spend accounting. Tests authored but not run; no validation, push, deployment or inference performed. See hybrid-remote-delegation.md.

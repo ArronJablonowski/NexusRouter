@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"math"
 	"slices"
@@ -46,6 +47,7 @@ func (b *SDKBackend) Info(ctx context.Context) (Info, error) {
 		return Info{}, ErrUnavailable
 	}
 	out, err := b.info(ctx, b.Models)
+	out.HybridVersion = 1
 	if err == nil {
 		out.Harnesses = filterHarnesses(b.Harnesses, out.Models, nil, true)
 	}
@@ -71,7 +73,7 @@ func (b *SDKBackend) info(ctx context.Context, configured []Model) (Info, error)
 		return Info{}, ErrUnavailable
 	}
 	models := cloneModels(configured)
-	out := Info{Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
+	out := Info{HybridVersion: 1, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
 	if b.Observe != nil {
 		observations, resources, err := b.Observe(ctx, cloneModels(models))
 		if err != nil || ctx.Err() != nil || len(observations) != len(models) {
@@ -157,7 +159,11 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	if !eligible {
 		return submissions.Status{}, ErrDenied
 	}
-	return b.Client.Submit(ctx, key, sdk.Request{Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
+	execution := t.Execution
+	if execution == nil {
+		execution = &runtime.RemoteExecution{Mode: "direct", Depth: 1}
+	}
+	return b.Client.Submit(ctx, key, sdk.Request{RemoteExecution: execution, Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
 }
 func (b *SDKBackend) Status(ctx context.Context, id string) (submissions.Status, error) {
 	if b.ReadStatus != nil {

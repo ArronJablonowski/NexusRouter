@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -32,6 +33,14 @@ func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret fun
 }
 
 func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, runErr error) {
+	if err := s.checkRemoteExecution(r); err != nil {
+		return Result{}, err
+	}
+	if r.RemoteExecution != nil && !r.RemoteExecution.Deadline.IsZero() {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, r.RemoteExecution.Deadline)
+		defer cancel()
+	}
 	r.openTaskStore = s.openTaskStore
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)
@@ -166,7 +175,16 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 	// It must not inherit the service's ordinary recursive delegation surface.
 	if r.delegatedParent == "" && r.runtimeHostAdmission == nil {
 		r.delegate = s.bindDelegate(r)
+		if r.RemoteExecution != nil {
+			r.delegate = nil
+			if r.RemoteExecution.Mode == "commander" {
+				r.delegate = s.bindRemoteDelegate(r)
+			}
+		}
 		r.delegateAudit = s.bindDelegationAudit()
+	}
+	if r.RemoteExecution != nil && r.RemoteExecution.Mode == "commander" {
+		r.Prompt = "Coordinate this bounded assignment. Use delegate or delegate_batch with an explicit model_id from the permitted specialists: " + strings.Join(r.RemoteExecution.SpecialistIDs, ", ") + ". Workers cannot delegate. Synthesize their results, identify failures, and return the final result to the controlling host.\n\n" + r.Prompt
 	}
 	return runExplicitAdmitted(ctx, cfg, r, s.secret)
 }

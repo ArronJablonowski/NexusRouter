@@ -136,10 +136,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 }
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
-	// Reviewed v1 assets: remote reported hostnames and shared specialist/remote branch geometry.
+	// Reviewed v1 assets: explicit bounded remote Commander dispatch controls.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "bcac1a27419af14a7afa965ddbe97460534319902da5d719d9d242fbb8e2456d" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "124c7ec4650cd3a430ec312b2e136e13b9ca570525659612c3dc22b6a7b72fef" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
