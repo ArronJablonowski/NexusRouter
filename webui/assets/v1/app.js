@@ -338,6 +338,25 @@
 	}
 	function formatTime(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString(); }
 	function stateLabel(value) { return typeof value === "string" && value ? value.replaceAll("_", " ") : "unknown"; }
+	const chatDescriptions = new Map(), descriptionQueue = [];
+ let descriptionReaders = 0;
+ function chatDescription(chatID) {
+  if (chatDescriptions.has(chatID)) return chatDescriptions.get(chatID);
+  const promise = new Promise(resolve => {descriptionQueue.push({chatID,resolve});});
+  if (chatDescriptions.size >= 500) chatDescriptions.delete(chatDescriptions.keys().next().value);
+  chatDescriptions.set(chatID,promise);readChatDescriptions();return promise;
+ }
+ function readChatDescriptions() {
+  while(descriptionReaders<4 && descriptionQueue.length){
+   const {chatID,resolve}=descriptionQueue.shift();descriptionReaders++;
+   requestJSON("/api/v1/chats/"+encodeURIComponent(chatID)+"/messages?limit=1").then(page=>{
+    if(!page||page.version!==1||page.chat_id!==chatID||!Array.isArray(page.messages)||page.messages.length>1)throw Error();
+    const message=page.messages.find(m=>m.role==="user"&&typeof m.text==="string");
+    const text=message?message.text.replace(/\s+/g," ").trim():"";
+    resolve(text?(text.length>100?text.slice(0,97)+"…":text):"Description unavailable");
+   }).catch(()=>{chatDescriptions.delete(chatID);resolve("Description unavailable");}).finally(()=>{descriptionReaders--;readChatDescriptions();});
+  }
+ }
 	function renderChat(item) {
 		if (!item || item.version !== 1 || typeof item.chat_id !== "string" || !item.chat_id || item.chat_id.length > 512) return false;
 		const row = element("li");
@@ -345,7 +364,10 @@
 		button.type = "button";
 		button.dataset.chatId = item.chat_id;
 		button.setAttribute("aria-current", item.chat_id === selectedChat ? "true" : "false");
-		button.append(element("span", "chat-name", item.chat_id));
+		const name = element("span", "chat-name", "Loading description…");
+  button.title = "Chat ID: " + item.chat_id;
+  button.append(name);
+  chatDescription(item.chat_id).then(description=>{if(button.isConnected){name.textContent=description;button.title=description+" — Chat ID: "+item.chat_id;}});
 		const meta = element("span", "chat-meta");
 		meta.append(element("span", "", stateLabel(item.state)), element("time", "", formatTime(item.started_at)));
 		button.append(meta);
@@ -773,7 +795,9 @@
 		approvalPanel.hidden = true;
 		clearAllProvisional();
 		for (const button of list.querySelectorAll("button[data-chat-id]")) button.setAttribute("aria-current", button.dataset.chatId === chatID ? "true" : "false");
-		title.textContent = chatID;
+		title.textContent = "Loading description…";
+  title.title = "Chat ID: " + chatID;
+  chatDescription(chatID).then(description=>{if(selectedChat===chatID)title.textContent=description;});
 		if (typeof state === "string") setTaskState(state);
 		else chatState.textContent = "";
 		transcript.replaceChildren();

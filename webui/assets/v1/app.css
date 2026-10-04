@@ -422,3 +422,6 @@ input, select { padding: .55rem .7rem; }
 .job-detail-dialog dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .5rem 1rem; }
 .job-detail-dialog dd { margin: 0; overflow-wrap: anywhere; }
 .job-instructions { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.chat-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+#chat-title { overflow-wrap: anywhere; }

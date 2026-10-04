@@ -2425,3 +2425,7 @@ Moved Active Jobs from Workboards to /app/active-jobs with primary navigation. L
 
 ## Active job descriptions and detail cards (2026-10-04)
 Job rows use bounded recorded user-instruction excerpts from the redacted presentation API, with metadata fallback when unavailable. Native dialog shows host/state/IDs/timestamps/instructions, full-conversation link for local jobs and existing authenticated status/result/cancellation controls for remote jobs. Remote inventory supplies only caller-owned bounded presentation excerpts; no raw tool/system content. Queued submissions without task history cannot yet supply descriptions. No tests or deployment performed; validation remains stopped.
+
+
+## Chat descriptions (2026-10-04)
+Chat list and conversation headings use concise redacted user-instruction excerpts, loaded with four bounded concurrent requests and cached in memory. IDs remain in URLs and tooltips. Missing/inaccessible history is explicitly unavailable. No inference or validation suites; deploy per standing user authorization.
