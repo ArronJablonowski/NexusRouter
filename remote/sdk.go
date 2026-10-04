@@ -18,6 +18,9 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	// ReadStatus borrows the serving dispatcher store when available.
+	ReadStatus func(context.Context, string) (submissions.Status, error)
+
 	LogEvents func(context.Context, sessions.EventLogOptions) (sessions.CommittedEventPage, error)
 
 	Usage func(context.Context, []string) (usagestats.RemoteUsage, error)
@@ -134,6 +137,9 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	return b.Client.Submit(ctx, key, sdk.Request{Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
 }
 func (b *SDKBackend) Status(ctx context.Context, id string) (submissions.Status, error) {
+	if b.ReadStatus != nil {
+		return b.ReadStatus(ctx, id)
+	}
 	return b.Client.SubmissionStatus(ctx, id)
 }
 func (b *SDKBackend) Cancel(ctx context.Context, id string) (submissions.Status, error) {
