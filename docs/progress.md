@@ -2468,3 +2468,6 @@ Added /cron with separate local and remote NexusRouter interval schedules and an
 
 ### Cron readability (2026-10-05)
 Cron now uses the Routing Grid palette, separate local/remote panels, structured cards with enabled/disabled badges, human-readable intervals and localized next-run times. Stable keyed rows retain scroll and DOM during refresh. OS host lists remain independently scrollable. Presentation-only update; no scheduler policy changes.
+
+### Shared Routing Grid appearance (2026-10-05)
+Applied the Routing Grid palette and panel/control styling across Chats, Workboards, Active jobs, Status, Models, Skills, Stats, Settings, dialogs, navigation and browser connection. Preserves existing layout, responsive rules, DOM updates and semantic error/warning colors. CSS-only change; no task execution or settings changes. Targeted browser checks and deployment evidence in resources/shared-theme-*.

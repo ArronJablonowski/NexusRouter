@@ -13,3 +13,5 @@ button { padding: .7rem 1rem; border: 0; border-radius: .5rem; background: #73e6
 #copy-command {margin-top:.8rem;cursor:pointer}
 #copy-command:disabled {opacity:.5;cursor:default}
 #copy-status {font-size:.9rem;color:#b8c7dc;min-height:1.4em}
+/* Match the application Routing Grid theme. */
+:root{background:#020c13;color:#e0f3f7}body{background:radial-gradient(ellipse at 50% 10%,#08333b,transparent 42rem),#020c13}section{border-color:#25828c;border-radius:.4rem;background:linear-gradient(140deg,#062630,#03141f);box-shadow:0 0 3rem #00eaff12}h1{color:#dfffff}p{color:#adc9d2;line-height:1.6}output,#command code{background:#02121b;border:1px solid #26616d;border-radius:.3rem;color:#87f4f1}button{border:1px solid #79eaf0;border-radius:.3rem;background:#64e1e7;color:#042129}:focus-visible{outline-color:#8fffff}

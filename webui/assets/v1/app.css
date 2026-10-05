@@ -455,3 +455,53 @@ input, select { padding: .55rem .7rem; }
 
 /* Cron shares the routing grid palette, with static readable schedule cards. */
 .cron-view>*{position:relative}.cron-heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1.5rem}.cron-heading h1{font-size:clamp(1.8rem,3vw,2.5rem);margin:.35rem 0;color:#e0fbff}.cron-heading p,.os-schedules-panel>header>p{color:#a5c6cd;line-height:1.5}.cron-view .eyebrow{color:#65d8e4;letter-spacing:.13em;font-size:.7rem;text-transform:uppercase}.cron-heading button{border:1px solid #22dae0;background:#073037;color:#bdffff;white-space:nowrap}.cron-legend{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem .8rem;padding:.9rem 1rem;border:1px solid #15505a;background:#041b22;color:#acc6ce;font-size:.8rem}.cron-legend>span:last-child{margin-left:auto}.cron-app-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;margin-top:1.5rem}.cron-host-panel{border:1px solid #168291;background:#04131ce6;padding:1.25rem;box-shadow:inset 0 1px #51efff20}.cron-host-panel h2,.os-schedules-panel h2{font-size:1.2rem;margin:.4rem 0;color:#d8f8ff}.cron-observation{font-size:.78rem;line-height:1.55;color:#9db9c3;margin:.8rem 0 1rem}.cron-cards{display:grid;gap:.7rem;list-style:none;margin:0;padding:0}.cron-card{padding:1rem;border:1px solid #145263;border-left:3px solid #36e7ed;background:linear-gradient(110deg,#082a35,#061b26);min-width:0}.cron-card-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:.8rem}.cron-card-heading strong{font-size:.9rem;line-height:1.5;color:#e1f4f8;overflow-wrap:anywhere}.cron-badge{display:inline-block;flex-shrink:0;border:1px solid currentColor;padding:.2rem .45rem;border-radius:.25rem;font-size:.65rem;font-weight:700;letter-spacing:.04em;line-height:1.3}.cron-badge.enabled{color:#77f3c0;background:#0b372f}.cron-badge.disabled{color:#b3bfcb;background:#192630}.cron-badge.system{color:#e5d58e;background:#322d17}.cron-timing{margin:.65rem 0 .3rem;color:#77e7ef;font-size:.86rem;font-weight:600}.cron-detail{margin:0;color:#a1b6c2;font-size:.72rem;line-height:1.55}.cron-card-disabled{border-left-color:#657d8a;background:#0b1b26}.cron-card-disabled .cron-timing{color:#b0c8d3}#cron-view .os-schedules-panel{margin-top:2rem;padding:1.25rem;border:1px solid #4d6070;border-radius:.3rem;background:#060f19d9}#cron-os-hosts{margin-top:1.25rem}#cron-os-hosts section{border:1px solid #295262;background:#061c25;border-radius:.2rem}#cron-os-hosts h3{font-size:.95rem;line-height:1.5;color:#c8f1f5}#cron-os-hosts .cron-cards{max-height:32rem;overflow:auto;scrollbar-gutter:stable;padding-right:.3rem}.cron-footnote{font-size:.75rem;line-height:1.6;color:#9bb5c0;margin-top:1.2rem}#cron-remote-hosts .cron-host{padding-top:.5rem;border-top:1px solid #205060}#cron-remote-hosts h3{font-size:.95rem;color:#e7d78f}@media(max-width:1000px){.cron-app-grid{grid-template-columns:1fr}.cron-card-heading{flex-wrap:wrap}.cron-legend>span:last-child{margin-left:0}}@media(max-width:600px){.cron-heading{align-items:flex-start;flex-direction:column}.cron-host-panel,#cron-view .os-schedules-panel{padding:.85rem}}
+
+/* Shared Routing Grid theme. Presentation only: preserve page geometry and live DOM. */
+:root{--nx-bg:#020c13;--nx-panel:#041721;--nx-raised:#082630;--nx-line:#205562;--nx-accent:#66edf2;--nx-text:#e0f3f7;--nx-muted:#a3bec8;background:var(--nx-bg);color:var(--nx-text)}
+body{background:radial-gradient(ellipse at 55% 0,#08333b,transparent 48rem),var(--nx-bg)}
+.topbar{background:#031018f5;border-color:var(--nx-line)}
+.mark{background:#64edef;color:#032126;border:1px solid #b1ffff;border-radius:.3rem;box-shadow:0 0 1rem #00eaff20}
+.rail{background:#030f18;border-color:var(--nx-line)}
+.rail a{border:1px solid transparent;border-radius:.25rem;color:#b8d2da}
+.rail a:hover,.rail a:focus-visible,.rail a[aria-current="page"]{background:#0a303b;border-color:#277581;color:#d5ffff;box-shadow:inset 3px 0 #56eff2}
+main{background:linear-gradient(#03131b80,#020c13b0),repeating-linear-gradient(90deg,transparent 0 63px,#00eaff06 64px),repeating-linear-gradient(0deg,transparent 0 63px,#00eaff06 64px)}
+h1,h2,h3{color:var(--nx-text)}
+.eyebrow{color:#76dce5;letter-spacing:.11em;font-size:.72rem}
+.status,.help,.notice,.chat-meta,.message-label,.provisional-label,.stats-note,.stats-since{color:var(--nx-muted)}
+button{border-color:#55dce3;border-radius:.3rem;background:#64e1e7;color:#042129}
+button:not(:disabled):hover{filter:brightness(1.1)}
+.secondary{border-color:#317585;background:#09303c;color:#ccf8fb;border-radius:.3rem}
+.danger{border-color:#b45b6c;background:#48212e;color:#ffdae0}
+textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3rem;color:var(--nx-text);accent-color:#56e8e9}
+:where(button,a,input,textarea,select,summary):focus-visible{outline:2px solid #8fffff;outline-offset:3px}
+.chat-index,.transcript-panel,.inspector,.board-index,.kanban-panel,.settings-card,.model-inventory-section,.stats-card{background:linear-gradient(140deg,#06222bdc,#03141ef5);border-color:#24616d;border-radius:.35rem;box-shadow:inset 0 1px #77faff12,0 0 1.5rem #00cddd07}
+.section-heading,.transcript-heading,.inspector-heading,.inspector-section,.kanban-heading,.workboard-filters,.task-controls,.approval-panel,.feedback-panel,.composer,.card-details,.card-detail-section,.stats-trip,.model-details{border-color:var(--nx-line)}
+.chat-list button,.board-list a{border-radius:.25rem}
+.chat-list button:hover,.chat-list button:focus-visible,.chat-list button[aria-current="true"],.board-list a:hover,.board-list a:focus-visible,.board-list a[aria-current="page"]{background:#0c3541;color:#e3fbff;box-shadow:inset 2px 0 #58eced}
+.count,.state-pill{background:#0d3540;color:#bff6fa;border:1px solid #2e6370;border-radius:.3rem}
+.state-running{color:#8df3c5}.state-failed,.state-canceled,.notice.error,.field-error,.mutation-bar{color:#ffb6c1}
+.message{border-color:#245663;background:#09232e;border-radius:.45rem}
+.message.user{background:#103943;border-color:#388692}
+.message-label{color:#78d7e3}.provisional-item{background:#062b2d;border-color:#63dfcd;border-radius:.4rem}
+.inspector-details dt,.inspector-details dd{background:#051b25;border-color:#204b5a;border-radius:0}
+.inspector-details dt{color:#abcbd3}.inspector-details dd{color:#e0f3f7}
+.inspector-list li,.kanban-card,.model-card,.setting-toggle,.approval-prompt{background:#082430;border-color:#285c6a;border-radius:.3rem}
+.model-card:hover,.model-card.expanded,.model-card-toggle:hover{background:#0b303c;border-color:#49acbb}
+.model-summary{background:linear-gradient(120deg,#09303c,#041620);border-color:#287181;border-radius:.35rem}
+.model-summary strong{color:#80eff0}.model-badge{border-color:#427281;color:#b7d6df;border-radius:.25rem}.model-badge.usable{color:#8bf0c1;border-color:#428f78}.model-badge.unavailable{color:#ffbac4;border-color:#aa5e6a}
+.kanban-column{background:#031721;border-color:#20525e;border-radius:.3rem}
+.kanban-card.selected-card{border-color:#68e6e9;box-shadow:0 0 0 1px #68e6e9}
+.attempt-toggle,.approval-list button{background:#0b3541;color:var(--nx-text)}
+.presentation-controls button[aria-pressed="true"]{border-color:#81f8f3;background:#0a4248;color:#caffff}
+.switch span{background:#102b38;border-color:#4a7783}.switch input:checked+span{background:#14656a;border-color:#72edf0}
+.settings-advisory,.approval-scope{background:#292719;border-color:#e1c86a;color:#ede0b5}
+.stats-card{border-radius:.35rem}.stats-local{border-top-color:#66dfba}.stats-cloud{border-top-color:#76d9ff}
+.odometer{background:linear-gradient(#092d39,#04151f);border-color:#266477;border-radius:.3rem;color:#d3fcff}.odometer-separator{color:#76a8b8}
+.dialog,.workboard-dialog,#stats-reset-dialog,.job-detail-dialog{background:#041923;color:var(--nx-text);border:1px solid #3e9ba8;border-radius:.4rem;box-shadow:0 0 3rem #00d5e512}
+.destructive-dialog{border-color:#d57a85}
+#remote-peers details,#remote-discovery-results>div,#remote-pair-form fieldset{border-color:var(--nx-line)}
+#remote-pair-form fieldset{background:#041b25;border-radius:.3rem}
+#skills-view,#stats-view,#models-view,#settings-view,#active-jobs-view,#status-view,#workboard-view{border-top:1px solid #1b6875;padding-top:1.25rem}
+#status-view .inspector{max-width:none}.active-jobs-panel{border-color:#287381;background:#051c26;border-radius:.3rem}
+.active-jobs-list li{background:#0a2b36;border-left-color:#5aeeef;border-radius:0 .25rem .25rem 0}
+@media(prefers-reduced-motion:reduce){.model-card,.switch span,.switch span::after{transition:none}}
