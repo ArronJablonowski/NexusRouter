@@ -116,7 +116,16 @@
         </section>
 
       </section>
-      <section id="cron-view" hidden><header class="control-heading"><h1>Cron</h1><button id="refresh-cron" type="button">Refresh</button></header><p>NexusRouter scheduled work. Enabled means scheduling is configured, not that a job is currently running. Next-run times are not exposed by these interval schedulers.</p><section><h2>Local scheduled tasks</h2><p id="cron-local-state" role="status">Loading schedules…</p><ul id="cron-local-list" class="inspector-list"></ul></section><section><h2>Remote scheduled tasks</h2><p id="cron-remote-state" role="status">Loading remote schedules…</p><div id="cron-remote-hosts"></div></section><section class="os-schedules-panel" aria-labelledby="os-schedules-title"><h2 id="os-schedules-title">Operating-system schedules</h2><p>Read-only timer, launchd, and cron metadata. Commands and environment variables are not displayed.</p><div id="cron-os-hosts"></div></section></section>
+      <section id="cron-view" class="tron-view cron-view" aria-labelledby="cron-title" hidden>
+        <header class="cron-heading"><div><p class="eyebrow">Schedule control center</p><h1 id="cron-title">Cron grid</h1><p>Scheduled work across your connected systems.</p></div><button id="refresh-cron" class="secondary" type="button">Refresh schedules</button></header>
+        <p class="cron-legend"><span class="cron-badge enabled">Enabled</span> Scheduling configured <span class="cron-badge disabled">Disabled</span> Not scheduled <span>Live execution status is shown on Active jobs.</span></p>
+        <div class="cron-app-grid">
+          <section class="cron-host-panel"><header><p class="eyebrow">This system</p><h2>Local scheduled tasks</h2></header><p id="cron-local-state" class="cron-observation" role="status">Loading schedules…</p><ul id="cron-local-list" class="cron-cards"></ul></section>
+          <section class="cron-host-panel"><header><p class="eyebrow">Connected systems</p><h2>Remote scheduled tasks</h2></header><p id="cron-remote-state" class="cron-observation" role="status">Loading remote schedules…</p><div id="cron-remote-hosts"></div></section>
+        </div>
+        <section class="os-schedules-panel" aria-labelledby="os-schedules-title"><header><p class="eyebrow">Host automation · read-only</p><h2 id="os-schedules-title">Operating-system schedules</h2><p>Timers, launchd jobs and cron entries, grouped by host.</p></header><div id="cron-os-hosts"></div></section>
+        <p class="cron-footnote">Updates every 30 seconds. Enabled does not mean running. NexusRouter interval schedulers do not expose next-run times. Commands and environment variables remain private.</p>
+      </section>
       <section id="status-view" hidden>
         <aside id="inspector" class="inspector" aria-labelledby="inspector-title">
           <div class="inspector-heading">
