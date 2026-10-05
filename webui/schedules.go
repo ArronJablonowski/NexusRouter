@@ -12,7 +12,10 @@ type SchedulePage struct {
 	ObservedAt time.Time  `json:"observed_at"`
 	Items      []Schedule `json:"items"`
 }
+
+// AIUsage describes capability, not measured token consumption. Empty means unknown on older hosts.
 type Schedule struct {
+	AIUsage     string `json:"ai_usage,omitempty"`
 	ID          string `json:"id"`
 	Description string `json:"description"`
 	Enabled     bool   `json:"enabled"`
@@ -29,6 +32,9 @@ func (p SchedulePage) Validate() error {
 			return ErrContract
 		}
 		seen[s.ID] = true
+		if s.AIUsage != "" && s.AIUsage != "possible" && s.AIUsage != "none" && s.AIUsage != "unknown" {
+			return ErrContract
+		}
 		d, e := time.ParseDuration(s.Interval)
 		if e != nil || d <= 0 || d > 24*time.Hour {
 			return ErrContract

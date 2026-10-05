@@ -2471,3 +2471,8 @@ Cron now uses the Routing Grid palette, separate local/remote panels, structured
 
 ### Shared Routing Grid appearance (2026-10-05)
 Applied the Routing Grid palette and panel/control styling across Chats, Workboards, Active jobs, Status, Models, Skills, Stats, Settings, dialogs, navigation and browser connection. Preserves existing layout, responsive rules, DOM updates and semantic error/warning colors. CSS-only change; no task execution or settings changes. Targeted browser checks and deployment evidence in resources/shared-theme-*.
+
+### Cron AI usage labels
+- Built-in schedule metadata now distinguishes operations that can invoke models (workboards and skill learning) from deterministic maintenance. Cards display capability independently of enabled state; this is not measured token usage.
+- Local and remote cards consume the same metadata; older hosts and OS entries without evidence show unknown, never infer no AI from script execution or job names.
+- Focused contract and read-only inventory checks; full validation and push remain stopped by user.

@@ -17,7 +17,14 @@ func (s *Service) BrowserSchedules(ctx context.Context) (webui.SchedulePage, err
 		if interval == "" {
 			interval = "1m"
 		}
-		p.Items = append(p.Items, webui.Schedule{ID: id, Description: description, Enabled: enabled, Interval: interval})
+		usage := "unknown"
+		switch id {
+		case "workboards", "skill-learning":
+			usage = "possible"
+		case "skill-regression", "outcome-supervision", "provider-health", "metrics-export", "trace-export", "harness-evidence":
+			usage = "none"
+		}
+		p.Items = append(p.Items, webui.Schedule{AIUsage: usage, ID: id, Description: description, Enabled: enabled, Interval: interval})
 	}
 	add("workboards", "Process eligible workboard cards", c.Workboard.Scheduler.Enabled, c.Workboard.Scheduler.Interval)
 	add("skill-learning", "Learn skills from recorded outcomes", c.Skills.Learning.Enabled, c.Skills.Learning.Interval)

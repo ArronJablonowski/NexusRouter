@@ -505,3 +505,5 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 #status-view .inspector{max-width:none}.active-jobs-panel{border-color:#287381;background:#051c26;border-radius:.3rem}
 .active-jobs-list li{background:#0a2b36;border-left-color:#5aeeef;border-radius:0 .25rem .25rem 0}
 @media(prefers-reduced-motion:reduce){.model-card,.switch span,.switch span::after{transition:none}}
+
+.cron-usage{font-size:.82rem;font-weight:600;color:var(--nx-muted);margin:.65rem 0 0}.cron-usage[data-usage="possible"]{color:#f4cb72}.cron-usage[data-usage="none"]{color:#8cddd0}
