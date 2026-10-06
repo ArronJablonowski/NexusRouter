@@ -98,6 +98,7 @@
 		approvalDeny.disabled = blocked;
 		approvalRevoke.disabled = blocked;
 		approvalClose.disabled = blocked;
+  for(const button of approvalList.querySelectorAll("[data-approval-action]"))button.disabled=blocked;
 		approvalPanel.hidden = !task;
 	}
 	function idempotencyKey() {
@@ -574,42 +575,38 @@
 		approvalAcknowledge.hidden = true;
 		(item.canDeny ? approvalDeny : approvalClose).focus();
 	}
-	function renderApproval(item) {
-		const row = element("li");
-		const button = element("button", "", item.toolName + " — " + stateLabel(item.state));
-		button.type = "button";
-		button.addEventListener("click", () => openApproval(item, button));
-		row.append(button);
-		approvalList.append(row);
-	}
+ function renderApproval(item) { return window.NexusChatRender.approval(approvalList,item,{element,stateLabel,decideApproval,openApproval}); }
+ let approvalTaskID="", approvalEpoch=0;
 	function loadApprovals() {
 		const task = selectedControls;
-		approvalList.replaceChildren();
-		approvalCount.textContent = "";
+  const epoch=++approvalEpoch;
+  if(approvalTaskID !== task?.taskID){approvalList.replaceChildren();approvalCount.textContent="";approvalTaskID=task?.taskID||"";}
 		if (!task || !selectedChat) {
 			approvalPanel.hidden = true;
 			return;
 		}
 		approvalPanel.hidden = false;
-		showNotice(approvalState, "Loading approvals…", false);
+		if(!approvalList.children.length)showNotice(approvalState, "Loading approvals…", false);
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(task.taskID) + "/approvals?limit=" + String(maxApprovals)).then(body => {
-			if (selectedControls !== task) return;
+			if (selectedControls?.taskID !== task.taskID || epoch !== approvalEpoch) return;
 			if (!body || body.version !== 1 || body.task_id !== task.taskID || !Array.isArray(body.items) || body.items.length > maxApprovals ||
 				typeof body.has_more !== "boolean" || typeof body.next_cursor !== "string" || body.next_cursor.length > 512 || body.has_more !== Boolean(body.next_cursor)) throw new Error("invalid approvals");
 			const items = body.items.map(item => validApproval(item, task.taskID));
 			if (items.some(item => !item || item.taskID !== task.taskID)) throw new Error("invalid approval");
-			for (const item of items) renderApproval(item);
+			const keep=new Set(items.map(renderApproval));
+   for(const row of [...approvalList.children])if(!keep.has(row))row.remove();
+   updateControls();
 			approvalCount.textContent = String(items.length);
 			if (body.has_more) showNotice(approvalState, "Showing the first " + String(items.length) + " approvals.", false);
 			else if (items.length) approvalState.hidden = true;
 			else showNotice(approvalState, "No approvals need attention.", false);
 		}).catch(() => {
-			if (selectedControls === task) showNotice(approvalState, "Approvals could not be loaded.", true);
+			if (selectedControls?.taskID === task.taskID && epoch === approvalEpoch) showNotice(approvalState, "Approvals could not be updated. Previous observations may be stale.", true);
 		});
 	}
-	function decideApproval(action) {
-		const item = activeApproval;
-		if (!item || pendingIntent) return;
+	function decideApproval(action, item = activeApproval) {
+  if (!item || pendingIntent || unresolvedOperations.length || !operationsReady || !csrfToken || taskContextUnavailable || selectedControls?.taskID !== item.taskID) return;
+  if (!(action === "allow" ? item.canAllow : action === "deny" ? item.canDeny : action === "revoke" && item.canRevoke)) return;
 		approvalClose.textContent = "Decision in progress";
 		mutate("/api/v1/tasks/" + encodeURIComponent(item.taskID) + "/approvals/" + encodeURIComponent(item.id) + "/decision", {
 			version: 1, task_id: item.taskID, approval_id: item.id, action, expected_revision: item.revision

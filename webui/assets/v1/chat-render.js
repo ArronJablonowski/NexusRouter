@@ -29,5 +29,29 @@ window.NexusChatRender = (() => {
    if(reset)for(const node of [...root.children])if(!keep.has(node))node.remove();
   });
  }
- return {messages,preserve};
+	function approval(approvalList, item, {element,stateLabel,decideApproval,openApproval}) {
+  let row = [...approvalList.children].find(node => node.dataset.approvalId === item.id);
+  if (!row) {
+   row = element("li", "message approval-message"); row.dataset.approvalId = item.id;
+   row.append(element("span", "message-label", "Tool approval"), element("p", "approval-request"), element("p", "approval-scope"), element("pre", "approval-proposal"), element("p", "approval-result"));
+   const actions = element("div", "control-actions");
+   for (const [action, label] of [["allow", "Allow once"], ["deny", "Deny"], ["revoke", "Revoke approval"]]) {
+    const button = element("button", action === "allow" ? "" : "secondary", label);
+    button.type = "button"; button.dataset.approvalAction = action;
+    button.addEventListener("click", () => decideApproval(action, row.approvalItem)); actions.append(button);
+   }
+   const details = element("button", "secondary", "View request details"); details.type="button";
+   details.addEventListener("click", () => openApproval(row.approvalItem, details)); actions.append(details);
+   row.append(actions); approvalList.append(row);
+  }
+  row.approvalItem = item;
+  const set = (selector, value) => { const node = row.querySelector(selector); if(node.textContent !== value) node.textContent=value; };
+  set(".approval-request", item.toolName + " · " + item.prompt);
+  set(".approval-scope", "Scope: " + item.scopeSummary + " · " + stateLabel(item.behavior));
+  set(".approval-proposal", item.proposalText); row.querySelector(".approval-proposal").hidden=!item.proposalText;
+  set(".approval-result", stateLabel(item.state) + (["approved","denied","revoked","consumed"].includes(item.state) ? " · Decision recorded in the approval log." : ""));
+  for(const [action, permitted] of [["allow",item.canAllow],["deny",item.canDeny],["revoke",item.canRevoke]]) row.querySelector('[data-approval-action="'+action+'"]').hidden=!permitted;
+  return row;
+ }
+ return {messages,preserve,approval};
 })();

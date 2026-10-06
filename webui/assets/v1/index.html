@@ -66,6 +66,11 @@
           <button id="load-more-messages" class="secondary transcript-more" type="button" hidden>Load more messages</button>
           <div id="provisional" class="provisional-stack" aria-label="Provisional assistant output" hidden></div>
           <output id="stream-announcement" class="visually-hidden" aria-live="polite"></output>
+          <section id="approval-panel" class="approval-panel" aria-labelledby="approval-title" hidden>
+            <div class="control-heading"><h3 id="approval-title">Tool approval messages</h3><output id="approval-count" class="count"></output></div>
+            <div id="approval-state" class="notice compact" role="status"></div>
+            <ul id="approval-list" class="approval-list" aria-label="Tool approval requests and decision log"></ul>
+          </section>
           <section id="task-controls" class="task-controls" aria-labelledby="task-controls-title" hidden>
             <h3 id="task-controls-title">Work controls</h3>
             <div id="steering-control">
@@ -77,11 +82,6 @@
               <button id="steer-task" class="secondary" type="button">Queue guidance</button>
               <button id="cancel-task" class="danger" type="button">Cancel task</button>
             </div>
-          </section>
-          <section id="approval-panel" class="approval-panel" aria-labelledby="approval-title" hidden>
-            <div class="control-heading"><h3 id="approval-title">Tool approvals</h3><output id="approval-count" class="count"></output></div>
-            <div id="approval-state" class="notice compact" role="status"></div>
-            <ul id="approval-list" class="approval-list" aria-label="Pending tool approvals"></ul>
           </section>
           <section id="feedback-panel" class="feedback-panel" aria-labelledby="feedback-title" hidden>
             <h3 id="feedback-title">Outcome evidence</h3>

@@ -507,3 +507,14 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 @media(prefers-reduced-motion:reduce){.model-card,.switch span,.switch span::after{transition:none}}
 
 .cron-usage{font-size:.82rem;font-weight:600;color:var(--nx-muted);margin:.65rem 0 0}.cron-usage[data-usage="possible"]{color:#f4cb72}.cron-usage[data-usage="none"]{color:#8cddd0}
+
+/* Tool approval messages stay in the conversation and retain their decision state. */
+.approval-list { display: grid; gap: .75rem; list-style: none; padding: 0; }
+.approval-message { width: 100%; max-width: 100%; border-left: 3px solid var(--accent, #00d9df); }
+.approval-message .approval-scope, .approval-message .approval-result { font-size: .875rem; }
+.approval-message .approval-proposal { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 22rem; overflow: auto; }
+.approval-message .control-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.approval-list { max-height: 28rem; }
+.approval-message .control-actions button { width: auto; margin: 0; text-align: center; }
+.approval-message [data-approval-action="allow"] { background: #087a70; }

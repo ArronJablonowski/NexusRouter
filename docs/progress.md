@@ -2483,3 +2483,8 @@ Applied the Routing Grid palette and panel/control styling across Chats, Workboa
 - Fixed Status task inspection starvation when refresh overlaps a slow response. Concurrent reads for the same task share the pending operation while task changes retain race protection.
 - Cron retains prior observations with a stale warning on transient remote inspection errors; authorization revocation still clears data. OS crontab environment assignments with whitespace around '=' are excluded from schedule metadata.
 - Focused regression checks and full-suite/deployment/live QA evidence are recorded under resources/qa-20261005-*; final completion requires successful full check and live retest.
+
+### In-chat tool approvals (2026-10-06)
+- Tool requests now appear as stable chat message cards, including exact scope/proposals and inline Allow once, Deny, and Revoke controls. Only a validated, committed server state is presented as recorded; unresolved outcomes continue using existing reconciliation controls. Free-text replies grant no authority.
+- Reuses authenticated CSRF-protected, revision-fenced, idempotent approval mutations. Existing transactionally stored records retain attributed decision actor/time and request identity; receipt retry regression verifies decisions are neither lost nor duplicated.
+- Browser regression covers inline approval and revocation, stable nodes, no modal dependency and recorded result rendering. Full check from prior QA failed on outdated envelope-version and route-guard test expectations; corrected both to match current contracts. New combined full check required before normal push/deployment.

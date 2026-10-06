@@ -24,7 +24,7 @@ func TestControlEnvelopeVersionsDurableAdmission(t *testing.T) {
 		t.Fatal(e)
 	}
 	branchBody, _ := branchEnvelope(t, branch, true)
-	for _, version := range []int{1, 2, 3, 4, 5, 6, 7, 8} {
+	for version := 1; version <= submissions.CurrentEnvelopeVersion+1; version++ {
 		for _, kind := range []string{"branch", "resume"} {
 			t.Run(fmt.Sprintf("%s-v%d", kind, version), func(t *testing.T) {
 				raw := branchBody
@@ -42,7 +42,7 @@ func TestControlEnvelopeVersionsDurableAdmission(t *testing.T) {
 				} else {
 					status, err = db.CreateBranchSubmission(ctx, key, hex.EncodeToString(sum[:]), config, raw)
 				}
-				if version == 1 || version == 8 {
+				if version == 1 || version > submissions.CurrentEnvelopeVersion {
 					if !errors.Is(err, submissions.ErrInvalid) {
 						t.Fatal("unsupported envelope accepted", status, err)
 					}
