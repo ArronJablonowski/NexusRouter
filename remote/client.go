@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -116,6 +117,9 @@ func (c *Client) callPinned(ctx context.Context, destination, op, method, path s
 		return ErrInvalid
 	}
 	request.Header.Set("X-Nexus-Instance", destination)
+	if hostname, e := os.Hostname(); e == nil && validHostname(hostname) {
+		request.Header.Set("X-Nexus-Hostname", hostname)
+	}
 	if task != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}

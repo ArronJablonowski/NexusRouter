@@ -214,6 +214,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			info.Version = Version
 			info.Instance = s.instance
+			info.Controller = requestingController(peer, r.Header.Get("X-Nexus-Hostname"))
 			info.Hostname = ""
 			if hostname, hostErr := os.Hostname(); hostErr == nil && validHostname(hostname) {
 				info.Hostname = hostname

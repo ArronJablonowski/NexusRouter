@@ -2532,3 +2532,12 @@ Recovery identity is preserved in the URL before sending; uncertain dispatch is
 not replayed. Remote requests are independent jobs, not resumed local conversations;
 existing chat history is not transferred. Full remote conversational history and
 persistent destination across separate chats are not implemented.
+
+## Routing Grid controlling commander
+
+Remote cards display the authenticated querying commander's reported hostname and
+registered endpoint IP when that peer has dispatch authority. The destination
+constructs this metadata from its permission-scoped trust relationship; other
+peers are not enumerated. Hostname is authenticated-peer-reported metadata, not
+DNS attestation. This labels paired control authority, not ownership of an active
+job. Older hosts explicitly show “not reported.”

@@ -533,3 +533,4 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 #host-routing select { max-width: 100%; }
 #host-receipt { overflow-wrap: anywhere; }
 #host-receipt pre { white-space: pre-wrap; }
+.remote-controller { margin: .5rem 0; color: #9fdade; font-size: .85rem; overflow-wrap: anywhere; }
