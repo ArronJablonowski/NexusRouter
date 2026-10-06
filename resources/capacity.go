@@ -37,7 +37,7 @@ type CapacityRequest struct {
 // ValidateNeed admits the model/resource requirement independently of a host
 // measurement so callers can reject malformed work before routing or profiling.
 func ValidateNeed(need Need) error {
-	if need.RAM == 0 || (need.Device != "" && (need.VRAM == 0 || !ValidGPUDeviceID(need.Device))) {
+	if (need.BackendManagedRAM && (need.VRAM != 0 || need.Device != "")) || need.RAM == 0 || (need.Device != "" && (need.VRAM == 0 || !ValidGPUDeviceID(need.Device))) {
 		return ErrResourceData
 	}
 	return nil
@@ -149,6 +149,12 @@ func checkedCapacity(result CapacityResult) (CapacityResult, error) {
 
 func capacityHeadroom(snapshot Snapshot, need Need, budget *Budget, now time.Time) CapacityHeadroom {
 	ram, _ := ramHeadroom(snapshot, budget.used.RAM, budget.limits.RAMPercent)
+	if need.BackendManagedRAM {
+		ceiling := byteCeiling(snapshot.TotalRAM, budget.limits.RAMPercent)
+		if budget.used.RAM <= ceiling {
+			ram = ceiling - budget.used.RAM
+		}
+	}
 	result := CapacityHeadroom{RAMBytes: ram, Device: need.Device}
 	if need.Device != "" {
 		total, available, err := DeviceMemory(snapshot, need.Device, now, budget.limits.MaxAge)

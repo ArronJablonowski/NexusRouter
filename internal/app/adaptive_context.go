@@ -127,7 +127,7 @@ func (s *Service) contextFitsMemory(ctx context.Context, model config.Model) fun
 		if err != nil {
 			return false
 		}
-		plan, err := s.budget.Plan(ctx, resources.CapacityRequest{Version: resources.CapacityContractVersion, Need: modelResources(sized), Snapshot: snapshot, Now: time.Now()})
+		plan, err := s.budget.Plan(ctx, resources.CapacityRequest{Version: resources.CapacityContractVersion, Need: s.modelResources(sized), Snapshot: snapshot, Now: time.Now()})
 		return err == nil && plan.Action == resources.CapacityAdmit
 	}
 }

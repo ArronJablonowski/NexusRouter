@@ -58,14 +58,14 @@ func (s *Service) reserveManagedResidency(ctx context.Context, provider config.P
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	low, err := s.budget.LowMemory(snapshot, modelResources(model), time.Now())
+	low, err := s.budget.LowMemory(snapshot, s.modelResources(model), time.Now())
 	if err != nil {
 		if errors.Is(err, resources.ErrCapacity) {
 			return bad()
 		}
 		return nil, ErrAdmission
 	}
-	need := modelResources(model)
+	need := s.modelResources(model)
 	plan, err := s.budget.Plan(ctx, resources.CapacityRequest{Version: resources.CapacityContractVersion, Snapshot: snapshot, Need: need, Now: time.Now()})
 	if err != nil {
 		return nil, ErrAdmission

@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"errors"
+	"net"
+	"net/url"
 	"runtime"
 	"sync"
 	"time"
@@ -84,4 +86,25 @@ func watchSwapGrowth(ctx context.Context, baseline, limit uint64, interval time.
 		}
 		return nil
 	}
+}
+
+// Backend-managed admission is opt-in and limited to local Ollama on macOS.
+func (s *Service) modelResources(model config.Model) resources.Need {
+	need := modelResources(model)
+	if runtime.GOOS != "darwin" || !s.settings.Hardware.MacBackendManagedMemory || model.Locality != "local" {
+		return need
+	}
+	for _, provider := range s.settings.Providers {
+		if provider.ID == model.Provider && provider.Kind == "ollama" {
+			endpoint, err := url.Parse(provider.ResolvedEndpoint())
+			if err != nil {
+				return need
+			}
+			host := endpoint.Hostname()
+			ip := net.ParseIP(host)
+			need.BackendManagedRAM = host == "localhost" || (ip != nil && ip.IsLoopback())
+			break
+		}
+	}
+	return need
 }

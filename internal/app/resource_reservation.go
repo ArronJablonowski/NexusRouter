@@ -233,7 +233,8 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 	// unload a peer daemon's model. Coordinated daemons conservatively retain
 	// resident models until residency lifecycle ownership is also durable.
 	request := resources.ReservationRequest{
-		Version: resources.ReservationContractVersion, ReservationID: input.reservationID,
+		BackendManagedRAM: s.modelResources(model).BackendManagedRAM,
+		Version:           resources.ReservationContractVersion, ReservationID: input.reservationID,
 		HostScope: hostResourceScope, Owner: owner, TaskID: input.taskID, SessionID: input.sessionID,
 		ProviderID: model.Provider, ModelID: model.ID, Profile: input.profile, GPUDevice: model.GPUDevice,
 		RAMBytes: model.RAMBytes, VRAMBytes: model.VRAMBytes, ContextTokens: input.contextTokens,
@@ -246,7 +247,7 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 	// claim. A durable failure therefore cannot create local overlap, while a
 	// local capacity denial creates no terminal durable tombstone for a pressure
 	// retry with the same frozen identity.
-	localRelease, err := s.budget.Reserve(snapshot, modelResources(model), now)
+	localRelease, err := s.budget.Reserve(snapshot, s.modelResources(model), now)
 	if err != nil {
 		if errors.Is(err, resources.ErrCapacity) {
 			return execution, nil, resources.ErrCapacity

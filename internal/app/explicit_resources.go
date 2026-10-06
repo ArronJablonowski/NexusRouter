@@ -223,7 +223,7 @@ func (s *Service) reserveUnmanaged(ctx context.Context, model config.Model) (rel
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	return s.budget.Reserve(snapshot, modelResources(model), time.Now())
+	return s.budget.Reserve(snapshot, s.modelResources(model), time.Now())
 }
 
 func modelResources(model config.Model) resources.Need {

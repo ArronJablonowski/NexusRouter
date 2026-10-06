@@ -21,8 +21,9 @@ type Limits struct {
 	MaxAge                  time.Duration
 }
 type Need struct {
-	RAM, VRAM uint64
-	Device    string
+	BackendManagedRAM bool
+	RAM, VRAM         uint64
+	Device            string
 }
 type Budget struct {
 	mu           sync.Mutex
@@ -138,6 +139,18 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 		return nil, ErrCapacity
 	}
 	ramRoom, ok := ramHeadroom(s, b.used.RAM, b.limits.RAMPercent)
+	if n.BackendManagedRAM {
+		// Explicit Mac backend policy: Ollama owns residency and reclamation.
+		// Retain physical-capacity, concurrent-reservation and pressure limits.
+		if s.Source != "darwin-vm-stat-estimate" || !s.UnifiedMemory || s.SwapUsed == nil || s.ThermalPressure == nil || n.VRAM != 0 || n.Device != "" {
+			return nil, ErrResourceData
+		}
+		ceiling := byteCeiling(s.TotalRAM, b.limits.RAMPercent)
+		ok = b.used.RAM <= ceiling
+		if ok {
+			ramRoom = ceiling - b.used.RAM
+		}
+	}
 	if !ok || n.RAM > ramRoom {
 		return nil, ErrCapacity
 	}

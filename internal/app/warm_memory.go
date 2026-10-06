@@ -19,6 +19,9 @@ type warmMemoryCoordinator interface {
 // serial, single-model provider. Shared servers and unverified observations
 // retain the complete cold estimate. Only the coordinated native path calls it.
 func (s *Service) warmMemoryEstimate(ctx context.Context, model config.Model, tokens int) (uint64, time.Time) {
+	if s.modelResources(model).BackendManagedRAM {
+		return 0, time.Time{}
+	}
 	if s.settings.Hardware.Concurrent != "1" || s.settings.Workers.Max != 1 {
 		return 0, time.Time{}
 	}

@@ -113,7 +113,7 @@ func TestReservationCanonicalDigestAndBinding(t *testing.T) {
 func TestReservationPublicTypesDoNotGrowPayloadFields(t *testing.T) {
 	// The warm fields contain only a byte estimate and model digest, never
 	// prompts, endpoints or credentials. Aggregate diagnostics still omit them.
-	requestFields := []string{"ColdRAMBytes", "ResidencyDigest", "Version", "ReservationID", "HostScope", "Owner", "TaskID", "SessionID", "ProviderID", "ModelID", "Profile", "GPUDevice", "RAMBytes", "VRAMBytes", "ContextTokens", "ConfigDigest", "RequestedAt", "TTL"}
+	requestFields := []string{"BackendManagedRAM", "ColdRAMBytes", "ResidencyDigest", "Version", "ReservationID", "HostScope", "Owner", "TaskID", "SessionID", "ProviderID", "ModelID", "Profile", "GPUDevice", "RAMBytes", "VRAMBytes", "ContextTokens", "ConfigDigest", "RequestedAt", "TTL"}
 	typeOf := reflect.TypeOf(ReservationRequest{})
 	if typeOf.NumField() != len(requestFields) {
 		t.Fatal("review new reservation fields for sensitive payloads", typeOf.NumField())

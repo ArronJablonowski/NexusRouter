@@ -104,14 +104,15 @@ type WorkboardAcceptanceJudge struct {
 	Timeout         string  `yaml:"timeout" json:"timeout"`
 }
 type Hardware struct {
-	MacMemoryPercent    float64 `yaml:"mac_memory_percent" json:"mac_memory_percent"`
-	MacSwapGrowthGB     float64 `yaml:"mac_swap_growth_gb" json:"mac_swap_growth_gb"`
-	AutoProfile         bool    `yaml:"auto_profile" json:"auto_profile"`
-	MaxRAM              float64 `yaml:"max_ram_usage_pct" json:"max_ram_usage_pct"`
-	MaxVRAM             float64 `yaml:"max_vram_usage_pct" json:"max_vram_usage_pct"`
-	Concurrent          string  `yaml:"max_concurrent_local_models" json:"max_concurrent_local_models"`
-	LocalPressurePolicy string  `yaml:"local_pressure_policy" json:"local_pressure_policy"`
-	LocalQueueTimeout   string  `yaml:"local_queue_timeout" json:"local_queue_timeout"`
+	MacBackendManagedMemory bool    `yaml:"mac_backend_managed_memory" json:"mac_backend_managed_memory"`
+	MacMemoryPercent        float64 `yaml:"mac_memory_percent" json:"mac_memory_percent"`
+	MacSwapGrowthGB         float64 `yaml:"mac_swap_growth_gb" json:"mac_swap_growth_gb"`
+	AutoProfile             bool    `yaml:"auto_profile" json:"auto_profile"`
+	MaxRAM                  float64 `yaml:"max_ram_usage_pct" json:"max_ram_usage_pct"`
+	MaxVRAM                 float64 `yaml:"max_vram_usage_pct" json:"max_vram_usage_pct"`
+	Concurrent              string  `yaml:"max_concurrent_local_models" json:"max_concurrent_local_models"`
+	LocalPressurePolicy     string  `yaml:"local_pressure_policy" json:"local_pressure_policy"`
+	LocalQueueTimeout       string  `yaml:"local_queue_timeout" json:"local_queue_timeout"`
 }
 type Workers struct {
 	Max               int     `yaml:"max_in_process" json:"max_in_process"`

@@ -42,6 +42,7 @@ func (o ReservationOwner) Validate() error {
 // It intentionally has no prompt, output, endpoint, credential or free-form
 // metadata fields. RAM includes weights and context/KV memory.
 type ReservationRequest struct {
+	BackendManagedRAM bool `json:"backend_managed_ram,omitempty"`
 	// Nonzero ColdRAMBytes marks a qualified warm estimate. This preserves the
 	// original full estimate and pinned model identity in the durable receipt;
 	// RAMBytes remains the actual incremental charge, never negative credit.
@@ -66,6 +67,9 @@ type ReservationRequest struct {
 }
 
 func (r ReservationRequest) Validate() error {
+	if r.BackendManagedRAM && (r.VRAMBytes != 0 || r.GPUDevice != "" || r.ColdRAMBytes != 0 || r.ResidencyDigest != "") {
+		return ErrReservation
+	}
 	if r.ColdRAMBytes != 0 || r.ResidencyDigest != "" {
 		if r.ColdRAMBytes <= r.RAMBytes || !reservationDigest(r.ResidencyDigest) || r.VRAMBytes != 0 || r.GPUDevice != "" {
 			return ErrReservation

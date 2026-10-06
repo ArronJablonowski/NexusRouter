@@ -446,11 +446,11 @@ func (c *Coordinator) admit(ctx context.Context, conn *sql.Conn, s resources.Sna
 		if old.request.HostScope != r.HostScope || old.state != "active" || !now.Before(old.expires) {
 			continue
 		}
-		if _, err = b.Reserve(s, resources.Need{RAM: old.request.RAMBytes, VRAM: old.request.VRAMBytes, Device: old.request.GPUDevice}, now); err != nil {
+		if _, err = b.Reserve(s, resources.Need{BackendManagedRAM: old.request.BackendManagedRAM, RAM: old.request.RAMBytes, VRAM: old.request.VRAMBytes, Device: old.request.GPUDevice}, now); err != nil {
 			return resources.ErrCapacity
 		}
 	}
-	_, err = b.Reserve(s, resources.Need{RAM: r.RAMBytes, VRAM: r.VRAMBytes, Device: r.GPUDevice}, now)
+	_, err = b.Reserve(s, resources.Need{BackendManagedRAM: r.BackendManagedRAM, RAM: r.RAMBytes, VRAM: r.VRAMBytes, Device: r.GPUDevice}, now)
 	return err
 }
 
