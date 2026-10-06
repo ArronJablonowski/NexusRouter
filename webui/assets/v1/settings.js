@@ -12,18 +12,19 @@
 	const skillsEnabled=document.querySelector("#skills-enabled"), skillsDraft=document.querySelector("#skills-auto-draft"), skillsRoot=document.querySelector("#skills-root"), skillsScope=document.querySelector("#skills-scope");
  const advertiseEnabled=document.querySelector("#remote-advertise-enabled"), advertiseInterface=document.querySelector("#remote-advertise-interface"), advertiseName=document.querySelector("#remote-advertise-name"), advertiseSSH=document.querySelector("#remote-advertise-ssh-port");
  function validAdvertisement(a) {return a && typeof a.enabled==="boolean" && typeof a.interface==="string" && typeof a.name==="string" && Number.isInteger(a.ssh_port) && a.ssh_port>=0 && a.ssh_port<=65535 && (!a.interface || /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/.test(a.interface)) && a.name.length<=253 && (!a.name || a.name.split(".").every(label=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) && (!a.enabled || Boolean(a.interface&&a.name));}
+ const macMemory=document.querySelector("#mac-memory"),macSwap=document.querySelector("#mac-swap");
  const dnsLogging=document.querySelector("#dns-logging"), dnsStatus=document.querySelector("#dns-logging-status");
  const digestPattern = /^[0-9a-f]{64}$/;
 	let csrf = "", projection = null, loading = false;
 	chat.hidden = true; workboards.hidden = true; models.hidden = true; view.hidden = false;
 	function validAccess(value) {
-		return value && [undefined,"","managed","full"].includes(value.dns_logging) && validAdvertisement(value.remote_advertisement) && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
+		return value && (value.mac_memory_percent===undefined || Number.isFinite(value.mac_memory_percent)&&value.mac_memory_percent>=0&&value.mac_memory_percent<=100) && (value.mac_swap_growth_gb===undefined || Number.isFinite(value.mac_swap_growth_gb)&&value.mac_swap_growth_gb>=0&&value.mac_swap_growth_gb<=1024) && [undefined,"","managed","full"].includes(value.dns_logging) && validAdvertisement(value.remote_advertisement) && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
 	}
 	function validProjection(value) {
 		return value && value.version === 1 && digestPattern.test(value.digest) && validAccess(value.active) && validAccess(value.saved) && typeof value.restart_required === "boolean" && value.restart_required === (JSON.stringify(value.active) !== JSON.stringify(value.saved));
 	}
 	function setStatus(message, failed) { status.textContent = message; status.classList.toggle("error", Boolean(failed)); }
-	function setBusy(value) { loading = value; [dnsLogging,skillsEnabled,skillsDraft,skillsRoot,skillsScope,advertiseEnabled,advertiseInterface,advertiseName,advertiseSSH].forEach(n=>n.disabled=value); save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
+	function setBusy(value) { loading = value; [macMemory,macSwap,dnsLogging,skillsEnabled,skillsDraft,skillsRoot,skillsScope,advertiseEnabled,advertiseInterface,advertiseName,advertiseSSH].forEach(n=>n.disabled=value); save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
 	function syncDependency() {
 		if (!tools.checked) delegated.checked = false;
 		delegated.disabled = loading || !tools.checked;
@@ -35,6 +36,7 @@
 	}
 	function render(value) {
 		projection = value;
+ macMemory.value=value.saved.mac_memory_percent||100;macSwap.value=value.saved.mac_swap_growth_gb||4;
  dnsLogging.value=value.saved.dns_logging||"";
  dnsStatus.textContent=value.active.dns_logging==="full"?"Managed logging enabled. Full capture: administrator setup required; not verified active.":value.active.dns_logging==="managed"?"Managed logging enabled. Daily DNS JSONL files are stored beside the runtime database; see Logging for coverage.":"DNS logging is off.";
  advertiseEnabled.checked=value.saved.remote_advertisement.enabled;advertiseInterface.value=value.saved.remote_advertisement.interface;advertiseName.value=value.saved.remote_advertisement.name;advertiseSSH.value=value.saved.remote_advertisement.ssh_port||"";
@@ -62,7 +64,7 @@
 			setStatus("Settings could not be loaded. Previously loaded values and edits are preserved.", true);
 		}).finally(() => setBusy(false));
 	}
-	function formValue() { return {dns_logging:dnsLogging.value,remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
+	function formValue() { return {mac_memory_percent:Number(macMemory.value),mac_swap_growth_gb:Number(macSwap.value),dns_logging:dnsLogging.value,remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
 	function validate(value) {
 		let message = "";
 		if (!validAdvertisement(value.remote_advertisement)) message = "Use a valid interface, lowercase TLS name, and optional SSH port from 1 to 65535. Interface and TLS name are required when discovery is enabled.";

@@ -125,7 +125,7 @@ func (s *Service) healthReportScoped(outer context.Context, supervisor health.Ch
 	profileCtx, profileCancel := context.WithTimeout(ctx, 2*time.Second)
 	snapshot, profileErr := profile(profileCtx)
 	profileCancel()
-	hostStatus, hostCode, gpuStatus, gpuCode := healthResources(snapshot, profileErr, s.settings.Hardware.MaxRAM, s.settings.Hardware.MaxVRAM)
+	hostStatus, hostCode, gpuStatus, gpuCode := healthResources(snapshot, profileErr, s.settings.Hardware.EffectiveRAMPercent(), s.settings.Hardware.MaxVRAM)
 	add("resources", "host", hostStatus, hostCode)
 	add("resources", "gpu", gpuStatus, gpuCode)
 	if hostStatus == "unknown" || profileErr != nil || snapshot.ThermalPressure == nil {
@@ -280,7 +280,7 @@ func (s *Service) healthReportScoped(outer context.Context, supervisor health.Ch
 				if total, available, err := resources.DeviceMemory(snapshot, m.GPUDevice, time.Now(), 5*time.Second); err == nil {
 					deviceSnapshot := snapshot
 					deviceSnapshot.VRAMTotal, deviceSnapshot.VRAMAvailable = &total, &available
-					_, _, modelGPUStatus, _ = healthResources(deviceSnapshot, profileErr, s.settings.Hardware.MaxRAM, s.settings.Hardware.MaxVRAM)
+					_, _, modelGPUStatus, _ = healthResources(deviceSnapshot, profileErr, s.settings.Hardware.EffectiveRAMPercent(), s.settings.Hardware.MaxVRAM)
 				}
 			}
 			if m.Locality == "local" && (hostStatus != "healthy" || m.VRAMBytes > 0 && modelGPUStatus != "healthy") {

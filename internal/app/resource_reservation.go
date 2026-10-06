@@ -117,7 +117,7 @@ func (s *Service) reservePrimary(ctx, admission context.Context, model config.Mo
 		if err != nil {
 			return ctx, nil, err
 		}
-		return ctx, func() error { release(); return nil }, nil
+		return s.guardMacSwap(ctx, model, func() error { release(); return nil })
 	}
 	profile := request.Profile
 	if profile == "" {
@@ -160,7 +160,7 @@ func (s *Service) reserveAuxiliaryExecution(ctx context.Context, model config.Mo
 		if err != nil {
 			return ctx, nil, err
 		}
-		return ctx, func() error { release(); return nil }, nil
+		return s.guardMacSwap(ctx, model, func() error { release(); return nil })
 	}
 	id := rand.Text()
 	contextTokens := model.WorkingContextTokens()
@@ -349,7 +349,7 @@ func (s *Service) reserveCoordinated(admission, execution context.Context, coord
 		})
 		return releaseErr
 	}
-	return run, release, nil
+	return s.guardMacSwap(run, model, release)
 }
 
 func reservationIdentity(taskID, modelID, daemonID string) string {

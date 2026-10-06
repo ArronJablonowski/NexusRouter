@@ -90,7 +90,7 @@ func (s *Service) browserModelsScoped(ctx context.Context, report health.Report,
 	out := contract.ModelInspectionPage{Version: 1, Availability: contract.Available, ConfigID: catalog.ConfigID, RefreshedAt: &refreshed,
 		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: refreshInterval.Milliseconds(),
 		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models)), Fitness: []contract.ModelFitnessInspection{}, LocalConcurrency: s.settings.Hardware.Concurrent,
-		LocalPressurePolicy: s.settings.Hardware.LocalPressurePolicy, LocalRAMLimitPct: s.settings.Hardware.MaxRAM, LocalVRAMLimitPct: s.settings.Hardware.MaxVRAM}
+		LocalPressurePolicy: s.settings.Hardware.LocalPressurePolicy, LocalRAMLimitPct: s.settings.Hardware.EffectiveRAMPercent(), LocalVRAMLimitPct: s.settings.Hardware.MaxVRAM}
 	out.CommanderID, out.CommanderSource = commanderID, commanderSource
 	out.CommanderFallbackID = fallbackID
 	out.SpecialistsAllowCloud = s.settings.WebUI.SpecialistsAllowCloud

@@ -14,6 +14,8 @@ var settingsDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 const MaxSettingsRootBytes = 4096
 
 type ToolAccessSettings struct {
+	MacMemoryPercent      float64                    `json:"mac_memory_percent"`
+	MacSwapGrowthGB       float64                    `json:"mac_swap_growth_gb"`
 	DNSLogging            string                     `json:"dns_logging"`
 	RemoteAdvertisement   remoteconfig.Advertisement `json:"remote_advertisement"`
 	SkillsEnabled         bool                       `json:"skills_enabled"`
@@ -27,6 +29,9 @@ type ToolAccessSettings struct {
 }
 
 func (s ToolAccessSettings) Validate() error {
+	if !finiteNonnegative(s.MacMemoryPercent) || s.MacMemoryPercent > 100 || !finiteNonnegative(s.MacSwapGrowthGB) || s.MacSwapGrowthGB > 1024 {
+		return ErrContract
+	}
 	if s.DNSLogging != "" && s.DNSLogging != "managed" && s.DNSLogging != "full" {
 		return ErrContract
 	}

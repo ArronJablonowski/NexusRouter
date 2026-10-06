@@ -2541,3 +2541,7 @@ constructs this metadata from its permission-scoped trust relationship; other
 peers are not enumerated. Hostname is authenticated-peer-reported metadata, not
 DNS attestation. This labels paired control authority, not ownership of an active
 job. Older hosts explicitly show “not reported.”
+
+
+## Mac memory controls (2026-10-06)
+Mac hosts default to a 100% RAM allowance and cancel owned local model requests when measured swap grows more than 4 decimal GB from execution admission. Settings exposes both limits; restart activates changes. One-second polling cancels provider contexts, not shared server processes, and cannot attribute host-wide swap growth to individual processes. Missing production swap observations fail closed. Linux memory policy is unchanged. No real memory exhaustion is induced in QA.

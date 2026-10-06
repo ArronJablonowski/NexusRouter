@@ -104,6 +104,8 @@ type WorkboardAcceptanceJudge struct {
 	Timeout         string  `yaml:"timeout" json:"timeout"`
 }
 type Hardware struct {
+	MacMemoryPercent    float64 `yaml:"mac_memory_percent" json:"mac_memory_percent"`
+	MacSwapGrowthGB     float64 `yaml:"mac_swap_growth_gb" json:"mac_swap_growth_gb"`
 	AutoProfile         bool    `yaml:"auto_profile" json:"auto_profile"`
 	MaxRAM              float64 `yaml:"max_ram_usage_pct" json:"max_ram_usage_pct"`
 	MaxVRAM             float64 `yaml:"max_vram_usage_pct" json:"max_vram_usage_pct"`
@@ -260,7 +262,7 @@ func Defaults() Settings {
 	readRoot, _ := os.Getwd()
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{Listen: "127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h", ModelInventoryRefreshInterval: "10s"},
 		Workboard: Workboard{Enabled: true, Decomposition: WorkboardDecomposition{Version: 1, MaxDepth: 4, MaxChildrenPerParent: 8}, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
-		Hardware:  Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
+		Hardware:  Hardware{MacMemoryPercent: 100, MacSwapGrowthGB: 4, AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}, Classifier: RoutingClassifier{MaxInputTokens: 4096, MaxOutputTokens: 256, Timeout: "30s"}},
 		Skills: Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"},
 			OutcomeRollbackSupervisor: OutcomeRollbackSupervisor{Version: 1, Interval: "5m", Domain: "unknown", Profile: "default", Source: "user_feedback", Privacy: "local_only", MinSamples: 20, MinDrop: .1, TasksPerVersion: 20},
@@ -327,6 +329,9 @@ func (s Settings) Validate() error {
 	}
 	if err := s.WebUI.Validate(s.Daemon.Listen); err != nil {
 		return err
+	}
+	if !finite(s.Hardware.MacMemoryPercent) || s.Hardware.MacMemoryPercent < 0 || s.Hardware.MacMemoryPercent > 100 || !finite(s.Hardware.MacSwapGrowthGB) || s.Hardware.MacSwapGrowthGB < 0 || s.Hardware.MacSwapGrowthGB > 1024 {
+		return errors.New("invalid Mac memory policy")
 	}
 	for _, p := range []float64{s.Hardware.MaxRAM, s.Hardware.MaxVRAM} {
 		if !finite(p) || p <= 0 || p > 100 {

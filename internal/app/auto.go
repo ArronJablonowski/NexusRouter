@@ -92,7 +92,7 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 	if s.Hardware.Concurrent != "auto" {
 		concurrent, _ = strconv.Atoi(s.Hardware.Concurrent)
 	}
-	limits := resources.Limits{MaxConcurrent: concurrent, RAMPercent: s.Hardware.MaxRAM, VRAMPercent: s.Hardware.MaxVRAM, MaxAge: 5 * time.Second}
+	limits := resources.Limits{MaxConcurrent: concurrent, RAMPercent: s.Hardware.EffectiveRAMPercent(), VRAMPercent: s.Hardware.MaxVRAM, MaxAge: 5 * time.Second}
 	var b *resources.Budget
 	if s.Hardware.Concurrent == "auto" {
 		b, err = resources.NewAdaptiveBudget(limits)
