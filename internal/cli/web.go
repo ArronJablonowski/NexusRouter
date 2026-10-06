@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"os"
 	"os/exec"
@@ -62,7 +63,7 @@ func runWeb(args []string, stdout, stderr io.Writer) int {
 	}
 	if token == "" && runtime.GOOS == "darwin" && filepath.Clean(*path) == installedPath {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		raw, probeErr := exec.CommandContext(ctx, "/bin/launchctl", "print", "gui/"+strconv.Itoa(os.Getuid())+"/"+serviceLabel).Output()
+		raw, probeErr := processaudit.Output(exec.CommandContext(ctx, "/bin/launchctl", "print", "gui/"+strconv.Itoa(os.Getuid())+"/"+serviceLabel))
 		cancel()
 		if probeErr == nil {
 			token = webLaunchToken(string(raw))

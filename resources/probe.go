@@ -3,6 +3,7 @@ package resources
 import (
 	"bytes"
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"os/exec"
 	"time"
@@ -34,7 +35,7 @@ func runProbe(ctx context.Context, path string, args ...string) ([]byte, error) 
 	cmd.Env = []string{"LANG=C", "LC_ALL=C", "PATH=/usr/bin:/bin"}
 	var output probeBuffer
 	cmd.Stdout, cmd.Stderr = &output, io.Discard
-	if err := cmd.Run(); err != nil || ctx.Err() != nil {
+	if err := processaudit.Run(cmd); err != nil || ctx.Err() != nil {
 		return nil, ErrProfile
 	}
 	return output.Bytes(), nil

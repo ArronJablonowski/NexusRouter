@@ -2,6 +2,7 @@ package releasepack
 
 import (
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -231,7 +232,7 @@ func (workspace *goReconstruction) goOutput(ctx context.Context, directory strin
 	var stdout, stderr boundedOutput
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil || stdout.overflow || stderr.overflow || workspace.verify() != nil {
+	if err := processaudit.Run(cmd); err != nil || stdout.overflow || stderr.overflow || workspace.verify() != nil {
 		return "", ErrInvalid
 	}
 	return strings.TrimSpace(stdout.String()), nil

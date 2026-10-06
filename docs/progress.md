@@ -2503,3 +2503,6 @@ Saved the selected Grid Runner/Neon Outline artwork under docs/branding and adde
 
 ### DNS logging levels
 Settings now persists Off/managed/full DNS logging with active-versus-saved restart semantics. Managed policy transports emit private daily structured resolver records without request paths/headers or fabricated packet/task attribution. Full mode retains managed records and explicitly reports privileged capture as unverified. An operator-run, root-only port-53 capture helper and coverage documentation are included; system-wide plaintext capture is not complete encrypted-DNS/process-attributed monitoring. Live privileged capture remains unqualified because neither host grants administrative access.
+
+## Direct subprocess auditing
+NexusRouter entry points now enable private daily launch/exit audit records, and all existing direct runtime subprocess execution sites use the shared logger. Logs include redacted argv and are inventoried on the Logging page. Targeted lifecycle, concurrency, redaction and launch-failure tests cover the audit boundary. Descendants created inside external programs and systemd/launchd remain outside direct-launch coverage and require privileged OS tracing; no complete process-tree claim is made.

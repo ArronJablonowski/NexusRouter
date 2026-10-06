@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/resources"
 	"os/exec"
@@ -38,11 +39,11 @@ func vllmController(cfg config.Settings, service *app.Service) func(context.Cont
 					return out, remote.ErrUnavailable
 				}
 			}
-			if exec.CommandContext(query, "systemctl", "--user", action, "--no-block", "nexusrouter-vllm.service").Run() != nil {
+			if processaudit.Run(exec.CommandContext(query, "systemctl", "--user", action, "--no-block", "nexusrouter-vllm.service")) != nil {
 				return out, remote.ErrUnavailable
 			}
 		}
-		raw, err := exec.CommandContext(query, "systemctl", "--user", "show", "--property=ActiveState", "--value", "nexusrouter-vllm.service").Output()
+		raw, err := processaudit.Output(exec.CommandContext(query, "systemctl", "--user", "show", "--property=ActiveState", "--value", "nexusrouter-vllm.service"))
 		if err != nil {
 			return out, remote.ErrUnavailable
 		}

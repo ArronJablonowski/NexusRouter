@@ -1,0 +1,9 @@
+# Subprocess audit
+
+The NexusRouter, legacy DarwinRouter and nexus-remote executables enable direct subprocess auditing at startup. Daily private JSONL files are stored at `~/.NexusRouter/data/process-audit/process-YYYY-MM-DD.jsonl` on each executing host. The Logging page lists this location. Library/SDK embeddings do not automatically initialize this executable-level audit.
+
+Records include launch ID, UTC timestamp, host, NexusRouter PID, child PID when available, resolved executable, argv array, working directory, launch outcome and exit code. Argument boundaries are preserved. Launch intent is persisted before execution; failure to persist prevents launching. Subsequent write failures emit a diagnostic without changing successful task results or triggering a replay. A missing terminal record can indicate the parent stopped or audit storage failed; it is not proof that the child remains active. Output-buffered probes record launch intent and terminal outcome rather than a separate started event.
+
+Conventional secret flags, URL credentials and query strings, and inline script/prompt arguments are redacted. Arbitrary positional secrets cannot be reliably detected. Logs contain operationally sensitive paths/arguments and have owner-only access. Environment variables, stdin, stdout and stderr are not copied into these logs. Files remain until the operator archives/removes them; they are not implicitly sent to the central collector.
+
+Coverage includes direct harness launches, Codex app-server, SSH transport, resource probes, operating-system schedule inspection, vLLM systemctl commands, daemon launch and release tooling. Processes created inside an external harness, shell script, or system service manager are not intercepted by Go's direct launch logger. Complete descendant coverage requires administrator-operated OS process tracing; DNS packet capture does not provide that coverage.

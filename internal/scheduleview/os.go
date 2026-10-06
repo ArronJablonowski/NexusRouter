@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"os"
 	"os/exec"
@@ -59,7 +60,7 @@ func command(ctx context.Context, name string, args ...string) ([]byte, error) {
 	c := exec.CommandContext(ctx, name, args...)
 	var out limited
 	c.Stdout = &out
-	err := c.Run()
+	err := processaudit.Run(c)
 	return out.Bytes(), err
 }
 func Read(ctx context.Context) Page {

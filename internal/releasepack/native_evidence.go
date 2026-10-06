@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"os"
 	"os/exec"
@@ -477,7 +478,7 @@ func nativeGateCommand(ctx context.Context, source string, env []string, target 
 	}
 	output := &boundedNativeGateLog{destination: log}
 	cmd.Stdout, cmd.Stderr = output, output
-	if err := cmd.Run(); err != nil || output.overflow {
+	if err := processaudit.Run(cmd); err != nil || output.overflow {
 		if contextErr := gateCtx.Err(); contextErr != nil {
 			return contextErr
 		}

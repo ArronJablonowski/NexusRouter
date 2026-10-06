@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/ArronJablonowski/NexusRouter/harness/internal/textgateway"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"io"
 	"math"
@@ -159,7 +160,7 @@ func runConfigured(ctx context.Context, c Config, prompt string, agent *agentExe
 	versionOutput := &limitedBuffer{limit: 1024}
 	version.Stdout = versionOutput
 	version.Stderr = io.Discard
-	if version.Run() != nil || strings.TrimSpace(string(versionOutput.data)) != SupportedVersion {
+	if processaudit.Run(version) != nil || strings.TrimSpace(string(versionOutput.data)) != SupportedVersion {
 		return Result{}, ErrProtocol
 	}
 	var gatewayURL, gatewayKey string
@@ -219,7 +220,7 @@ func runConfigured(ctx context.Context, c Config, prompt string, agent *agentExe
 		input.Close()
 		return Result{}, ErrRun
 	}
-	if command.Start() != nil {
+	if processaudit.Start(command) != nil {
 		input.Close()
 		output.Close()
 		return Result{}, ErrRun
@@ -227,7 +228,7 @@ func runConfigured(ctx context.Context, c Config, prompt string, agent *agentExe
 	defer func() {
 		input.Close()
 		done := make(chan error, 1)
-		go func() { done <- command.Wait() }()
+		go func() { done <- processaudit.Wait(command) }()
 		var exitErr error
 		select {
 		case exitErr = <-done:

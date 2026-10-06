@@ -3,6 +3,7 @@ package codexrpc
 import (
 	"context"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"os"
 	"os/exec"
@@ -110,14 +111,14 @@ func StartProcess(ctx context.Context, spec ProcessSpec) (*Process, error) {
 	}
 	defer devnull.Close()
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = childIn, childOut, devnull
-	if ctx.Err() != nil || cmd.Start() != nil {
+	if ctx.Err() != nil || processaudit.Start(cmd) != nil {
 		_ = input.Close()
 		_ = output.Close()
 		return nil, ErrProcessStart
 	}
 	p := &Process{cmd: cmd, input: input, output: output, decoder: NewDecoder(output, 0), encoder: NewEncoder(input, 0), done: make(chan struct{}), stopped: make(chan struct{})}
 	go func() {
-		if cmd.Wait() != nil {
+		if processaudit.Wait(cmd) != nil {
 			p.waitErr = ErrProcessExit
 		}
 		// Reap the leader once. Close deliberately owns transport shutdown so

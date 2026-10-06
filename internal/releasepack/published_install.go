@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"os"
 	"os/exec"
@@ -313,7 +314,7 @@ func executePublishedNativeArchive(ctx context.Context, downloadDir, installRoot
 	command.Dir = install
 	command.Env = []string{"HOME=" + install, "TMPDIR=" + install, "PATH=/usr/bin:/bin", "LANG=C", "LC_ALL=C", "TZ=UTC"}
 	command.Stdout, command.Stderr = &output, &output
-	if err = command.Run(); err != nil || output.overflow || strings.TrimSpace(output.String()) != "nexus "+receipt.ReleaseVersion {
+	if err = processaudit.Run(command); err != nil || output.overflow || strings.TrimSpace(output.String()) != "nexus "+receipt.ReleaseVersion {
 		return "", "", ErrPublishedInstallEvidence
 	}
 	if !publishedInstallChainMatches(parentRoot, installedRoot, binRoot, parentInfo, installedInfo, binInfo, info) ||

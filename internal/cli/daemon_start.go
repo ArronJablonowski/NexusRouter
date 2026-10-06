@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"net"
 	"os"
 	"os/exec"
@@ -80,13 +81,13 @@ func runDaemonStart(ctx context.Context, cfg config.Settings, path, token string
 		return bad()
 	}
 	command.Stdin, command.Stdout, command.Stderr = null, null, null
-	err = command.Start()
+	err = processaudit.Start(command)
 	_ = null.Close()
 	if err != nil {
 		return bad()
 	}
 	done := make(chan struct{})
-	go func() { _ = command.Wait(); close(done) }()
+	go func() { _ = processaudit.Wait(command); close(done) }()
 	ready := false
 	defer func() {
 		if !ready {

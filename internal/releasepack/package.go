@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,7 +80,7 @@ func command(ctx context.Context, dir string, env []string, name string, args ..
 	var out boundedOutput
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	if err := cmd.Run(); err != nil || out.overflow {
+	if err := processaudit.Run(cmd); err != nil || out.overflow {
 		return "", fmt.Errorf("release command failed: %s", filepath.Base(name))
 	}
 	return strings.TrimSpace(out.String()), nil

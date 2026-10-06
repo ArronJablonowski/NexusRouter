@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"os"
 	"os/exec"
@@ -193,7 +194,7 @@ func runAttestationCommand(ctx context.Context, binary string, args ...string) (
 	stdout.limit, stderr.limit = maxVerifierOutput, maxVerifierError
 	command := exec.CommandContext(ctx, binary, args...)
 	command.Stdout, command.Stderr = &stdout, &stderr
-	err := command.Run()
+	err := processaudit.Run(command)
 	if err != nil || stdout.overflow || stderr.overflow || ctx.Err() != nil {
 		return nil, ErrVerify
 	}

@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"net"
 	"os"
@@ -86,7 +87,7 @@ func (s SSH) dial(ctx context.Context, address string) (net.Conn, error) {
 		return nil, ErrUnavailable
 	}
 	command.Stderr = io.Discard // Do not return remote banners, paths or auth diagnostics.
-	if err = command.Start(); err != nil {
+	if err = processaudit.Start(command); err != nil {
 		stdin.Close()
 		stdout.Close()
 		cancel()
@@ -96,7 +97,7 @@ func (s SSH) dial(ctx context.Context, address string) (net.Conn, error) {
 	connection := &sshConnection{Conn: local, cancel: cancel, bridge: bridge}
 	go func() { _, _ = io.Copy(stdin, bridge); stdin.Close() }()
 	go func() { _, _ = io.Copy(bridge, stdout); bridge.Close() }()
-	go func() { _ = command.Wait(); stdin.Close(); stdout.Close(); bridge.Close(); cancel() }()
+	go func() { _ = processaudit.Wait(command); stdin.Close(); stdout.Close(); bridge.Close(); cancel() }()
 	return connection, nil
 }
 

@@ -48,6 +48,7 @@ func (s *Service) BrowserLogging(ctx context.Context) (webui.LoggingPage, error)
 		}
 	}
 	if home, err := os.UserHomeDir(); err == nil {
+		add("process-audit", "Subprocess audit", filepath.Join(home, ".NexusRouter", "data", "process-audit"), "Local direct subprocesses", "Daily process-YYYY-MM-DD.jsonl", "NexusRouter executable logs direct launches. Descendants started inside harnesses or service managers require OS-level monitoring. Conventional credential arguments and inline scripts/prompts are redacted; environment and process output are excluded. Retained until operator archival/removal.", "Launch ID, timestamps, hostname, parent PID and child PID", "Executable, redacted argv, working directory, launch outcome and exit code")
 		root := filepath.Join(home, ".NexusRouter", "data", "central-logs")
 		add("collector", "Collected remote logs", filepath.Join(root, "logs.sqlite"), "Remote replica · stored locally", "SQLite", "Known collector location. Presence does not establish current collector health. Excludes OS logs and standalone learning stores.", "Authorized runtime and security event records, source host and stream", "Task/session IDs, event and collection timestamps, record hashes and collection cursors")
 		for _, suffix := range []string{"stdout", "stderr"} {

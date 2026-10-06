@@ -3,6 +3,7 @@ package releasepack
 import (
 	"context"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"os"
 	"os/exec"
 	"path"
@@ -41,7 +42,7 @@ func snapshot(ctx context.Context, source, commit, destination string, env []str
 		var body boundedOutput
 		cmd.Stdout = &body
 		cmd.Stderr = &boundedOutput{}
-		err = cmd.Run()
+		err = processaudit.Run(cmd)
 		cancel()
 		if err != nil || body.overflow {
 			return ErrInvalid

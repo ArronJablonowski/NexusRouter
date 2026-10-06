@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"io"
 	"math"
 	"net/http"
@@ -250,7 +251,7 @@ func runProcess(cmd *exec.Cmd) error {
 	configureProcess(cmd)
 	cmd.Cancel = func() error { return killProcessGroup(cmd) }
 	cmd.WaitDelay = 2 * time.Second
-	err := cmd.Run()
+	err := processaudit.Run(cmd)
 	if cmd.Process != nil && groupStillAlive(cmd) {
 		_ = killProcessGroup(cmd)
 		return ErrRun

@@ -3,6 +3,7 @@ package codexbridge
 import (
 	"bytes"
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/internal/processaudit"
 	"os/exec"
 	"time"
 
@@ -19,7 +20,7 @@ func launchMetadata(ctx context.Context, base codexrpc.ProcessSpec, args ...stri
 	cmd.WaitDelay = time.Second
 	out := &launchMetadataBuffer{}
 	cmd.Stdout = out
-	if cmd.Run() != nil {
+	if processaudit.Run(cmd) != nil {
 		return nil, ErrLaunchObservation
 	}
 	return out.buf.Bytes(), nil
