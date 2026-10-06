@@ -518,3 +518,6 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .approval-list { max-height: 28rem; }
 .approval-message .control-actions button { width: auto; margin: 0; text-align: center; }
 .approval-message [data-approval-action="allow"] { background: #087a70; }
+
+.approval-messages { flex: none; padding: 0 1.4rem; }
+.approval-messages .approval-list { margin: 0; }

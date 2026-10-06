@@ -7,7 +7,7 @@
 	const provisional = document.querySelector("#provisional"), streamAnnouncement = document.querySelector("#stream-announcement");
 	const taskControls = document.querySelector("#task-controls"), steeringControl = document.querySelector("#steering-control"), steeringText = document.querySelector("#steering-text");
 	const steerTask = document.querySelector("#steer-task"), cancelTask = document.querySelector("#cancel-task"), approvalPanel = document.querySelector("#approval-panel");
-	const approvalState = document.querySelector("#approval-state"), approvalList = document.querySelector("#approval-list"), approvalCount = document.querySelector("#approval-count");
+	const approvalState = document.querySelector("#approval-state"), approvalList = document.querySelector("#approval-list");
 	const feedbackPanel = document.querySelector("#feedback-panel"), feedbackSummary = document.querySelector("#feedback-summary");
 	const attemptCostLabel = document.querySelector("#attempt-cost-label"), attemptCost = document.querySelector("#attempt-cost"), attemptCostHelp = document.querySelector("#attempt-cost-help");
 	const feedbackAccepted = document.querySelector("#feedback-accepted"), feedbackRejected = document.querySelector("#feedback-rejected");
@@ -99,7 +99,7 @@
 		approvalRevoke.disabled = blocked;
 		approvalClose.disabled = blocked;
   for(const button of approvalList.querySelectorAll("[data-approval-action]"))button.disabled=blocked;
-		approvalPanel.hidden = !task;
+		approvalPanel.hidden = !task || (!approvalList.children.length && approvalState.hidden);
 	}
 	function idempotencyKey() {
 		const bytes = new Uint8Array(18);
@@ -580,13 +580,13 @@
 	function loadApprovals() {
 		const task = selectedControls;
   const epoch=++approvalEpoch;
-  if(approvalTaskID !== task?.taskID){approvalList.replaceChildren();approvalCount.textContent="";approvalTaskID=task?.taskID||"";}
+  if(approvalTaskID !== task?.taskID){approvalList.replaceChildren();approvalState.hidden=true;approvalTaskID=task?.taskID||"";}
 		if (!task || !selectedChat) {
 			approvalPanel.hidden = true;
 			return;
 		}
-		approvalPanel.hidden = false;
-		if(!approvalList.children.length)showNotice(approvalState, "Loading approvals…", false);
+		if(!approvalList.children.length)approvalState.hidden=true;
+  updateControls();
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(task.taskID) + "/approvals?limit=" + String(maxApprovals)).then(body => {
 			if (selectedControls?.taskID !== task.taskID || epoch !== approvalEpoch) return;
 			if (!body || body.version !== 1 || body.task_id !== task.taskID || !Array.isArray(body.items) || body.items.length > maxApprovals ||
@@ -595,13 +595,11 @@
 			if (items.some(item => !item || item.taskID !== task.taskID)) throw new Error("invalid approval");
 			const keep=new Set(items.map(renderApproval));
    for(const row of [...approvalList.children])if(!keep.has(row))row.remove();
-   updateControls();
-			approvalCount.textContent = String(items.length);
 			if (body.has_more) showNotice(approvalState, "Showing the first " + String(items.length) + " approvals.", false);
-			else if (items.length) approvalState.hidden = true;
-			else showNotice(approvalState, "No approvals need attention.", false);
+			else approvalState.hidden = true;
+   updateControls();
 		}).catch(() => {
-			if (selectedControls?.taskID === task.taskID && epoch === approvalEpoch) showNotice(approvalState, "Approvals could not be updated. Previous observations may be stale.", true);
+			if (selectedControls?.taskID === task.taskID && epoch === approvalEpoch) {showNotice(approvalState, "Approvals could not be updated. Previous observations may be stale.", true);updateControls();}
 		});
 	}
 	function decideApproval(action, item = activeApproval) {

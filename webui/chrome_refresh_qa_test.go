@@ -75,10 +75,14 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
 		t.Fatal(e)
 	}
 	var fail atomic.Bool
+	var emptyApprovals atomic.Bool
 	var approvalStage atomic.Int32
 	var approvalWrites atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/fixture/empty-approvals":
+			emptyApprovals.Store(true)
+			return
 		case "/fixture/fail":
 			fail.Store(true)
 			return
@@ -116,6 +120,10 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
 			w.Write([]byte(`{"version":1,"task_id":"task-fixture","revision":1,"objective":[],"feedback_allowed":true}`))
 			return
 		case "/app/api/v1/tasks/task-fixture/approvals":
+			if emptyApprovals.Load() {
+				writeChromeJSON(w, ApprovalPage{Version: 1, TaskID: "task-fixture", Items: []ApprovalSummary{}})
+				return
+			}
 			stage := approvalStage.Load()
 			state := "pending"
 			if stage == 1 {
@@ -172,6 +180,7 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
  if(!await evaluate('document.querySelectorAll("#transcript .message").length===1&&document.querySelectorAll("[data-chat-id]").length===1'))throw Error('recovery duplicated content');
  if(!await evaluate('document.querySelector("#transcript .message")===window.messageBefore&&document.querySelector("[data-chat-id]")===window.chatBefore'))throw Error('refresh replaced stable chat nodes');
  if(!await evaluate('controlFlashes===0&&!document.querySelector("#feedback-panel").hidden'))throw Error('refresh toggled composer or feedback panel');
+ if(await evaluate('!!document.querySelector("#approval-title,#approval-count")'))throw Error('redundant approval panel chrome remains');
  await eventually('!!document.querySelector(".approval-message")&&!document.querySelector("[data-approval-action=allow]").disabled','inline approval unavailable');
  await evaluate('window.approvalBefore=document.querySelector(".approval-message");document.querySelector("[data-approval-action=allow]").click()');
  await eventually('document.querySelector(".approval-result").textContent.includes("approved")','allow decision not rendered');
@@ -184,6 +193,10 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
  await cdp('Page.reload');
  await eventually('document.querySelector(".approval-result")?.textContent.includes("revoked")','recorded decision did not survive reload');
  if(!await evaluate('document.querySelectorAll(".approval-message").length===1&&document.querySelector("[data-approval-action=allow]").hidden&&document.querySelector("[data-approval-action=deny]").hidden&&document.querySelector("[data-approval-action=revoke]").hidden'))throw Error('resolved approval offered duplicate authority');
+ await evaluate('fetch("/fixture/empty-approvals")');
+ await cdp('Page.reload');
+ await eventually('!!document.querySelector("#composer-text")&&!document.querySelector("#composer-text").disabled','empty chat controls not ready');
+ await eventually('document.querySelector("#approval-panel").hidden&&document.querySelector("#approval-panel").offsetHeight===0','empty approval object occupies space');
  socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", script, strconv.Itoa(port), server.URL).CombinedOutput()
 	if e != nil {
