@@ -56,3 +56,18 @@ func TestMacSwapProbeFailureStopsExecution(t *testing.T) {
 		t.Fatal("missing failure")
 	}
 }
+
+func TestSwapReservationPreservesCleanupError(t *testing.T) {
+	cleanupErr := errors.New("durable release failed")
+	calls := 0
+	release := finishSwapReservation(func() error { return errSwapGrowth }, func() error { calls++; return cleanupErr })
+	for i := 0; i < 2; i++ {
+		err := release()
+		if !errors.Is(err, errSwapGrowth) || !errors.Is(err, cleanupErr) {
+			t.Fatalf("lost error: %v", err)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("released %d times", calls)
+	}
+}

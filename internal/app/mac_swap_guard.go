@@ -38,18 +38,21 @@ func (s *Service) guardMacSwap(ctx context.Context, model config.Model, release 
 		limit = s.settings.Hardware.MacSwapGrowthBytes()
 	}
 	run, finish := watchSwapGrowth(ctx, *initial.SwapUsed, limit, time.Second, s.resourceProfile)
+	return run, finishSwapReservation(finish, release), nil
+}
+
+// Preserve both the guard cause and durable cleanup failure, releasing once.
+func finishSwapReservation(finish, release func() error) func() error {
 	var once sync.Once
 	var result error
-	return run, func() error {
+	return func() error {
 		once.Do(func() {
 			guardErr := finish()
-			result = release()
-			if guardErr != nil {
-				result = guardErr
-			}
+			result = errors.Join(guardErr, release())
 		})
 		return result
-	}, nil
+	}
+
 }
 
 func watchSwapGrowth(ctx context.Context, baseline, limit uint64, interval time.Duration, profile func(context.Context) (resources.Snapshot, error)) (context.Context, func() error) {

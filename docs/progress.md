@@ -2559,3 +2559,6 @@ Added authenticated read-only /app/dependencies with bundled Go runtime and tran
 
 ## Thirty-minute execution default (2026-10-06)
 CLI runs, default daemon submissions and default HTTP provider requests now allow 30 minutes. Explicit provider/daemon overrides remain respected; parent cancellation and memory safeguards remain active. Targeted timeout configuration and provider override tests verify behavior; no full suite claimed.
+
+## Muse review: retain swap guard and release failures (2026-10-06)
+Confirmed a cleanup error could be masked by swap cancellation. Combined errors with errors.Join while retaining finish-before-release ordering and exactly-once cleanup. Targeted swap guard and cleanup tests passed with race detector; go vet internal/app passed. Deployment deferred while Spark reviews are active.
