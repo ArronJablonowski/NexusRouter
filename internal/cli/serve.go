@@ -362,10 +362,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return db.ReadCommittedEventPage(ctx, options)
 			},
 		}, Inspections: webuiapp.InspectionServices{
-			Logging:   service.BrowserLogging,
-			Schedules: service.BrowserSchedules,
-			Stats:     service.BrowserStats,
-			Skills:    service.BrowserSkills,
+			Dependencies: service.BrowserDependencies,
+			Logging:      service.BrowserLogging,
+			Schedules:    service.BrowserSchedules,
+			Stats:        service.BrowserStats,
+			Skills:       service.BrowserSkills,
 			Models: func(ctx context.Context) (webui.ModelInspectionPage, error) {
 				report, _ := healthReport(ctx)
 				return service.BrowserModels(ctx, report)

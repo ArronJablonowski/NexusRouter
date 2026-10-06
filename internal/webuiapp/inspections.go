@@ -16,19 +16,20 @@ import (
 )
 
 type InspectionServices struct {
-	Logging     func(context.Context) (contract.LoggingPage, error)
-	Schedules   func(context.Context) (contract.SchedulePage, error)
-	Skills      func(context.Context) (app.BrowserSkillPage, error)
-	Stats       func(context.Context, *usagestats.Reset) (usagestats.Snapshot, error)
-	Models      func(context.Context) (contract.ModelInspectionPage, error)
-	Route       func(context.Context, string) (contract.RouteInspection, error)
-	Usage       func(context.Context, string) (contract.TaskUsageInspection, error)
-	Tools       func(context.Context, string, string, int) (contract.ToolInspectionPage, error)
-	Audits      func(context.Context, string, string, int) (contract.AuditInspectionPage, error)
-	Health      func(context.Context) (contract.HealthInspection, error)
-	Resources   func(context.Context) (contract.ResourceInspection, error)
-	Settings    func(context.Context) (contract.SettingsInspection, error)
-	Deprecation func(context.Context, string, string, string, evaluation.DeprecationPolicy) (evaluation.DeprecationReport, error)
+	Dependencies func(context.Context) (contract.DependencyInventory, error)
+	Logging      func(context.Context) (contract.LoggingPage, error)
+	Schedules    func(context.Context) (contract.SchedulePage, error)
+	Skills       func(context.Context) (app.BrowserSkillPage, error)
+	Stats        func(context.Context, *usagestats.Reset) (usagestats.Snapshot, error)
+	Models       func(context.Context) (contract.ModelInspectionPage, error)
+	Route        func(context.Context, string) (contract.RouteInspection, error)
+	Usage        func(context.Context, string) (contract.TaskUsageInspection, error)
+	Tools        func(context.Context, string, string, int) (contract.ToolInspectionPage, error)
+	Audits       func(context.Context, string, string, int) (contract.AuditInspectionPage, error)
+	Health       func(context.Context) (contract.HealthInspection, error)
+	Resources    func(context.Context) (contract.ResourceInspection, error)
+	Settings     func(context.Context) (contract.SettingsInspection, error)
+	Deprecation  func(context.Context, string, string, string, evaluation.DeprecationPolicy) (evaluation.DeprecationReport, error)
 }
 
 func inspectionQueryPath(base, path string) bool {
@@ -38,6 +39,13 @@ func inspectionQueryPath(base, path string) bool {
 func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.Request) bool {
 	base, path := h.basePath+"/api/v1", request.URL.Path
 	switch {
+	case path == base+"/dependencies":
+		serveInspection(h, writer, request, "dependencies_unavailable", func(ctx context.Context) (contract.DependencyInventory, error) {
+			if h.inspections.Dependencies == nil {
+				return contract.DependencyInventory{}, errors.New("unavailable")
+			}
+			return h.inspections.Dependencies(ctx)
+		})
 	case path == base+"/logging":
 		serveInspection(h, writer, request, "logging_unavailable", func(ctx context.Context) (contract.LoggingPage, error) {
 			if h.inspections.Logging == nil {
@@ -189,7 +197,7 @@ func canonicalToolCursor(value string) bool {
 }
 
 type inspectionResponse interface {
-	contract.LoggingPage | scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
+	contract.DependencyInventory | contract.LoggingPage | scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
 }
 
 func serveInspection[T inspectionResponse](h *Handler, writer http.ResponseWriter, request *http.Request, code string, read func(context.Context) (T, error)) {
@@ -229,6 +237,8 @@ func safeInspection[T inspectionResponse](ctx context.Context, read func(context
 
 func inspectionInvalid[T inspectionResponse](value T) bool {
 	switch typed := any(value).(type) {
+	case contract.DependencyInventory:
+		return typed.Validate() != nil
 	case contract.LoggingPage:
 		return typed.Validate() != nil
 	case scheduleview.Page:

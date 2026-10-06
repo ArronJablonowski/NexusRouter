@@ -24,11 +24,16 @@
       <a href="__DARWIN_BASE_PATH__/routing-map" data-view="routing">Command grid</a>
       <a href="__DARWIN_BASE_PATH__/model-elimination" data-view="elimination">Elimination</a>
       <a href="__DARWIN_BASE_PATH__/skills" data-view="skills">Skills</a>
+      <a href="__DARWIN_BASE_PATH__/dependencies" data-view="dependencies">Dependencies</a>
       <a href="__DARWIN_BASE_PATH__/logging" data-view="logging">Logging</a>
       <a href="__DARWIN_BASE_PATH__/stats" data-view="stats">Stats</a>
       <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
+      <section id="dependencies-view" aria-labelledby="dependencies-title" hidden>
+<header class="control-heading"><h1 id="dependencies-title">Dependencies</h1><button id="dependencies-refresh" type="button">Check again</button></header>
+<p>Dependencies on this host: bundled libraries, configured executables and optional tools. Remote hosts and isolated runner environments require their own checks. Installation does not imply service readiness.</p>
+<p id="dependencies-status" role="status">Checking dependencies…</p><div id="dependencies-items" class="logging-grid"></div></section>
       <section id="logging-view" aria-labelledby="logging-title" hidden>
         <header class="control-heading"><div><p class="eyebrow">Storage and observability</p><h1 id="logging-title">Logging</h1></div><button id="logging-refresh" type="button">Refresh locations</button></header>
         <p>Where NexusRouter stores records, and the metrics or information each location can contain. This page reads metadata only, not log contents.</p>
@@ -633,6 +638,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-membership.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/dependencies.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/logging.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/cron.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/status.js" defer></script>
