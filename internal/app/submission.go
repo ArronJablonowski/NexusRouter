@@ -26,7 +26,7 @@ var ErrSubmission = errors.New("submission unavailable")
 // submissionContractVersion fences durable queued work from binaries whose
 // admission or canonicalization semantics differ. Increment it whenever a
 // change can reinterpret a persisted submission request.
-const submissionContractVersion = 8
+const submissionContractVersion = submissions.CurrentEnvelopeVersion
 
 const submissionIntentVersion = 1
 

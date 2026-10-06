@@ -492,3 +492,18 @@ func TestBranchRecoveryRejectsRemovedDurableFence(t *testing.T) {
 		t.Fatal(status, err)
 	}
 }
+
+func TestSubmissionEnvelopeVersionCompatibility(t *testing.T) {
+	for version := 0; version <= submissions.CurrentEnvelopeVersion+1; version++ {
+		body, err := json.Marshal(branchSubmissionEnvelope{Version: version, Request: json.RawMessage(`{}`), Intent: submissionIntentProjection{Version: 1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _, branchErr := parseBranchSubmission(body)
+		_, _, resumeErr := parseResumeSubmission(body)
+		supported := version >= 2 && version <= submissions.CurrentEnvelopeVersion
+		if (branchErr == nil) != supported || (resumeErr == nil) != supported {
+			t.Fatalf("version %d: branch=%v resume=%v supported=%v", version, branchErr, resumeErr, supported)
+		}
+	}
+}

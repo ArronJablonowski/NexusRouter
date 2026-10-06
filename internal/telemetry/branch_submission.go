@@ -66,7 +66,7 @@ func parseBranchSubmission(body []byte) (submissions.BranchSourceFence, bool, er
 	var envelope branchSubmissionEnvelope
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || (envelope.Version != 2 && envelope.Version != 3 && envelope.Version != 4 && envelope.Version != 5 && envelope.Version != 6 && envelope.Version != 7) || envelope.Intent.Version != 1 || len(envelope.Request) == 0 {
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || (envelope.Version < 2 || envelope.Version > submissions.CurrentEnvelopeVersion) || envelope.Intent.Version != 1 || len(envelope.Request) == 0 {
 		return submissions.BranchSourceFence{}, false, submissions.ErrInvalid
 	}
 	canonical, err := json.Marshal(envelope)

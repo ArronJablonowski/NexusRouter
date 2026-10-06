@@ -421,7 +421,7 @@ func (h *Handler) mutationFailure(writer http.ResponseWriter, request *http.Requ
 		retryable = false
 	case errors.Is(err, runtime.ErrSteeringLimit), errors.Is(err, submissions.ErrCapacity), errors.Is(err, browserops.ErrCapacity):
 		status, code = http.StatusTooManyRequests, "capacity"
-	case errors.Is(err, app.ErrAdmission), errors.Is(err, approvals.ErrInvalid), errors.Is(err, browserops.ErrInvalid):
+	case errors.Is(err, app.ErrAdmission), errors.Is(err, submissions.ErrInvalid), errors.Is(err, approvals.ErrInvalid), errors.Is(err, browserops.ErrInvalid):
 		status, code = http.StatusUnprocessableEntity, "admission_denied"
 		retryable = false
 	}

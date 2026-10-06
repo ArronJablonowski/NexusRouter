@@ -369,20 +369,22 @@
 		}).finally(() => { loadMoreAudits.disabled = false; });
 	}
 
+ let taskPending=null;
 	function loadTask(taskID) {
   const link=document.querySelector('[data-view="status"]');if(link)link.href=base+"/status?task="+encodeURIComponent(taskID);
-  if(!isStatus)return;
+  if(!isStatus)return Promise.resolve();
+  if(taskPending?.id===taskID)return taskPending.promise;
 		if(selectedTaskID!==taskID){for(const list of [routeDetails,routeCandidates,usageDetails,toolList,auditList])list.replaceChildren();}
 		selectedTaskID = taskID;
 		taskInspector.hidden = false;
 		const requestID = ++inspectorRequest;
-		loadRoute(taskID, requestID);
-		loadUsage(taskID, requestID);
-		loadTools(taskID, "", true, requestID);
-		loadAudits(taskID, "", true, requestID);
+		const pending={id:taskID,promise:null};
+  pending.promise=Promise.all([loadRoute(taskID,requestID),loadUsage(taskID,requestID),loadTools(taskID,"",true,requestID),loadAudits(taskID,"",true,requestID)]).finally(()=>{if(taskPending===pending)taskPending=null;});
+  taskPending=pending;return pending.promise;
 	}
 
 	function clearTask() {
+  taskPending=null;
 		selectedTaskID = "";
 		inspectorRequest++;
 		taskInspector.hidden = true;

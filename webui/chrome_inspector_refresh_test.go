@@ -19,8 +19,14 @@ func TestChromeInspectorUpdatesValuesInPlace(t *testing.T) {
 		t.Fatal(e)
 	}
 	var stage atomic.Int32
+	var taskReads atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/app/api/v1/tasks/slow/route":
+			taskReads.Add(1)
+			time.Sleep(200 * time.Millisecond)
+			writeChromeJSON(w, map[string]any{"version": 1, "task_id": "slow", "availability": "unavailable", "candidates": []any{}})
+			return
 		case "/fixture/advance":
 			stage.Add(1)
 			return
@@ -71,9 +77,16 @@ func TestChromeInspectorUpdatesValuesInPlace(t *testing.T) {
  await evaluate('fetch("/fixture/advance")');
  await evaluate('window.NexusInspector.loadGlobals()');
  if(!await evaluate('rows.every((n,i)=>n===document.querySelector("#health-details").children[i])&&rows[1].textContent==="degraded"'))throw Error('failure erased last values');
+ await evaluate('window.firstTask=window.NexusInspector.loadTask("slow");window.secondTask=window.NexusInspector.loadTask("slow");window.samePending=firstTask===secondTask');
+ if(!await evaluate('samePending'))throw Error('overlapping task refresh not coalesced');
+ await evaluate('window.firstTask');
+ if(!await evaluate('document.querySelector("#route-state").textContent==="Route unavailable."'))throw Error('slow task response discarded');
  socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", script, strconv.Itoa(port), server.URL).CombinedOutput()
 	if e != nil {
 		t.Fatalf("%v %s", e, out)
+	}
+	if taskReads.Load() != 1 {
+		t.Fatalf("overlapping refresh made %d route reads", taskReads.Load())
 	}
 }

@@ -2476,3 +2476,10 @@ Applied the Routing Grid palette and panel/control styling across Chats, Workboa
 - Built-in schedule metadata now distinguishes operations that can invoke models (workboards and skill learning) from deterministic maintenance. Cards display capability independently of enabled state; this is not measured token usage.
 - Local and remote cards consume the same metadata; older hosts and OS entries without evidence show unknown, never infer no AI from script execution or job names.
 - Focused contract and read-only inventory checks; full validation and push remain stopped by user.
+
+### Code and functionality QA (2026-10-05)
+- User requested full QA, authorizing a new full check for these changes; stopped review supervisors and scheduled automation remain stopped.
+- Reproduced live completed-chat follow-up rejection: application intake writes envelope version 8 while telemetry branch/resume parsers stopped at 7. Shared version constant now keeps readers aligned, preserves legacy versions and rejects future versions. Invalid intake now returns a definitive admission rejection instead of misleading retryable 503/unknown outcome.
+- Fixed Status task inspection starvation when refresh overlaps a slow response. Concurrent reads for the same task share the pending operation while task changes retain race protection.
+- Cron retains prior observations with a stale warning on transient remote inspection errors; authorization revocation still clears data. OS crontab environment assignments with whitespace around '=' are excluded from schedule metadata.
+- Focused regression checks and full-suite/deployment/live QA evidence are recorded under resources/qa-20261005-*; final completion requires successful full check and live retest.

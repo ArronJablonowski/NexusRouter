@@ -12,6 +12,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/browserauth"
 	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
@@ -149,5 +150,17 @@ func TestRevisionConflictPublishesTypedCurrentRevision(t *testing.T) {
 	var published contract.Error
 	if response.Code != http.StatusConflict || json.Unmarshal(response.Body.Bytes(), &published) != nil || published.Validate() != nil || published.CurrentRevision == nil || *published.CurrentRevision != 7 || published.SubjectType != "task" || published.SubjectID != "task" || published.OperationID != "operation_123456789" {
 		t.Fatal(response.Code, response.Body.String())
+	}
+}
+
+func TestInvalidSubmissionIsDefinitiveAdmissionRejection(t *testing.T) {
+	handler := mutationHandlerFixture(t, MutationServices{Chat: func(context.Context, string, contract.ChatRequest) (contract.ChatMutationReceipt, error) {
+		return contract.ChatMutationReceipt{}, submissions.ErrInvalid
+	}})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedMutationRequest(t, handler, "/app/api/v1/chats", `{"version":1,"action":"submit","idempotency_key":"browser-submit-key-01","text":"hello"}`))
+	var failure contract.Error
+	if response.Code != http.StatusUnprocessableEntity || json.Unmarshal(response.Body.Bytes(), &failure) != nil || failure.Code != "admission_denied" || failure.Retryable {
+		t.Fatalf("expected definite rejection, got %d %s", response.Code, response.Body.String())
 	}
 }

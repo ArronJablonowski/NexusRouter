@@ -11,6 +11,9 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
+// CurrentEnvelopeVersion identifies the durable intake envelope, not the status API.
+const CurrentEnvelopeVersion = 8
+
 const MaxRequestBytes = 8 << 20
 const MaxQueued = 128
 

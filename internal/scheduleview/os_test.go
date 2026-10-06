@@ -10,7 +10,7 @@ import (
 
 func TestCronMetadataExcludesCommandsAndEnvironment(t *testing.T) {
 	var entries []Entry
-	readCron([]byte("TOKEN=private\n# comment\n*/5 * * * * /bin/runner --token private\n@reboot /bin/start private\n"), "Current user", false, func(e Entry) { entries = append(entries, e) })
+	readCron([]byte("TOKEN=private\n MAILTO = "+`"private value with multiple secret words"`+"\nSHELL \t= /private/runner\n# comment\n*/5 * * * * /bin/runner --token private\n@reboot /bin/start private\n"), "Current user", false, func(e Entry) { entries = append(entries, e) })
 	if len(entries) != 2 || entries[0].Schedule != "*/5 * * * *" || entries[1].Schedule != "@reboot" {
 		t.Fatalf("metadata %#v", entries)
 	}

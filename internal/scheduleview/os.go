@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -193,13 +194,16 @@ func Read(ctx context.Context) Page {
 	}
 	return p
 }
+
+var cronEnvironment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s*=`)
+
 func readCron(data []byte, source string, system bool, add func(Entry)) {
 	if len(data) > 1<<20 {
 		return
 	}
 	for i, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" || strings.HasPrefix(line, "#") || cronEnvironment.MatchString(line) {
 			continue
 		}
 		f := strings.Fields(line)
