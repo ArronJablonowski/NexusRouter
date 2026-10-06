@@ -2491,3 +2491,6 @@ Applied the Routing Grid palette and panel/control styling across Chats, Workboa
 
 ### Remove redundant approval panel chrome
 Removed the separate Tool approvals heading, count badge, divider/padded panel and empty-state notice. Only actual approval messages or a compact inspection error occupy conversation space. Browser regression verifies inline decisions remain usable and an empty approval container has zero height. Prepared in an isolated checkout while the prior rollout remains validation-pinned.
+
+### Logging inventory page
+Added authenticated read-only /logging and /api/v1/logging. Cards describe configured runtime/usage stores, detected installation output files, known collector locations, operator QA artifacts and exporter state. Lists record categories and coverage limits, never log contents, credentials, or private exporter endpoints. Existence is explicitly not health; optional/missing stores stay distinguishable. Stable DOM refresh and narrow viewport covered in Chrome; metadata-only/no-file-creation and authentication/GET-only tests cover the server boundary. Remote-native file inventory is not queried: remote records shown here are locally collected replicas.

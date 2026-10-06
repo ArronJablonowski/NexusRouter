@@ -357,6 +357,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return db.ReadCommittedEventPage(ctx, options)
 			},
 		}, Inspections: webuiapp.InspectionServices{
+			Logging:   service.BrowserLogging,
 			Schedules: service.BrowserSchedules,
 			Stats:     service.BrowserStats,
 			Skills:    service.BrowserSkills,

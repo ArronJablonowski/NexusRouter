@@ -24,10 +24,17 @@
       <a href="__DARWIN_BASE_PATH__/routing-map" data-view="routing">Command grid</a>
       <a href="__DARWIN_BASE_PATH__/model-elimination" data-view="elimination">Elimination</a>
       <a href="__DARWIN_BASE_PATH__/skills" data-view="skills">Skills</a>
+      <a href="__DARWIN_BASE_PATH__/logging" data-view="logging">Logging</a>
       <a href="__DARWIN_BASE_PATH__/stats" data-view="stats">Stats</a>
       <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
+      <section id="logging-view" aria-labelledby="logging-title" hidden>
+        <header class="control-heading"><div><p class="eyebrow">Storage and observability</p><h1 id="logging-title">Logging</h1></div><button id="logging-refresh" type="button">Refresh locations</button></header>
+        <p>Where NexusRouter stores records, and the metrics or information each location can contain. This page reads metadata only, not log contents.</p>
+        <p id="logging-status" role="status">Loading logging locations…</p>
+        <div id="logging-locations" class="logging-grid"></div>
+      </section>
       <section id="active-jobs-view" aria-labelledby="active-jobs-title" hidden>
         <header class="control-heading"><h1 id="active-jobs-title">Active jobs</h1></header>
         <p>Current execution status, queued work, and unresolved historical records. Updates automatically.</p>
@@ -611,6 +618,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-membership.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/logging.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/cron.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/status.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-models.js" defer></script>

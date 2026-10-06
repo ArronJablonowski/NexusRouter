@@ -521,3 +521,5 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 
 .approval-messages { flex: none; padding: 0 1.4rem; }
 .approval-messages .approval-list { margin: 0; }
+
+.logging-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));gap:1rem}.logging-card{padding:1.2rem;border:1px solid var(--nx-line,#12626b);border-left:3px solid #00d9df;background:#041e28}.logging-card h2{font-size:1.1rem;margin-top:0}.logging-path{display:block;white-space:pre-wrap;overflow-wrap:anywhere;color:#68e4e5;padding:.6rem;background:#071721}.logging-meta{font-size:.85rem;color:#9dc9cf}.logging-card li{margin:.5rem 0}.logging-card .help{line-height:1.5}
