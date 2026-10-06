@@ -104,6 +104,7 @@ type WorkboardAcceptanceJudge struct {
 	Timeout         string  `yaml:"timeout" json:"timeout"`
 }
 type Hardware struct {
+	BackendManagedMemory    *bool   `yaml:"backend_managed_memory,omitempty" json:"backend_managed_memory,omitempty"`
 	MacBackendManagedMemory bool    `yaml:"mac_backend_managed_memory" json:"mac_backend_managed_memory"`
 	MacMemoryPercent        float64 `yaml:"mac_memory_percent" json:"mac_memory_percent"`
 	MacSwapGrowthGB         float64 `yaml:"mac_swap_growth_gb" json:"mac_swap_growth_gb"`

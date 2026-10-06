@@ -151,6 +151,11 @@ func capacityHeadroom(snapshot Snapshot, need Need, budget *Budget, now time.Tim
 	ram, _ := ramHeadroom(snapshot, budget.used.RAM, budget.limits.RAMPercent)
 	if need.BackendManagedRAM {
 		ceiling := byteCeiling(snapshot.TotalRAM, budget.limits.RAMPercent)
+		if snapshot.RAMReserveBytes <= snapshot.TotalRAM {
+			ceiling = min(ceiling, snapshot.TotalRAM-snapshot.RAMReserveBytes)
+		} else {
+			ceiling = 0
+		}
 		if budget.used.RAM <= ceiling {
 			ram = ceiling - budget.used.RAM
 		}

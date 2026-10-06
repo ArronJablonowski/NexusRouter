@@ -140,7 +140,7 @@ func (c *InMemoryCoordinator) Acquire(ctx context.Context, snapshot Snapshot, re
 	if delta := now.Sub(request.RequestedAt); delta < -reservationClockSkew || delta > reservationClockSkew {
 		return ReservationBinding{}, ErrReservation
 	}
-	release, err := c.budget.Reserve(snapshot, Need{RAM: request.RAMBytes, VRAM: request.VRAMBytes, Device: request.GPUDevice}, now)
+	release, err := c.budget.Reserve(snapshot, Need{BackendManagedRAM: request.BackendManagedRAM, RAM: request.RAMBytes, VRAM: request.VRAMBytes, Device: request.GPUDevice}, now)
 	if err != nil {
 		return ReservationBinding{}, err
 	}

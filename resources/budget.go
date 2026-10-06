@@ -140,12 +140,16 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	}
 	ramRoom, ok := ramHeadroom(s, b.used.RAM, b.limits.RAMPercent)
 	if n.BackendManagedRAM {
-		// Explicit Mac backend policy: Ollama owns residency and reclamation.
+		// Backend policy: the inference server owns residency and reclamation.
 		// Retain physical-capacity, concurrent-reservation and pressure limits.
-		if s.Source != "darwin-vm-stat-estimate" || !s.UnifiedMemory || s.SwapUsed == nil || s.ThermalPressure == nil || n.VRAM != 0 || n.Device != "" {
+		if s.SwapUsed == nil || (s.Source == "darwin-vm-stat-estimate" && s.ThermalPressure == nil) || n.VRAM != 0 || n.Device != "" {
 			return nil, ErrResourceData
 		}
 		ceiling := byteCeiling(s.TotalRAM, b.limits.RAMPercent)
+		if s.RAMReserveBytes > s.TotalRAM {
+			return nil, ErrResourceData
+		}
+		ceiling = min(ceiling, s.TotalRAM-s.RAMReserveBytes)
 		ok = b.used.RAM <= ceiling
 		if ok {
 			ramRoom = ceiling - b.used.RAM

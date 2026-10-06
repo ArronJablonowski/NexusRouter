@@ -38,6 +38,8 @@ func autoFixture(t *testing.T) (*Service, config.Settings) {
 	}))
 	t.Cleanup(server.Close)
 	cfg := config.Defaults()
+	strict := false
+	cfg.Hardware.BackendManagedMemory = &strict
 	// Preserve this synthetic fixture's 80% admission boundary on all platforms.
 	cfg.Hardware.MacMemoryPercent = cfg.Hardware.MaxRAM
 	// These routing fixtures explicitly isolate their own tool catalogs.

@@ -18,7 +18,7 @@ var errSwapGrowth = errors.New("Mac swap growth limit exceeded")
 // Watch only this execution. Canceling its provider context stops generation without
 // killing shared servers or unloading models owned by other work.
 func (s *Service) guardMacSwap(ctx context.Context, model config.Model, release func() error) (context.Context, func() error, error) {
-	if runtime.GOOS != "darwin" || model.Locality != "local" {
+	if model.Locality != "local" || (runtime.GOOS != "darwin" && !s.modelResources(model).BackendManagedRAM) {
 		return ctx, release, nil
 	}
 	probe, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -26,14 +26,18 @@ func (s *Service) guardMacSwap(ctx context.Context, model config.Model, release 
 	cancel()
 	// Only Darwin measurements represent the Mac swap counter; synthetic or
 	// other-platform profiles do not establish a Mac swap baseline.
-	if err == nil && initial.Source != "darwin-vm-stat-estimate" {
+	if err == nil && runtime.GOOS == "darwin" && initial.Source != "darwin-vm-stat-estimate" {
 		return ctx, release, nil
 	}
 	if err != nil || initial.SwapUsed == nil {
 		_ = release()
 		return ctx, nil, ErrAdmission
 	}
-	run, finish := watchSwapGrowth(ctx, *initial.SwapUsed, s.settings.Hardware.MacSwapGrowthBytes(), time.Second, s.resourceProfile)
+	limit := uint64(5 << 30)
+	if runtime.GOOS == "darwin" {
+		limit = s.settings.Hardware.MacSwapGrowthBytes()
+	}
+	run, finish := watchSwapGrowth(ctx, *initial.SwapUsed, limit, time.Second, s.resourceProfile)
 	var once sync.Once
 	var result error
 	return run, func() error {
@@ -88,14 +92,15 @@ func watchSwapGrowth(ctx context.Context, baseline, limit uint64, interval time.
 	}
 }
 
-// Backend-managed admission is opt-in and limited to local Ollama on macOS.
+// Backend-managed admission defaults on for built-in loopback Ollama and
+// OpenAI-compatible servers (including vLLM). Custom factories retain strict admission.
 func (s *Service) modelResources(model config.Model) resources.Need {
 	need := modelResources(model)
-	if runtime.GOOS != "darwin" || !s.settings.Hardware.MacBackendManagedMemory || model.Locality != "local" {
+	if s.providerFactory != nil || (s.settings.Hardware.BackendManagedMemory != nil && !*s.settings.Hardware.BackendManagedMemory) || model.Locality != "local" {
 		return need
 	}
 	for _, provider := range s.settings.Providers {
-		if provider.ID == model.Provider && provider.Kind == "ollama" {
+		if provider.ID == model.Provider && (provider.Kind == "ollama" || provider.Kind == "openai_compatible") {
 			endpoint, err := url.Parse(provider.ResolvedEndpoint())
 			if err != nil {
 				return need
