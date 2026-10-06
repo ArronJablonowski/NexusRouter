@@ -2506,3 +2506,6 @@ Settings now persists Off/managed/full DNS logging with active-versus-saved rest
 
 ## Direct subprocess auditing
 NexusRouter entry points now enable private daily launch/exit audit records, and all existing direct runtime subprocess execution sites use the shared logger. Logs include redacted argv and are inventoried on the Logging page. Targeted lifecycle, concurrency, redaction and launch-failure tests cover the audit boundary. Descendants created inside external programs and systemd/launchd remain outside direct-launch coverage and require privileged OS tracing; no complete process-tree claim is made.
+
+## Logging storage measurements
+Logging cards expose measured bytes and stored entry counts, with physical-file deduplication in page totals. SQLite size includes WAL, SHM and rollback journals; entry counts sum user-table rows, while text/JSONL counts use lines. External exporters and mixed build artifacts are excluded. Requests use a three-second count budget and a 64 MiB per-text-file scan limit; unknown counts are explicitly partial, never substituted with zero. Fixture and browser tests cover database/text counts, hardlink deduplication, partial measurements and stable card refresh.

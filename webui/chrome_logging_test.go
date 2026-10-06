@@ -19,7 +19,8 @@ func TestChromeLoggingStableMetadata(t *testing.T) {
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/app/api/v1/logging" {
-			writeChromeJSON(w, LoggingPage{Version: 1, ObservedAt: time.Now().UTC(), Items: []LogLocation{{ID: "runtime", Name: "Task history", Location: "/private/fixture/runtime.db", Scope: "Local", Format: "SQLite", Status: "Present", Records: []string{"Input/output tokens", "Approval actor and timestamp"}, Note: "Fixture metadata only"}}})
+			size, entries := int64(2048), int64(12)
+			writeChromeJSON(w, LoggingPage{TotalBytes: size, TotalEntries: entries, Version: 1, ObservedAt: time.Now().UTC(), Items: []LogLocation{{Bytes: &size, Entries: &entries, Measurement: "Database rows", ID: "runtime", Name: "Task history", Location: "/private/fixture/runtime.db", Scope: "Local", Format: "SQLite", Status: "Present", Records: []string{"Input/output tokens", "Approval actor and timestamp"}, Note: "Fixture metadata only"}}})
 			return
 		}
 		shell.ServeHTTP(w, r)
@@ -33,6 +34,7 @@ func TestChromeLoggingStableMetadata(t *testing.T) {
  await cdp('Page.navigate',{url:origin+'/app/logging'});
  await eventually('document.querySelectorAll(".logging-card").length===1','logging inventory failed');
  if(!await evaluate('document.querySelector("#logging-view").hidden===false&&document.querySelector("#chat-view").hidden&&document.querySelector(".logging-card").textContent.includes("Approval actor")&&document.querySelector("[data-view=logging]").getAttribute("aria-current")==="page"'))throw Error('logging page not selected or incomplete');
+ if(!await evaluate('document.querySelector("#logging-totals").textContent.includes("2 KiB")&&document.querySelector(".logging-storage").textContent.includes("12")'))throw Error('missing sizes/counts');
  await evaluate('window.cardBefore=document.querySelector(".logging-card");document.querySelector("#logging-refresh").click()');
  await eventually('!document.querySelector("#logging-refresh").disabled','refresh did not finish');
  if(!await evaluate('document.querySelector(".logging-card")===cardBefore'))throw Error('refresh replaced metadata card');

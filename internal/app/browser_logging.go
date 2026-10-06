@@ -70,5 +70,6 @@ func (s *Service) BrowserLogging(ctx context.Context) (webui.LoggingPage, error)
 	export("metrics", "Metrics export", m != nil && m.Enabled, m != nil, "Accounting records, known/unknown usage and cost coverage, input/output tokens and normalized cost", "CPU thread count, total/available RAM and VRAM, swap bytes, thermal-pressure and unified-memory flags", "Reservation counts, reserved RAM/VRAM and resource availability flags (when available)")
 	t := s.settings.Telemetry.TraceExport
 	export("traces", "Trace export", t != nil && t.Enabled, t != nil, "Task/turn/tool execution spans, timing and correlation metadata")
+	measureLogStorage(ctx, &p)
 	return p, p.Validate()
 }
