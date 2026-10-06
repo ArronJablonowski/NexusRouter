@@ -10,7 +10,7 @@ func TestDaemonExecutionTimeoutConfiguration(t *testing.T) {
 		raw   string
 		want  time.Duration
 		valid bool
-	}{{"", 5 * time.Minute, true}, {"100ms", 100 * time.Millisecond, true}, {"30m", 30 * time.Minute, true}, {"0s", 0, false}, {"31m", 0, false}, {"invalid", 0, false}} {
+	}{{"", 30 * time.Minute, true}, {"100ms", 100 * time.Millisecond, true}, {"30m", 30 * time.Minute, true}, {"0s", 0, false}, {"31m", 0, false}, {"invalid", 0, false}} {
 		cfg := Defaults()
 		cfg.Daemon.ExecutionTimeout = tc.raw
 		got, err := cfg.Daemon.ExecutionDuration()

@@ -20,7 +20,7 @@ type HTTP struct {
 	client      *http.Client
 }
 
-const defaultRequestTimeout = 5 * time.Minute
+const defaultRequestTimeout = 30 * time.Minute
 
 // MaxRequestTimeout bounds explicitly configured long-running local reviews.
 const MaxRequestTimeout = 30 * time.Minute

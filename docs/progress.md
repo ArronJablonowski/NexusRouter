@@ -2556,3 +2556,6 @@ Backend-managed memory now defaults on for built-in loopback Ollama/OpenAI-compa
 
 ## Dependency inventory page (2026-10-06)
 Added authenticated read-only /app/dependencies with bundled Go runtime and transitive build libraries, optional tools discovered on the service PATH, and configured provider/harness executable checks. Stable card refresh and narrow-layout browser coverage, shell manifest review, API authorization/method checks and metadata/cancellation test. Isolated Python packages and remote-host inventories are explicitly unverified, not falsely labeled absent; package presence does not establish GPU compatibility. No automatic installation or model execution.
+
+## Thirty-minute execution default (2026-10-06)
+CLI runs, default daemon submissions and default HTTP provider requests now allow 30 minutes. Explicit provider/daemon overrides remain respected; parent cancellation and memory safeguards remain active. Targeted timeout configuration and provider override tests verify behavior; no full suite claimed.

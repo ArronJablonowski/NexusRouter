@@ -239,7 +239,7 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "cannot read UTF-8 prompt (maximum 1 MiB; input deadline 30 seconds)")
 		return 1
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 	service, err := app.NewService(s, os.Getenv)
 	if err != nil {

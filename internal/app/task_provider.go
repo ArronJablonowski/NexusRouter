@@ -248,7 +248,7 @@ func openTaskProvider(ctx context.Context, s config.Settings, provider config.Pr
 
 func httpProviderTimeout(provider config.Provider) time.Duration {
 	if provider.RequestTimeout == "" {
-		return 5 * time.Minute
+		return 30 * time.Minute
 	}
 	timeout, _ := config.Duration(provider.RequestTimeout)
 	return timeout

@@ -6,10 +6,10 @@ import (
 )
 
 // ExecutionDuration bounds each dispatched submission independently of caller
-// disconnects. An omitted setting preserves the historical five-minute limit.
+// disconnects. An omitted setting uses the thirty-minute default.
 func (d Daemon) ExecutionDuration() (time.Duration, error) {
 	if d.ExecutionTimeout == "" {
-		return 5 * time.Minute, nil
+		return 30 * time.Minute, nil
 	}
 	timeout, err := Duration(d.ExecutionTimeout)
 	if err != nil || timeout < 100*time.Millisecond || timeout > 30*time.Minute {
