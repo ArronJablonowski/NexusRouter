@@ -2494,3 +2494,6 @@ Removed the separate Tool approvals heading, count badge, divider/padded panel a
 
 ### Logging inventory page
 Added authenticated read-only /logging and /api/v1/logging. Cards describe configured runtime/usage stores, detected installation output files, known collector locations, operator QA artifacts and exporter state. Lists record categories and coverage limits, never log contents, credentials, or private exporter endpoints. Existence is explicitly not health; optional/missing stores stay distinguishable. Stable DOM refresh and narrow viewport covered in Chrome; metadata-only/no-file-creation and authentication/GET-only tests cover the server boundary. Remote-native file inventory is not queried: remote records shown here are locally collected replicas.
+
+### Startup recovery validation synchronization
+The startup recovery regression closed the dispatcher after an unrelated control submission completed, potentially canceling the independent reconciler before its assertion. Wait for the original submission to reach failed before shutdown, retaining all lease, result and exactly-once provider assertions. Prior full-suite failure evidence remains in resources/logging-page-full-check.*. Corrected full validation pending.

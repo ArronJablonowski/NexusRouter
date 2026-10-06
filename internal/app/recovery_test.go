@@ -99,6 +99,11 @@ func TestRecoveryStartupOnlyExecutesUndispatchedClaims(t *testing.T) {
 			}
 			defer d.Close()
 			awaitSubmission(t, ctx, s, awaitID, "succeeded")
+			if dispatched {
+				// Workers and recovery run independently; completing the control
+				// submission does not mean recovery has finished.
+				awaitSubmission(t, ctx, s, claim.Status.ID, "failed")
+			}
 			if err := d.Close(); err != nil {
 				t.Fatal(err)
 			}
