@@ -2545,3 +2545,5 @@ job. Older hosts explicitly show “not reported.”
 
 ## Mac memory controls (2026-10-06)
 Mac hosts default to a 100% RAM allowance and cancel owned local model requests when measured swap grows more than 4 decimal GB from execution admission. Settings exposes both limits; restart activates changes. One-second polling cancels provider contexts, not shared server processes, and cannot attribute host-wide swap growth to individual processes. Missing production swap observations fail closed. Linux memory policy is unchanged. No real memory exhaustion is induced in QA.
+
+Daemon startup can reconfigure a persisted host policy only in an atomic transaction with zero active reservations. Prior reservations remain intact, and handles holding the previous policy are fenced. A live Mac mini deployment exposed the previous immutable-policy startup conflict; the idle transition fixes settings activation.

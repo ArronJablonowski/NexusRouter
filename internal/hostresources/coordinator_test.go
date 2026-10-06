@@ -536,3 +536,59 @@ func TestNativeProcessHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIdlePolicyReconfigureFencesOldHandle(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "private", "policy.db")
+	old := resources.Limits{MaxConcurrent: 1, RAMPercent: 80, VRAMPercent: 80, MaxAge: time.Minute}
+	a, err := OpenPath(ctx, path, old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	next := old
+	next.RAMPercent = 100
+	b, err := OpenPathReconfigure(ctx, path, next, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	conn, err := a.db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if !errors.Is(a.validatePolicy(ctx, conn), resources.ErrReservationConflict) {
+		t.Fatal("old handle not fenced")
+	}
+}
+
+func TestIdlePolicyReconfigureRejectsActiveReservations(t *testing.T) {
+	a, _, path := fixture(t, 1)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	r := request(t, "policy-active", now)
+	if _, err := a.Acquire(ctx, snapshot(now), r, now); err != nil {
+		t.Fatal(err)
+	}
+	next := a.limits
+	next.RAMPercent = 95
+	if c, err := OpenPathReconfigure(ctx, path, next, false); !errors.Is(err, resources.ErrReservationConflict) {
+		if c != nil {
+			c.Close()
+		}
+		t.Fatal("active policy changed", err)
+	}
+	if _, err := a.Release(ctx, r.ReservationID, r.Owner, now); err != nil {
+		t.Fatal("existing owner affected", err)
+	}
+	c, err := OpenPathReconfigure(ctx, path, next, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	var count int
+	if err := c.db.QueryRow("SELECT count(*) FROM reservations WHERE id=?", r.ReservationID).Scan(&count); err != nil || count != 1 {
+		t.Fatal("history lost", count, err)
+	}
+}

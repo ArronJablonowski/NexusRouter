@@ -50,15 +50,13 @@ func InstallHostResourceCoordinator(ctx context.Context, service *Service, daemo
 	ownerRoot := branding.Getenv("DARWIN_PROCESS_OWNER_DIR")
 	if branding.Getenv("DARWIN_RESOURCE_COORDINATOR_DB") == "" && filepath.IsAbs(ownerRoot) && filepath.Clean(ownerRoot) == ownerRoot {
 		path := filepath.Join(ownerRoot, "host-resources.db")
-		if service.settings.Hardware.Concurrent == "auto" {
-			coordinator, err = hostresources.OpenPathAdaptive(ctx, path, service.resourceLimits)
-		} else {
-			coordinator, err = hostresources.OpenPath(ctx, path, service.resourceLimits)
-		}
-	} else if service.settings.Hardware.Concurrent == "auto" {
-		coordinator, err = hostresources.OpenAdaptive(ctx, service.resourceLimits)
+		coordinator, err = hostresources.OpenPathReconfigure(ctx, path, service.resourceLimits, service.settings.Hardware.Concurrent == "auto")
 	} else {
-		coordinator, err = hostresources.Open(ctx, service.resourceLimits)
+		path, pathErr := hostresources.Path()
+		if pathErr != nil {
+			return nil, ErrAdmission
+		}
+		coordinator, err = hostresources.OpenPathReconfigure(ctx, path, service.resourceLimits, service.settings.Hardware.Concurrent == "auto")
 	}
 	if err != nil {
 		return nil, ErrAdmission

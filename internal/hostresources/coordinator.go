@@ -33,9 +33,10 @@ var (
 )
 
 type Coordinator struct {
-	db       *sql.DB
-	limits   resources.Limits
-	adaptive bool
+	db          *sql.DB
+	limits      resources.Limits
+	adaptive    bool
+	reconfigure bool
 }
 
 func Path() (string, error) {
@@ -77,7 +78,15 @@ func OpenPathAdaptive(ctx context.Context, path string, limits resources.Limits)
 	return openPath(ctx, path, limits, true)
 }
 
+// OpenPathReconfigure installs a new policy only while no reservation is active.
+// Existing handles retain their old limits and fail policy validation afterward.
+func OpenPathReconfigure(ctx context.Context, path string, limits resources.Limits, adaptive bool) (*Coordinator, error) {
+	return openPathPolicy(ctx, path, limits, adaptive, true)
+}
 func openPath(ctx context.Context, path string, limits resources.Limits, adaptive bool) (*Coordinator, error) {
+	return openPathPolicy(ctx, path, limits, adaptive, false)
+}
+func openPathPolicy(ctx context.Context, path string, limits resources.Limits, adaptive, reconfigure bool) (*Coordinator, error) {
 	if ctx == nil || ctx.Err() != nil || !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return nil, resources.ErrReservation
 	}
@@ -113,7 +122,7 @@ func openPath(ctx context.Context, path string, limits resources.Limits, adaptiv
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	c := &Coordinator{db: db, limits: limits, adaptive: adaptive}
+	c := &Coordinator{db: db, limits: limits, adaptive: adaptive, reconfigure: reconfigure}
 	if err = c.initialize(ctx); err != nil {
 		db.Close()
 		return nil, err
@@ -156,7 +165,22 @@ func (c *Coordinator) initialize(ctx context.Context) error {
 		return err
 	}
 	if err = bindPolicy(ctx, conn, c.limits, c.adaptive); err != nil {
-		return err
+		if !c.reconfigure || !errors.Is(err, resources.ErrReservationConflict) {
+			return err
+		}
+		var active int
+		if e := conn.QueryRowContext(ctx, "SELECT count(*) FROM reservations WHERE state='active'").Scan(&active); e != nil {
+			return e
+		}
+		if active != 0 {
+			return resources.ErrReservationConflict
+		}
+		if _, err = conn.ExecContext(ctx, "DELETE FROM coordinator_policy WHERE singleton=1"); err != nil {
+			return err
+		}
+		if err = bindPolicy(ctx, conn, c.limits, c.adaptive); err != nil {
+			return err
+		}
 	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err
