@@ -2497,3 +2497,6 @@ Added authenticated read-only /logging and /api/v1/logging. Cards describe confi
 
 ### Startup recovery validation synchronization
 The startup recovery regression closed the dispatcher after an unrelated control submission completed, potentially canceling the independent reconciler before its assertion. Wait for the original submission to reach failed before shutdown, retaining all lease, result and exactly-once provider assertions. Prior full-suite failure evidence remains in resources/logging-page-full-check.*. Corrected full validation pending.
+
+### Approved NexusRouter branding
+Saved the selected Grid Runner/Neon Outline artwork under docs/branding and added its transparent N to the top-left website header with fixed dimensions and decorative alt text. Logo edits are isolated from the running recovery validation. Deployment pending.
