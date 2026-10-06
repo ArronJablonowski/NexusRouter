@@ -525,3 +525,11 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .logging-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));gap:1rem}.logging-card{padding:1.2rem;border:1px solid var(--nx-line,#12626b);border-left:3px solid #00d9df;background:#041e28}.logging-card h2{font-size:1.1rem;margin-top:0}.logging-path{display:block;white-space:pre-wrap;overflow-wrap:anywhere;color:#68e4e5;padding:.6rem;background:#071721}.logging-meta{font-size:.85rem;color:#9dc9cf}.logging-card li{margin:.5rem 0}.logging-card .help{line-height:1.5}
 
 .topbar .mark{display:inline-block;width:2.5rem;height:2.5rem;object-fit:contain;vertical-align:middle;background:transparent;border:0;border-radius:0;box-shadow:none}
+
+.host-options { border: 1px solid var(--accent, #00dce5); background: #06212c; max-height: 15rem; overflow-y: auto; }
+.host-options button { display: block; width: 100%; text-align: left; overflow-wrap: anywhere; }
+.host-options [aria-selected="true"] { background: #12505d; outline: 2px solid #00dce5; outline-offset: -2px; }
+#host-routing { border-left: 3px solid #00dce5; padding: .5rem; }
+#host-routing select { max-width: 100%; }
+#host-receipt { overflow-wrap: anywhere; }
+#host-receipt pre { white-space: pre-wrap; }

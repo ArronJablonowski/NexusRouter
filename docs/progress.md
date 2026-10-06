@@ -2520,3 +2520,15 @@ and all configuration fields, staged edits, full config validation on save, priv
 backups and atomic replacement. Environment overlays are intentionally not persisted.
 Runtime service controls and pairing remain separate commands. Structured collections
 currently use JSON entry rather than per-row forms. No automatic service restart.
+
+## Chat host mentions
+
+Added leading `@hostname`/`@peer-id` routing with permission-scoped paired-host
+lookup, popup selection, arrow/Enter/Tab completion and Escape dismissal. `@local`
+uses the existing local chat route. Remote tasks require an explicit permitted
+zero-cost local model; use existing recorded dispatch and status/result/cancellation
+controls. Unknown hosts and unavailable destinations never fall back to local work.
+Recovery identity is preserved in the URL before sending; uncertain dispatch is
+not replayed. Remote requests are independent jobs, not resumed local conversations;
+existing chat history is not transferred. Full remote conversational history and
+persistent destination across separate chats are not implemented.

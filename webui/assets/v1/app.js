@@ -818,7 +818,8 @@
 		if (selectedChat) loadHistory(selectedChat, "", true, false);
 	}
 	function submitComposer() {
-		const text = composerText.value;
+		const text = window.NexusHostMentions ? window.NexusHostMentions.prepare(composerText.value, selectedChat, csrfToken) : composerText.value;
+		if (text === null) return;
 		composerError.hidden = true;
 		if (!text.trim()) {
 			showNotice(composerError, "Enter a message first.", true);
