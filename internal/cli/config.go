@@ -25,7 +25,7 @@ func (o overrides) Set(s string) error {
 
 func runConfig(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || (args[0] != "validate" && args[0] != "show") {
-		_, _ = fmt.Fprintln(stderr, "usage: nexus config validate|show [--config path] [--user-config path] [--set key=value]")
+		_, _ = fmt.Fprintln(stderr, "usage: nexus config validate|show [--config path] [--user-config path] [--set key=value]; nexus config menu [--config path]")
 		return 2
 	}
 	fs := flag.NewFlagSet("config", flag.ContinueOnError)

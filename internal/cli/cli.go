@@ -95,6 +95,12 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "settings" {
+		return runSettingsMenu(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) > 1 && args[0] == "config" && args[1] == "menu" {
+		return runSettingsMenu(args[2:], stdin, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "remote" {
 		return runRemote(args[1:], stdin, stdout, stderr)
 	}

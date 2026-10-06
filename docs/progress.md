@@ -2512,3 +2512,11 @@ Logging cards expose measured bytes and stored entry counts, with physical-file 
 
 ## Bounded automatic commander consultation
 Added peer discovery and remote assignments through delegate/delegate_batch, sharing the parent's existing call budget and journal. Recorded dispatch, caller-scoped status, deadline and cancellation preserve route identity and prevent automatic duplicate delivery. Consultation protocol v2 authorizes only the destination's configured commander, disallows recursive tools, and admits declared zero-cost models; private/cloud peer boundaries are rechecked. Paid-model aggregate reservations, arbitrary multi-hop cooperation, and shared project state remain unimplemented. Outbound credentials and explicit peer permissions are required on each initiating host.
+
+## Headless settings menu
+
+Added `nexus settings --config PATH` / `nexus config menu` with schema-derived sections
+and all configuration fields, staged edits, full config validation on save, private
+backups and atomic replacement. Environment overlays are intentionally not persisted.
+Runtime service controls and pairing remain separate commands. Structured collections
+currently use JSON entry rather than per-row forms. No automatic service restart.
