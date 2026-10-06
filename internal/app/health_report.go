@@ -153,7 +153,7 @@ func (s *Service) healthReportScoped(outer context.Context, supervisor health.Ch
 						policyBlocked[i] = m.Locality != "cloud"
 						break
 					}
-					transport, policyErr := policy.NewTransport(m.Locality == "local" || s.settings.Mode == "local_only", []string{p.ResolvedEndpoint()})
+					transport, policyErr := policy.NewTransport(m.Locality == "local" || s.settings.Mode == "local_only", []string{p.ResolvedEndpoint()}, s.settings.DNSAudit())
 					if policyErr != nil {
 						policyBlocked[i] = true
 					} else {
@@ -221,7 +221,7 @@ func (s *Service) healthReportScoped(outer context.Context, supervisor health.Ch
 					continue
 				}
 				endpoint := p.ResolvedEndpoint()
-				transport, err := policy.NewTransport(s.settings.Mode == "local_only" || probes[i].local, []string{endpoint})
+				transport, err := policy.NewTransport(s.settings.Mode == "local_only" || probes[i].local, []string{endpoint}, s.settings.DNSAudit())
 				if err == nil {
 					var adapter providers.Provider
 					adapter, err = providers.Build(query, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: endpoint, Kind: p.Kind, Purpose: providers.PurposeHealth, Timeout: httpProviderTimeout(p), OllamaThink: p.OllamaThink, APIKey: probes[i].key, Transport: transport})

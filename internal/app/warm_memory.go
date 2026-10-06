@@ -52,7 +52,7 @@ func (s *Service) warmMemoryEstimate(ctx context.Context, model config.Model, to
 		}
 		bounded, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
-		transport, err := policy.NewTransport(true, []string{p.ResolvedEndpoint()})
+		transport, err := policy.NewTransport(true, []string{p.ResolvedEndpoint()}, s.settings.DNSAudit())
 		if err != nil {
 			return 0, time.Time{}
 		}

@@ -20,19 +20,20 @@ var ErrEgress = errors.New("network destination denied by policy")
 // Recognized loopback destinations are pinned in every deployment mode.
 // This protects runtime HTTP traffic, not arbitrary code running in-process.
 type Transport struct {
+	audit     DNSAudit
 	inner     *http.Transport
 	origins   map[string]bool
 	localOnly bool
 }
 
-func NewTransport(localOnly bool, endpoints []string) (*Transport, error) {
-	return NewTransportWithHeaderTimeout(localOnly, endpoints, time.Minute)
+func NewTransport(localOnly bool, endpoints []string, audit ...DNSAudit) (*Transport, error) {
+	return NewTransportWithHeaderTimeout(localOnly, endpoints, time.Minute, audit...)
 }
 
 // NewTransportWithHeaderTimeout lets bounded provider requests wait for slow
 // local prefill without an unrelated shorter transport deadline. Caller
 // cancellation and HTTP client total deadlines still take precedence.
-func NewTransportWithHeaderTimeout(localOnly bool, endpoints []string, timeout time.Duration) (*Transport, error) {
+func NewTransportWithHeaderTimeout(localOnly bool, endpoints []string, timeout time.Duration, audit ...DNSAudit) (*Transport, error) {
 	if timeout < 100*time.Millisecond || timeout > 30*time.Minute {
 		return nil, errors.New("invalid response header timeout")
 	}
@@ -57,6 +58,9 @@ func NewTransportWithHeaderTimeout(localOnly bool, endpoints []string, timeout t
 		origins[origin(u)] = true
 	}
 	t := &Transport{origins: origins, localOnly: localOnly}
+	if len(audit) > 0 {
+		t.audit = audit[0]
+	}
 	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
 	t.inner = &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}, TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: timeout, IdleConnTimeout: 90 * time.Second, MaxIdleConns: 20, MaxConnsPerHost: 8, MaxResponseHeaderBytes: 1 << 20}
 	t.inner.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -70,6 +74,9 @@ func NewTransportWithHeaderTimeout(localOnly bool, endpoints []string, timeout t
 		address, err = transportDialAddress(localOnly, host, port)
 		if err != nil {
 			return nil, err
+		}
+		if t.audit.Path != "" {
+			return t.audit.dial(ctx, network, address, dialer.DialContext)
 		}
 		return dialer.DialContext(ctx, network, address)
 	}

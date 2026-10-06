@@ -14,6 +14,7 @@ var settingsDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 const MaxSettingsRootBytes = 4096
 
 type ToolAccessSettings struct {
+	DNSLogging            string                     `json:"dns_logging"`
 	RemoteAdvertisement   remoteconfig.Advertisement `json:"remote_advertisement"`
 	SkillsEnabled         bool                       `json:"skills_enabled"`
 	SkillsAutoDraft       bool                       `json:"skills_auto_draft"`
@@ -26,6 +27,9 @@ type ToolAccessSettings struct {
 }
 
 func (s ToolAccessSettings) Validate() error {
+	if s.DNSLogging != "" && s.DNSLogging != "managed" && s.DNSLogging != "full" {
+		return ErrContract
+	}
 	if s.RemoteAdvertisement.Validate() != nil {
 		return ErrContract
 	}

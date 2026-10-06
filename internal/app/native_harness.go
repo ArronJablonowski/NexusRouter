@@ -194,7 +194,7 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	if err != nil {
 		return result, ErrAdmission
 	}
-	tr, err := policy.NewTransportWithHeaderTimeout(s.Mode == "local_only" || m.Locality == "local", []string{p.ResolvedEndpoint()}, httpProviderTimeout(p))
+	tr, err := policy.NewTransportWithHeaderTimeout(s.Mode == "local_only" || m.Locality == "local", []string{p.ResolvedEndpoint()}, httpProviderTimeout(p), s.DNSAudit())
 	if err != nil {
 		return result, ErrAdmission
 	}

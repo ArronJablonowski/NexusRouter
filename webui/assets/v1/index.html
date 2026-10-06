@@ -251,6 +251,12 @@
             <label for="remote-advertise-name">Advertised TLS name</label><input id="remote-advertise-name" type="text" maxlength="253" autocomplete="off" spellcheck="false" placeholder="node-a">
             <label for="remote-advertise-ssh-port">SSH port hint (optional)</label><input id="remote-advertise-ssh-port" type="number" min="1" max="65535" step="1" placeholder="22">
             <p class="settings-intro">Save, then restart the remote host using this configuration. Explicit service advertisement flags override these saved values. The host verifies its private IPv4 interface and certificate when starting. This does not install SSH, pair peers, or start a remote service.</p>
+            <fieldset class="settings-card"><legend>DNS logging</legend>
+<label for="dns-logging">Logging level</label><select id="dns-logging"><option value="">Off</option><option value="managed">Level 1 — NexusRouter-managed DNS</option><option value="full">Level 2 — Full DNS capture (administrator required)</option></select>
+<p>Level 1 records DNS lookups through NexusRouter's managed HTTP transport on this host. It does not observe independent browser, shell, SSH, or Codex subprocess resolvers.</p>
+<p>Level 2 retains Level 1 and requests privileged capture. Administrator installation is required separately; saving this preference does not start a system monitor or grant privileges. The bundled scripts/dns-capture.py helper can record TCP/UDP port 53 with administrator privileges. Encrypted/custom DNS requires additional enforcement and is not visible to ordinary packet capture.</p>
+<output id="dns-logging-status" role="status">Loading DNS logging status…</output>
+</fieldset>
             <p id="settings-validation" class="field-error" role="alert" hidden></p>
             <div class="button-row"><button id="save-settings" type="submit">Save settings</button><button id="reset-settings" class="secondary" type="button">Reset changes</button></div>
             <output id="settings-status" class="settings-status" role="status" aria-live="polite">Loading settings…</output>

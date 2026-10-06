@@ -194,7 +194,7 @@ func prepareTaskProvider(s config.Settings, provider config.Provider, model conf
 	}
 	if provider.Kind != "codex_app_server" {
 		endpoint := provider.ResolvedEndpoint()
-		transport, err := policy.NewTransportWithHeaderTimeout(s.Mode == "local_only" || model.Locality == "local", []string{endpoint}, httpProviderTimeout(provider))
+		transport, err := policy.NewTransportWithHeaderTimeout(s.Mode == "local_only" || model.Locality == "local", []string{endpoint}, httpProviderTimeout(provider), s.DNSAudit())
 		if err != nil {
 			return nil, nil, ErrAdmission
 		}

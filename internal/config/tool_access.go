@@ -23,6 +23,7 @@ var (
 // local operator UI. It includes the adjacent specialist-locality policy but
 // is not a general-purpose configuration editor.
 type ToolAccess struct {
+	DNSLogging            string `json:"dns_logging"`
 	RemoteAdvertisement   remoteconfig.Advertisement
 	SkillsEnabled         bool
 	SkillsAutoDraft       bool
@@ -64,6 +65,7 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	if err != nil {
 		return ToolAccess{}, "", err
 	}
+	setConfigScalar(root, []string{"telemetry", "dns_logging"}, "!!str", next.DNSLogging)
 	setConfigScalar(root, []string{"remote_advertisement", "enabled"}, "!!bool", boolText(next.RemoteAdvertisement.Enabled))
 	setConfigScalar(root, []string{"remote_advertisement", "interface"}, "!!str", next.RemoteAdvertisement.Interface)
 	setConfigScalar(root, []string{"remote_advertisement", "name"}, "!!str", next.RemoteAdvertisement.Name)
@@ -154,7 +156,7 @@ func setConfigScalar(node *yaml.Node, path []string, tag, value string) {
 }
 
 func toolAccess(settings Settings) ToolAccess {
-	return ToolAccess{RemoteAdvertisement: settings.RemoteAdvertisement, SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
+	return ToolAccess{DNSLogging: settings.Telemetry.DNSLogging, RemoteAdvertisement: settings.RemoteAdvertisement, SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
 }
 
 func boolText(value bool) string {

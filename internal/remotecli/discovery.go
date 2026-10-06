@@ -48,7 +48,7 @@ func modelObserver(cfg config.Settings, secret func(string) string, profile func
 						apiKey = secret(p.APIKeyEnv)
 					}
 					if p.APIKeyEnv == "" || apiKey != "" {
-						tr, e := policy.NewTransport(local, []string{p.ResolvedEndpoint()})
+						tr, e := policy.NewTransport(local, []string{p.ResolvedEndpoint()}, cfg.DNSAudit())
 						if e == nil {
 							probe, stop := context.WithTimeout(ctx, 2*time.Second)
 							adapter, err := providers.Build(probe, nil, providers.Connection{Version: 1, ID: p.ID, Endpoint: p.ResolvedEndpoint(), Kind: p.Kind, Purpose: providers.PurposeDiscovery, Timeout: 2 * time.Second, APIKey: apiKey, Transport: tr})

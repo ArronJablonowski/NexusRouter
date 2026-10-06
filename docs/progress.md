@@ -2500,3 +2500,6 @@ The startup recovery regression closed the dispatcher after an unrelated control
 
 ### Approved NexusRouter branding
 Saved the selected Grid Runner/Neon Outline artwork under docs/branding and added its transparent N to the top-left website header with fixed dimensions and decorative alt text. Logo edits are isolated from the running recovery validation. Deployment pending.
+
+### DNS logging levels
+Settings now persists Off/managed/full DNS logging with active-versus-saved restart semantics. Managed policy transports emit private daily structured resolver records without request paths/headers or fabricated packet/task attribution. Full mode retains managed records and explicitly reports privileged capture as unverified. An operator-run, root-only port-53 capture helper and coverage documentation are included; system-wide plaintext capture is not complete encrypted-DNS/process-attributed monitoring. Live privileged capture remains unqualified because neither host grants administrative access.

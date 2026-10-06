@@ -38,6 +38,9 @@ func (s *Service) BrowserLogging(ctx context.Context) (webui.LoggingPage, error)
 		add("remote-usage", "Remote usage accounting", trust+".usage.db", "Remote-derived · stored locally", "SQLite", "Usage reported through the configured remote transport; not every job on a remote host.", "Reported input/output tokens and usage coverage for remote calls")
 	}
 	dir := filepath.Dir(db)
+	if s.settings.Telemetry.DNSLogging != "" {
+		add("dns", "NexusRouter DNS audit", dir, "Local managed transport", "Daily dns-YYYY-MM-DD.jsonl", "Resolver operations, not raw DNS packets. No entries for pooled connections or literal IPs. Excludes independent subprocess DNS. Full capture requires separate administrator setup and is not verified by this setting.", "Timestamp, hostname query, executing host and process ID, resolution outcome, addresses, latency and coalescing")
+	}
 	for _, x := range []struct{ id, name, file string }{{"application", "Application output", "darwin.log"}, {"stdout", "Service standard output", "launchd.stdout.log"}, {"stderr", "Service standard error", "launchd.stderr.log"}} {
 		path := filepath.Join(dir, x.file)
 		if _, err := os.Stat(path); err == nil {

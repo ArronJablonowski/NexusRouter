@@ -65,7 +65,7 @@ func (s *Service) scopedLocalModelInventory(ctx context.Context, scope map[strin
 				configured := s.settings.Providers[index]
 				entry := providerInventory{}
 				query, cancel := context.WithTimeout(ctx, 2*time.Second)
-				transport, err := policy.NewTransport(true, []string{configured.ResolvedEndpoint()})
+				transport, err := policy.NewTransport(true, []string{configured.ResolvedEndpoint()}, s.settings.DNSAudit())
 				if err == nil {
 					key := ""
 					if s.secret != nil && configured.APIKeyEnv != "" {

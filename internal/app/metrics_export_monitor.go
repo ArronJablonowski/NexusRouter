@@ -62,7 +62,7 @@ func startMetricsExport(ctx context.Context, s *Service, options metrics.ExportO
 		return nil, metrics.ErrExport
 	}
 	// Validate destination authority before starting, without DNS or a connection.
-	transport, err := policy.NewTransport(metricsExportPinned(s.settings.Mode, options.Endpoint), []string{options.Endpoint})
+	transport, err := policy.NewTransport(metricsExportPinned(s.settings.Mode, options.Endpoint), []string{options.Endpoint}, s.settings.DNSAudit())
 	if err != nil {
 		return nil, metrics.ErrExport
 	}

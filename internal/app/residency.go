@@ -101,7 +101,7 @@ func (s *Service) reserveManagedResidency(ctx context.Context, provider config.P
 			return nil, ErrAdmission
 		}
 		resolvedEndpoint := provider.ResolvedEndpoint()
-		transport, err := policy.NewTransport(true, []string{resolvedEndpoint})
+		transport, err := policy.NewTransport(true, []string{resolvedEndpoint}, s.settings.DNSAudit())
 		if err != nil {
 			return nil, ErrAdmission
 		}

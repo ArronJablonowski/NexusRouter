@@ -228,6 +228,7 @@ type Security struct {
 	RedactEnv  []string `yaml:"redact_env,omitempty" json:"redact_env,omitempty"`
 }
 type Telemetry struct {
+	DNSLogging            string                `yaml:"dns_logging,omitempty" json:"dns_logging,omitempty"`
 	Database              string                `yaml:"database" json:"database"`
 	OTEL                  bool                  `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
 	ProviderHealthHistory ProviderHealthHistory `yaml:"provider_health_history" json:"provider_health_history"`
@@ -507,6 +508,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Mode == "local_only" && !s.Memory.LocalOnly {
 		return errors.New("local-only mode requires local memory")
+	}
+	if s.Telemetry.DNSLogging != "" && s.Telemetry.DNSLogging != "managed" && s.Telemetry.DNSLogging != "full" {
+		return errors.New("invalid DNS logging level")
 	}
 	if s.Telemetry.Database == "" {
 		return errors.New("database path required")

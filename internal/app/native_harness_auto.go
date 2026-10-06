@@ -141,7 +141,7 @@ func (s *Service) nativeModels(ctx context.Context, p config.Provider, local boo
 }
 func (s *Service) nativeModelInventory(ctx context.Context, p config.Provider, local bool) (map[string]bool, error) {
 	models := map[string]bool{}
-	tr, err := policy.NewTransport(s.settings.Mode == "local_only" || local, []string{p.ResolvedEndpoint()})
+	tr, err := policy.NewTransport(s.settings.Mode == "local_only" || local, []string{p.ResolvedEndpoint()}, s.settings.DNSAudit())
 	if err != nil {
 		return nil, err
 	}

@@ -37,7 +37,7 @@ func (s *Service) exportMetrics(ctx context.Context, options metrics.ExportOptio
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	mode, database := s.settings.Mode, s.settings.Telemetry.Database
-	transport, err := policy.NewTransport(metricsExportPinned(mode, options.Endpoint), []string{options.Endpoint})
+	transport, err := policy.NewTransport(metricsExportPinned(mode, options.Endpoint), []string{options.Endpoint}, s.settings.DNSAudit())
 	if err != nil {
 		return err
 	}

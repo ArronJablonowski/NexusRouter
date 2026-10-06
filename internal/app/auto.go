@@ -542,7 +542,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 					break
 				}
 				endpoint := pr.ResolvedEndpoint()
-				tr, e := policy.NewTransport(cfg.Mode == "local_only" || c.Local, []string{endpoint})
+				tr, e := policy.NewTransport(cfg.Mode == "local_only" || c.Local, []string{endpoint}, cfg.DNSAudit())
 				if e != nil {
 					c.PolicyAllowed = false
 					break
