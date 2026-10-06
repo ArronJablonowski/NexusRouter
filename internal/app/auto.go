@@ -34,6 +34,7 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
+	collaboration              CommanderCollaboration
 	nativeHarnesses            map[string]NativeHarness
 	harnessEvidence            *harness.EvidenceStore
 	nativeHarnessIdentities    map[string]harness.Identity
@@ -355,7 +356,7 @@ func RunAuto(ctx context.Context, s config.Settings, r Request, secret func(stri
 }
 
 func validateInput(r Request) error {
-	if r.RemoteExecution != nil && (r.RemoteExecution.Validate() != nil || r.ModelID == "" || r.ModelID == "auto" || (r.HarnessID != "" && r.RemoteExecution.Mode == "commander") || r.ContinueTaskID != "") {
+	if r.RemoteExecution != nil && (r.RemoteExecution.Validate() != nil || r.ModelID == "" || r.ModelID == "auto" || (r.HarnessID != "" && r.RemoteExecution.Mode != "direct") || r.ContinueTaskID != "") {
 		return ErrAdmission
 	}
 	if r.SummaryAttemptID != "" && (r.ContinueTaskID == "" || r.Compaction != nil || len(r.SummaryAttemptID) > 128 || strings.TrimSpace(r.SummaryAttemptID) != r.SummaryAttemptID) {

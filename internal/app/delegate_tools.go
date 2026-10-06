@@ -76,6 +76,7 @@ func applicationToolPolicyFor(configured string) *tools.Policy {
 		{Tool: "workboard_request_cancel", Scope: "*", Decision: writeDecision},
 		{Tool: "workboard_propose_criteria", Scope: "*", Decision: writeDecision},
 		{Tool: "workboard_request_candidate_decision", Scope: "*", Decision: writeDecision},
+		{Tool: "list_commanders", Scope: "delegation", Decision: tools.Allow},
 		{Tool: "delegate", Scope: "delegation", Decision: tools.Allow},
 		{Tool: "delegate_batch", Scope: "delegation", Decision: tools.Allow},
 	}}

@@ -39,3 +39,27 @@ func TestRemoteCommanderAuthorityAndBounds(t *testing.T) {
 		t.Fatal("direct gained delegation")
 	}
 }
+
+func TestCommanderConsultAuthority(t *testing.T) {
+	zero := 0.0
+	s := &Service{settings: config.Settings{Models: []config.Model{{ID: "chief", EstimatedCost: &zero}}}}
+	s.settings.WebUI.DefaultModel = "chief"
+	r := Request{ModelID: "chief", RemoteExecution: &runtime.RemoteExecution{Mode: "consult", Depth: 1, Deadline: time.Now().Add(time.Minute)}}
+	if s.checkRemoteExecution(r) != nil {
+		t.Fatal("consult rejected")
+	}
+	r.ModelID = "other"
+	if s.checkRemoteExecution(r) == nil {
+		t.Fatal("caller selected non-commander")
+	}
+	r.ModelID = "chief"
+	r.MaxCost = 1
+	if s.checkRemoteExecution(r) == nil {
+		t.Fatal("unreserved cost admitted")
+	}
+	r.MaxCost = 0
+	r.RemoteExecution.Depth = 2
+	if s.checkRemoteExecution(r) == nil {
+		t.Fatal("recursive remote hop admitted")
+	}
+}

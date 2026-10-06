@@ -56,6 +56,9 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 	r.contextEstimator = s.contextEstimator
 	r.contextEngine = s.contextEngine
 	r = s.bindToolExtension(r)
+	if r.delegatedParent == "" && r.RemoteExecution == nil && r.runtimeHostAdmission == nil && r.ModelID == s.settings.WebUI.DefaultModel {
+		r.collaboration = s.collaboration
+	}
 	var model config.Model
 	for _, m := range cfg.Models {
 		if m.ID == r.ModelID {

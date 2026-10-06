@@ -199,7 +199,10 @@ func initialTaskTools(cfg config.Settings, r Request) []providers.Tool {
 	if cfg.Tools.ReplaceEnabled {
 		result = append(result, replaceFileSpec())
 	}
-	if cfg.Workers.DelegateModel != "" {
+	if cfg.Workers.DelegateModel != "" || r.collaboration != nil {
+		if r.collaboration != nil {
+			result = append(result, commanderListSpec())
+		}
 		result = append(result, delegateSpec(), delegateBatchSpec())
 	}
 	return result

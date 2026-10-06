@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/internal/gridcollab"
 	"io"
 	"net"
 	"net/http"
@@ -379,6 +380,9 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	}
 	service, err := app.NewService(cfg, os.Getenv)
 	if err != nil {
+		return err
+	}
+	if err := gridcollab.Install(service, cfg); err != nil {
 		return err
 	}
 	// Remote execution must contend with other local daemons, not just the

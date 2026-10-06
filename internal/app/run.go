@@ -27,6 +27,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	collaboration                   CommanderCollaboration
 	RemoteExecution                 *runtime.RemoteExecution `json:"remote_execution,omitempty"`
 	ExpectedHarnessIdentity         *harness.Identity        `json:"expected_harness_identity,omitempty"`
 	HarnessEvaluation               bool                     `json:"harness_evaluation,omitempty"`
@@ -511,13 +512,18 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			}
 		}}
 	}
-	if s.Workers.DelegateModel != "" && r.delegate != nil {
+	if (s.Workers.DelegateModel != "" || r.collaboration != nil) && r.delegate != nil {
 		if registry == nil {
 			registry = &tools.Registry{}
 		}
 		compactionAuthority, authorityErr := sealDelegationCompactionAuthority(result.TaskID, r.compactionPlan, r.delegationCompactionPolicy)
 		if authorityErr != nil {
 			return result, authorityErr
+		}
+		if r.collaboration != nil {
+			if err := registerCommanderList(registry, r.collaboration, collaborationContextTokens(r.ContextTokens), privacy == "local_only"); err != nil {
+				return result, ErrAdmission
+			}
 		}
 		if err := registerDelegate(registry, delegatedReadCapability, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, compactionAuthority); err != nil {
 			return result, ErrAdmission

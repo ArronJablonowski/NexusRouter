@@ -21,7 +21,10 @@ func (r RemoteExecution) Validate() error {
 		return bad
 	}
 	switch r.Mode {
-	case "direct":
+	case "direct", "consult":
+		if r.Mode == "consult" && r.Deadline.IsZero() {
+			return bad
+		}
 		if len(r.SpecialistIDs) != 0 || r.MaxCalls != 0 {
 			return bad
 		}

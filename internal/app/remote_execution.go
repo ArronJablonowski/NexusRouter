@@ -25,6 +25,17 @@ func (s *Service) checkRemoteExecution(r Request) error {
 	if !x.Deadline.IsZero() && (!time.Now().Before(x.Deadline) || time.Until(x.Deadline) > time.Hour) {
 		return ErrAdmission
 	}
+	if x.Mode == "consult" {
+		if r.ModelID != s.settings.WebUI.DefaultModel || r.MaxCost != 0 {
+			return ErrAdmission
+		}
+		for _, m := range s.settings.Models {
+			if m.ID == r.ModelID && m.EstimatedCost != nil && *m.EstimatedCost == 0 {
+				return nil
+			}
+		}
+		return ErrAdmission
+	}
 	if x.Mode == "direct" {
 		return nil
 	}
@@ -86,7 +97,8 @@ func (s *Service) bindRemoteDelegate(request Request) delegateRunner {
 	return func(ctx context.Context, prompt, validation, parent string, local bool) (Result, error) {
 		x := request.RemoteExecution
 		id, _ := ctx.Value(remoteSpecialistKey{}).(string)
-		if x == nil || x.Mode != "commander" || !slices.Contains(x.SpecialistIDs, id) || s.checkRemoteExecution(request) != nil {
+		instance, _ := ctx.Value(commanderInstanceKey{}).(string)
+		if instance != "" || x == nil || x.Mode != "commander" || !slices.Contains(x.SpecialistIDs, id) || s.checkRemoteExecution(request) != nil {
 			return Result{}, ErrAdmission
 		}
 		// A child has no RemoteExecution, recursive delegate tools, ambient stores or writes.

@@ -50,7 +50,7 @@ func (b *SDKBackend) Info(ctx context.Context) (Info, error) {
 		return Info{}, ErrUnavailable
 	}
 	out, err := b.info(ctx, b.Models)
-	out.HybridVersion = 1
+	out.HybridVersion = 2
 	if err == nil {
 		out.Harnesses = filterHarnesses(b.Harnesses, out.Models, nil, true)
 	}
@@ -76,7 +76,7 @@ func (b *SDKBackend) info(ctx context.Context, configured []Model) (Info, error)
 		return Info{}, ErrUnavailable
 	}
 	models := cloneModels(configured)
-	out := Info{HybridVersion: 1, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
+	out := Info{HybridVersion: 2, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
 	if b.Schedules != nil {
 		page, err := b.Schedules(ctx)
 		if err != nil || page.Validate() != nil {

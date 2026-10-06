@@ -49,7 +49,7 @@ type Task struct {
 
 func (t Task) Validate() error {
 	if t.Execution != nil {
-		if t.Execution.Validate() != nil || (t.HarnessID != "" && t.Execution.Mode == "commander") {
+		if t.Execution.Validate() != nil || (t.HarnessID != "" && t.Execution.Mode != "direct") {
 			return ErrInvalid
 		}
 		for _, id := range t.Execution.SpecialistIDs {

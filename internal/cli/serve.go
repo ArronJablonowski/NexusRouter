@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/internal/gridcollab"
 	"io"
 	"log"
 	"net"
@@ -81,6 +82,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	service, err := app.NewService(s, os.Getenv)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid application configuration")
+		return 1
+	}
+	if err := gridcollab.Install(service, s); err != nil {
+		fmt.Fprintln(stderr, "cannot initialize commander collaboration")
 		return 1
 	}
 	registry, err = app.BuildConfiguredSkillValidatorRegistry(service, registry)
