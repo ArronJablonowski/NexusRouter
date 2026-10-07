@@ -94,7 +94,8 @@ type ResourceObservation struct {
 	AvailableRAM *uint64   `json:"available_ram_bytes,omitempty"`
 }
 type Model struct {
-	Observation *ModelObservation `json:"observation,omitempty"`
+	Inspection  *webui.ModelInspection `json:"inspection,omitempty"`
+	Observation *ModelObservation      `json:"observation,omitempty"`
 
 	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
 	ID            string   `json:"id"`
@@ -160,6 +161,12 @@ func validHostname(s string) bool {
 }
 
 func (i Info) ValidateRouting() error {
+	for _, m := range i.Models {
+		if d := m.Inspection; d != nil && (d.Validate() != nil || d.ID != m.ID || d.Provider != m.Provider || d.Model != m.Model || (d.Locality == "local") != m.Local) {
+			return ErrInvalid
+		}
+	}
+
 	if !i.Controller.valid() {
 		return ErrInvalid
 	}

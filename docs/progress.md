@@ -2601,3 +2601,5 @@ Moved model switches beside the model-name header for local, cloud and remote ca
 Model switches now precede each model name visually and in DOM order; targeted Web UI checks and live deployment verification recorded separately.
 
 Remote model cards reuse local card layout classes, left switches, provider subtitles, badges and accessible disclosure buttons. Details update in place and retain expansion during refresh; remote presence is not labeled health.
+
+Remote model inventory now transports the permission-scoped local ModelInspection metadata and displays local-equivalent details and badges. Older hosts explicitly retain unknown details. Host/model identity and contract validation protect the transport boundary.

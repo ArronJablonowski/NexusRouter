@@ -6,6 +6,7 @@
  const text=(v,n=512)=>typeof v==='string'&&v.length>0&&v.length<=n&&!/[\x00-\x1f\x7f-\x9f]/.test(v);
  const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(v);
  const node=(tag,value)=>{const e=document.createElement(tag);if(value!==undefined)e.textContent=value;return e;};
+ const bytes=v=>{if(!Number.isSafeInteger(v)||v<0)return 'Unknown';const units=['B','KiB','MiB','GiB','TiB'];let i=0;while(v>=1024&&i<4){v/=1024;i++;}return v.toLocaleString(undefined,{maximumFractionDigits:i?1:0})+' '+units[i];};
  const set=(e,v)=>{if(e.textContent!==v)e.textContent=v;};
  async function json(path,options={}) {
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
@@ -35,10 +36,15 @@
     heading.addEventListener('click',()=>{const open=heading.getAttribute('aria-expanded')!=='true';heading.setAttribute('aria-expanded',String(open));facts.hidden=!open;el.classList.toggle('expanded',open);set(disclosure,open?'−':'+');});
     h.list.append(el);if(window.NexusModelUse)window.NexusModelUse.attach(el,info.instance,m.id);row={el,name,provider,availability,locality,facts,values:new Map()};h.rows.set(m.id,row);
    }
-   const observation=m.observation?.state||'unknown';
+   const observation=m.observation?.state||'unknown',d=m.inspection;
+   if(d&&(d.id!==m.id||d.provider!==m.provider||d.model!==m.model))throw Error();
    set(row.name,m.model);set(row.provider,m.provider);
-   set(row.availability,observation==='present'?'Present':observation==='absent'?'Not present':'Availability unknown');set(row.locality,m.local?'Remote local':'Remote cloud');
-   for(const [label,value] of [['Host',info.hostname||info.instance],['Model ID',m.id],['Context',m.context_tokens?m.context_tokens.toLocaleString()+' tokens':'Unknown'],['Capabilities',m.capabilities?.join(', ')||'None declared'],['Observed',m.observation?new Date(m.observation.checked_at).toLocaleString():'Unknown']]){
+   set(row.availability,d?(d.usable?'Usable':d.health==='disabled'?'Disabled':'Unavailable'):observation==='present'?'Present':observation==='absent'?'Not present':'Availability unknown');set(row.locality,d?(m.local?(d.installed?'Installed':'Not installed'):'Configured'):(m.local?'Remote local':'Remote cloud'));
+   let configured=row.configured;if(!configured){configured=node('span','Configured');configured.className='model-badge';row.locality.parentNode.append(configured);row.configured=configured;}configured.hidden=!d?.configured||!m.local;
+   let extra=row.extra;if(!extra){extra=node('span');extra.className='model-badge';row.locality.parentNode.append(extra);row.extra=extra;}set(extra,d?(m.local?bytes(d.size_bytes):'Configured'):'Details unavailable on this host');
+   const fields=[['Host',info.hostname||info.instance],['Model ID',m.id],['Context',(d?d.context_tokens:m.context_tokens)?(d?d.context_tokens:m.context_tokens).toLocaleString()+' tokens':'Unknown'],['Capabilities',(d?.capabilities||m.capabilities)?.join(', ')||'None declared'],['Observed',m.observation?new Date(m.observation.checked_at).toLocaleString():'Unknown']];
+   for(const [label,value] of [['Size on disk',m.local?bytes(d?.size_bytes):'Not applicable'],['Health',d?d.health+(d.status_code?' · '+d.status_code.replaceAll('_',' '):''):'Unknown'],['Health checked',d?.health_checked_at?new Date(d.health_checked_at).toLocaleString():'Unknown'],['Estimated cost',d?.estimated_cost===undefined?'Unknown':String(d.estimated_cost)],['RAM / VRAM',bytes(d?.ram_bytes)+' / '+bytes(d?.vram_bytes)],['Failure domain',d?.failure_domain||'Unknown'],['Parameters',d?.parameter_size||'Unknown'],['Quantization',d?.quantization||'Unknown'],['Family',d?.family||'Unknown'],['Modified',d?.modified_at?new Date(d.modified_at).toLocaleString():'Unknown'],['Digest',d?.digest?d.digest.slice(0,12)+'…':'Unknown']])fields.push([label,value]);
+   for(const [label,value] of fields){
     let field=row.values.get(label);if(!field){field=node('dd');row.facts.append(node('dt',label),field);row.values.set(label,field);}set(field,value);
    }
   }

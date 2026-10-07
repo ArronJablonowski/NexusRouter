@@ -130,6 +130,19 @@ func (b *SDKBackend) info(ctx context.Context, configured []Model) (Info, error)
 			ids = append(ids, m.ID)
 		}
 		page, err := b.Routing(ctx, ids)
+		if err == nil && page.Availability == webui.Available {
+			for _, detail := range page.Models {
+				if detail.Validate() != nil {
+					return Info{}, ErrInvalid
+				}
+				for i := range out.Models {
+					if out.Models[i].ID == detail.ID {
+						copy := detail
+						out.Models[i].Inspection = &copy
+					}
+				}
+			}
+		}
 		if err == nil && page.Availability == webui.Available && page.Rankings != nil {
 			out.Routing = &webui.RoutingInspection{Rankings: page.Rankings, CommanderID: page.CommanderID, CommanderSource: page.CommanderSource, CommanderFallbackID: page.CommanderFallbackID}
 			if out.ValidateRouting() != nil {
