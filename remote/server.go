@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/ArronJablonowski/NexusRouter/internal/scheduleview"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 	"io"
 	"net"
 	"net/http"
@@ -104,7 +105,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	op, key := "", ""
-	if r.URL.Path == "/v1/remote/os-schedules" && r.Method == "GET" {
+	if (r.URL.Path == "/v1/remote/os-schedules" || r.URL.Path == "/v1/remote/dependencies") && r.Method == "GET" {
 		op = "inspect"
 	} else if (r.URL.Path == "/v1/remote/info" || r.URL.Path == "/v1/remote/catalogue" || r.URL.Path == "/v1/remote/harness-identity" || r.URL.Path == "/v1/remote/harness-capacity" || r.URL.Path == "/v1/remote/harness-readiness") && r.Method == "GET" {
 		op = "info"
@@ -192,6 +193,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		result, err = s.harnessCapacity(ctx, peer, r)
 	} else if r.URL.Path == "/v1/remote/harness-identity" {
 		result, err = s.harnessIdentity(ctx, peer, r)
+	} else if r.URL.Path == "/v1/remote/dependencies" {
+		if reader, ok := s.backend.(interface {
+			Dependencies(context.Context) (webui.DependencyInventory, error)
+		}); ok {
+			var page webui.DependencyInventory
+			page, err = reader.Dependencies(ctx)
+			if err == nil {
+				err = page.Validate()
+			}
+			result = page
+		} else {
+			err = ErrUnavailable
+		}
 	} else if r.URL.Path == "/v1/remote/os-schedules" {
 		page := scheduleview.Read(ctx)
 		err = page.Validate()

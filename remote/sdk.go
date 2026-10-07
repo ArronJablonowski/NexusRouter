@@ -21,11 +21,12 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
-	Schedules     func(context.Context) (webui.SchedulePage, error)
-	JobHistory    func(context.Context, string, webui.HistoryOptions) (webui.HistoryPage, error)
-	RunnerModelID string
-	ControlRunner func(context.Context, string) (RunnerStatus, error)
-	Routing       func(context.Context, []string) (webui.ModelInspectionPage, error)
+	ReadDependencies func(context.Context) (webui.DependencyInventory, error)
+	Schedules        func(context.Context) (webui.SchedulePage, error)
+	JobHistory       func(context.Context, string, webui.HistoryOptions) (webui.HistoryPage, error)
+	RunnerModelID    string
+	ControlRunner    func(context.Context, string) (RunnerStatus, error)
+	Routing          func(context.Context, []string) (webui.ModelInspectionPage, error)
 	// ReadStatus borrows the serving dispatcher store when available.
 	ReadStatus func(context.Context, string) (submissions.Status, error)
 
@@ -246,4 +247,11 @@ func (b *SDKBackend) JobDescription(ctx context.Context, ids []string) string {
 		}
 	}
 	return ""
+}
+
+func (b *SDKBackend) Dependencies(ctx context.Context) (webui.DependencyInventory, error) {
+	if b.ReadDependencies == nil {
+		return webui.DependencyInventory{}, ErrUnavailable
+	}
+	return b.ReadDependencies(ctx)
 }

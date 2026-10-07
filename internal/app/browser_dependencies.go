@@ -14,6 +14,7 @@ import (
 // BrowserDependencies inspects metadata only: it never installs tools or starts models.
 func (s *Service) BrowserDependencies(ctx context.Context) (webui.DependencyInventory, error) {
 	p := webui.DependencyInventory{Version: 1, ObservedAt: time.Now().UTC(), Items: []webui.Dependency{}}
+	p.Hostname, _ = os.Hostname()
 	add := func(name, status, scope, location, note string) {
 		p.Items = append(p.Items, webui.Dependency{ID: fmt.Sprintf("dependency-%d", len(p.Items)), Name: name, Status: status, Scope: scope, Location: location, Note: note})
 	}

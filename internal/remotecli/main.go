@@ -398,7 +398,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{Schedules: func(context.Context) (webui.SchedulePage, error) {
+	backend := &remote.SDKBackend{ReadDependencies: service.BrowserDependencies, Schedules: func(context.Context) (webui.SchedulePage, error) {
 		return webui.SchedulePage{Version: 1, ObservedAt: time.Now().UTC(), Items: []webui.Schedule{}}, nil
 	}, JobHistory: service.ChatHistory, RunnerModelID: cfg.VLLM.ModelID, ControlRunner: vllmController(cfg, service), Routing: service.RemoteRoutingInspection, ReadStatus: service.SubmissionStatus, Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {

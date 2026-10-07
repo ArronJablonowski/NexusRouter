@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/ArronJablonowski/NexusRouter/internal/scheduleview"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 	"io"
 	"net"
 	"net/http"
@@ -201,6 +202,15 @@ func (c *Client) callPinned(ctx context.Context, destination, op, method, path s
 func (c *Client) OSSchedules(ctx context.Context, destination string) (scheduleview.Page, error) {
 	var out scheduleview.Page
 	err := c.call(ctx, destination, "inspect", "GET", "/v1/remote/os-schedules", nil, nil, &out)
+	if err == nil {
+		err = out.Validate()
+	}
+	return out, err
+}
+
+func (c *Client) Dependencies(ctx context.Context, destination string) (webui.DependencyInventory, error) {
+	var out webui.DependencyInventory
+	err := c.call(ctx, destination, "inspect", "GET", "/v1/remote/dependencies", nil, nil, &out)
 	if err == nil {
 		err = out.Validate()
 	}

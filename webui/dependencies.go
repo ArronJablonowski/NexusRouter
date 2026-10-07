@@ -3,6 +3,7 @@ package webui
 import "time"
 
 type DependencyInventory struct {
+	Hostname   string       `json:"hostname,omitempty"`
 	Version    int          `json:"version"`
 	ObservedAt time.Time    `json:"observed_at"`
 	Items      []Dependency `json:"items"`
@@ -18,6 +19,9 @@ type Dependency struct {
 
 func (p DependencyInventory) Validate() error {
 	if p.Version != 1 || !validBrowserTime(p.ObservedAt) || len(p.Items) > 1024 {
+		return ErrContract
+	}
+	if p.Hostname != "" && requireText(p.Hostname, 253) != nil {
 		return ErrContract
 	}
 	seen := map[string]bool{}

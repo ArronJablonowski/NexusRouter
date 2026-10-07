@@ -2585,3 +2585,7 @@ UI follow-up testing also reproduced a Codex protocol failure: a checked feature
 ## 2026-10-07 model-use switches
 
 Added persistent, runtime model-use policy and accessible switches on local/cloud and remote model cards. Local policy rejects new explicit admissions and excludes automatic routing candidates; remote switches restrict this UI host's remote client, without changing peer permissions or stopping active work. Unconfigured discovered models show a disabled control requiring configuration. Policy uses a locked atomic sidecar beside the task database; malformed policy fails closed. Checked configuration/Web UI/remote race suites, focused app routing/health/evaluator tests, explicit denied admission and authenticated mutation tests, and vet. Live browser toggle/persistence verification follows deployment. This is change-scoped validation, not a full repository suite.
+
+## 2026-10-07 dependency host groups
+
+Dependencies now display stable hostname sections for this host and paired hosts with inspection permission. Missing tools use orange vertical accents; unavailable/environment-dependent checks use amber and retain their explicit status. Added a bounded remote dependency inspection endpoint without expanding peer permissions; older/offline hosts show unavailable. Web UI, remote protocol and browser API race suites passed, along with focused visual/refresh, hostname, permission and metadata tests and vet. Live three-host display verification follows deployment.
