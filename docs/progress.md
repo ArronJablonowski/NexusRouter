@@ -2562,3 +2562,7 @@ CLI runs, default daemon submissions and default HTTP provider requests now allo
 
 ## Muse review: retain swap guard and release failures (2026-10-06)
 Confirmed a cleanup error could be masked by swap cancellation. Combined errors with errors.Join while retaining finish-before-release ordering and exactly-once cleanup. Targeted swap guard and cleanup tests passed with race detector; go vet internal/app passed. Deployment deferred while Spark reviews are active.
+
+
+### 2026-10-07 submission cancellation fixture
+Corrected RunSubmission test resource fixture from1000-byte synthetic RAM to64GiB total/56GiB available with known zero swap. Original isolated cancellation test failed before provider admission; same test now passes. All TestRunSubmission tests pass with race detection. No production behavior changed; no deployment needed for this test-only correction.

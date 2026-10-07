@@ -15,6 +15,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
@@ -32,7 +33,13 @@ func runSubmissionService(t *testing.T, handler http.HandlerFunc) (*Service, *ht
 		provider.Close()
 		t.Fatal(err)
 	}
-	s.profile = healthProfile
+	s.profile = func(ctx context.Context) (resources.Snapshot, error) {
+		snapshot, err := healthProfile(ctx)
+		snapshot.TotalRAM, snapshot.AvailableRAM = 64<<30, 56<<30
+		swap := uint64(0)
+		snapshot.SwapUsed = &swap
+		return snapshot, err
+	}
 	return s, provider
 }
 
