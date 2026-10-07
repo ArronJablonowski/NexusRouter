@@ -2593,3 +2593,7 @@ Dependencies now display stable hostname sections for this host and paired hosts
 ## 2026-10-07 Routing Grid host IP
 
 Connected Systems cards now show a separate Host IP from the paired endpoint, preserving the distinct controlling commander address. Hostname-based endpoints explicitly report that their IP is not supplied rather than guessing. Web UI race suite passed, including both fixture host IP labels; live verification follows deployment.
+
+## 2026-10-07 inline model switch
+
+Moved model switches beside the model-name header for local, cloud and remote cards. Switches remain separate interactive controls from disclosure buttons; feedback stays below the header. Web UI race suite passed; live layout verification follows deployment.
