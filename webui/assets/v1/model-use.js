@@ -15,7 +15,7 @@
  window.NexusModelUse={attach(root,host,model,configured=true){
   const row=document.createElement('div');row.className='model-use-control';
   const label=document.createElement('label'),input=document.createElement('input'),text=document.createElement('span'),message=document.createElement('span');input.type='checkbox';input.setAttribute('role','switch');input.setAttribute('aria-label','Enable '+model+' on '+host);message.setAttribute('role','status');
-  label.append(input,text);row.append(label);message.className='model-use-feedback';root.classList.add('model-card-with-switch');root.append(row,message);
+  label.append(input,text);row.append(label);message.className='model-use-feedback';root.classList.add('model-card-with-switch');root.prepend(row);root.append(message);
   const c={root:row,input,label:text,message,key:host+'/'+model,configured,busy:false};controls.add(c);update();
   input.addEventListener('change',async()=>{const enabled=input.checked;c.busy=true;input.disabled=true;message.textContent='Saving…';try{policy=await request({host,model,enabled});message.textContent=(host==='local'?'Applies to new jobs.':'Applies to requests from this host.')+' Running jobs continue.';}catch{message.textContent='Could not save. Refresh and try again.';}finally{c.busy=false;update();}});
  }};

@@ -549,13 +549,13 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 
 .remote-host-address { margin: .4rem 0; color: #e5f7f8; font-size: .9rem; overflow-wrap: anywhere; }
 
-.model-card-with-switch { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; }
-.model-card-with-switch > .model-card-toggle, .model-card-with-switch > details { grid-column:1; grid-row:1; min-width:0; }
+.model-card-with-switch { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:start; }
+.model-card-with-switch > .model-card-toggle, .model-card-with-switch > details { grid-column:2; grid-row:1; min-width:0; }
 .model-card-with-switch > .model-card-toggle { grid-template-columns:minmax(0,1fr) 1.2rem; }
 .model-card-with-switch .model-card-identity { grid-column:1; grid-row:1; }
 .model-card-with-switch .model-disclosure { grid-column:2; grid-row:1; }
 .model-card-with-switch .model-badges { grid-column:1 / -1; grid-row:2; }
-.model-card-with-switch > .model-use-control { grid-column:2; grid-row:1; padding:.6rem .7rem; border:0; margin:0; }
+.model-card-with-switch > .model-use-control { grid-column:1; grid-row:1; padding:.6rem .7rem; border:0; margin:0; }
 .model-card-with-switch .model-use-control label > span { display:none; }
 .model-card-with-switch > .model-details, .model-card-with-switch > .model-use-feedback { grid-column:1 / -1; }
 .model-use-feedback { display:block; padding:0 .7rem .5rem; font-size:.85rem; color:#9bbfc7; }

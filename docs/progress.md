@@ -2597,3 +2597,5 @@ Connected Systems cards now show a separate Host IP from the paired endpoint, pr
 ## 2026-10-07 inline model switch
 
 Moved model switches beside the model-name header for local, cloud and remote cards. Switches remain separate interactive controls from disclosure buttons; feedback stays below the header. Web UI race suite passed; live layout verification follows deployment.
+
+Model switches now precede each model name visually and in DOM order; targeted Web UI checks and live deployment verification recorded separately.
