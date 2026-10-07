@@ -67,6 +67,16 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	if err != nil {
 		return ToolAccess{}, "", err
 	}
+	// All edited sections are mappings. Reject malformed shapes before any
+	// scalar mutation; sequence children are not key/value pairs.
+	for i := 0; i < len(root.Content); i += 2 {
+		switch root.Content[i].Value {
+		case "hardware", "telemetry", "remote_advertisement", "tools", "workers", "web_ui", "skills":
+			if root.Content[i+1].Kind != yaml.MappingNode {
+				return ToolAccess{}, "", ErrConfigWrite
+			}
+		}
+	}
 	setConfigScalar(root, []string{"hardware", "mac_memory_percent"}, "!!float", strconv.FormatFloat(next.MacMemoryPercent, 'f', -1, 64))
 	setConfigScalar(root, []string{"hardware", "mac_swap_growth_gb"}, "!!float", strconv.FormatFloat(next.MacSwapGrowthGB, 'f', -1, 64))
 	setConfigScalar(root, []string{"telemetry", "dns_logging"}, "!!str", next.DNSLogging)

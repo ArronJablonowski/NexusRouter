@@ -110,3 +110,19 @@ func TestProjectAdvertisementSettingsPersistAndRejectStale(t *testing.T) {
 		t.Fatal("invalid changed file", err)
 	}
 }
+
+func TestProjectToolAccessRejectsMalformedSectionsWithoutMutation(t *testing.T) {
+	for _, section := range []string{"hardware", "telemetry", "remote_advertisement", "tools", "workers", "web_ui", "skills"} {
+		t.Run(section, func(t *testing.T) {
+			body := "version: 1\n" + section + ": [mac_memory_percent]\n"
+			path := file(t, body)
+			if _, _, err := UpdateProjectToolAccess(path, configDigest([]byte(body)), ToolAccess{}); err == nil {
+				t.Fatal("malformed section accepted")
+			}
+			got, err := os.ReadFile(path)
+			if err != nil || string(got) != body {
+				t.Fatal("invalid configuration modified", err)
+			}
+		})
+	}
+}

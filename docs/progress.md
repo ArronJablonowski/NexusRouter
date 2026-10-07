@@ -2566,3 +2566,7 @@ Confirmed a cleanup error could be masked by swap cancellation. Combined errors 
 
 ### 2026-10-07 submission cancellation fixture
 Corrected RunSubmission test resource fixture from1000-byte synthetic RAM to64GiB total/56GiB available with known zero swap. Original isolated cancellation test failed before provider admission; same test now passes. All TestRunSubmission tests pass with race detection. No production behavior changed; no deployment needed for this test-only correction.
+
+
+### 2026-10-07 settings shape validation
+Reproduced panic when a config section edited by the settings writer is a YAML sequence instead of a mapping. Reject all seven edited section shapes before mutation. Regression checks rejection and unchanged file contents. Full internal/config tests pass with race detection; go vet and diff checks pass. Deployment pending idle boundary.
