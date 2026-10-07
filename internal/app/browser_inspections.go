@@ -190,6 +190,9 @@ func (s *Service) browserModelsScoped(ctx context.Context, report health.Report,
 			}
 		}
 	}
+	if allowed == nil {
+		s.appendCloudInventory(ctx, &out)
+	}
 	out.Fitness, err = browserModelFitness(ctx, s.settings.Telemetry.Database, catalog.Models)
 	if err != nil {
 		// Model inventory remains useful before the telemetry database is

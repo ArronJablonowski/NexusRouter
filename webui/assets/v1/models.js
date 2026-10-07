@@ -59,7 +59,7 @@
 		const open = expanded.has(item.id), detailsID = "model-details-" + item.id;
 		heading.type = "button"; heading.setAttribute("aria-expanded", String(open)); heading.setAttribute("aria-controls", detailsID);
 		identity.append(element("strong", "model-card-name", item.model), element("span", "model-card-provider", item.provider));
-		badges.append(badge(item.usable ? "Usable" : item.health === "disabled" ? "Disabled" : "Unavailable", "model-status-badge " + (item.usable ? "usable" : "unavailable")));
+		badges.append(badge(item.status_code === "catalog_only" ? "Discovered · access unverified" : item.usable ? "Usable" : item.health === "disabled" ? "Disabled" : "Unavailable", "model-status-badge " + (item.usable ? "usable" : "unavailable")));
 		if (item.locality === "local") badges.append(badge(item.installed ? "Installed" : "Not installed", "model-install-badge"));
 		if (item.configured) badges.append(badge("Configured", "model-config-badge"));
 		if (item.locality === "local") badges.append(badge(bytes(item.size_bytes), "model-size-badge"));
@@ -94,7 +94,8 @@
 		const signature = JSON.stringify(page.models);
 		if (signature !== modelSignature && !localList.contains(document.activeElement) && !cloudList.contains(document.activeElement)) { localList.replaceChildren(...locals.map(card)); cloudList.replaceChildren(...clouds.map(card)); modelSignature = signature; }
 		localCount.textContent = String(locals.length); cloudCount.textContent = String(clouds.length);
-		localState.hidden = locals.length > 0; cloudState.hidden = clouds.length > 0;
+		localState.hidden = locals.length > 0; cloudState.hidden = clouds.length > 0 && page.cloud_discovery_status === undefined;
+        if(page.cloud_discovery_status) notice(cloudState,({complete:"Provider catalogs discovered. New models require configuration before use; catalog presence does not verify access.",partial:"Cloud discovery incomplete: a provider failed or the inventory limit was reached.",disabled:"Cloud discovery is disabled in local-only mode.",not_configured:"No cloud providers configured."})[page.cloud_discovery_status]||"Cloud discovery unavailable.",page.cloud_discovery_status === "partial");
 		if (!locals.length) notice(localState, "No local models were discovered or configured.", false);
 		if (!clouds.length) notice(cloudState, "No cloud models are configured.", false);
 		total.textContent = page.local_total_coverage === "partial" && page.local_total_bytes === 0 ? "Unavailable" : bytes(page.local_total_bytes);

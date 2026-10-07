@@ -178,6 +178,7 @@ func (f RoutingEvidenceFallbackInspection) Validate() error {
 }
 
 type ModelInspectionPage struct {
+	CloudDiscoveryStatus  string                              `json:"cloud_discovery_status,omitempty"`
 	Rankings              []SpecialistRankingInspection       `json:"rankings,omitempty"`
 	Version               int                                 `json:"version"`
 	Availability          Availability                        `json:"availability"`
@@ -204,6 +205,11 @@ type ModelInspectionPage struct {
 }
 
 func (p ModelInspectionPage) Validate() error {
+	switch p.CloudDiscoveryStatus {
+	case "", "complete", "partial", "disabled", "not_configured":
+	default:
+		return ErrContract
+	}
 	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || p.LocalProviders == nil || p.Fitness == nil || len(p.Models) > MaxInspectionModels || len(p.Fitness) > 4096 || len(p.EvidenceFallbacks) > 128 || p.Availability == Unavailable && len(p.EvidenceFallbacks) > 0 ||
 		(p.Availability == Available) != (p.ConfigID != "") || !validInspectionDigest(p.ConfigID, p.Availability == Available) ||
 		p.LocalUnknownSizeCount < 0 || p.LocalUnknownSizeCount > MaxInspectionModels ||

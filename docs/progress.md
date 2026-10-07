@@ -2603,3 +2603,5 @@ Model switches now precede each model name visually and in DOM order; targeted W
 Remote model cards reuse local card layout classes, left switches, provider subtitles, badges and accessible disclosure buttons. Details update in place and retain expansion during refresh; remote presence is not labeled health.
 
 Remote model inventory now transports the permission-scoped local ModelInspection metadata and displays local-equivalent details and badges. Older hosts explicitly retain unknown details. Host/model identity and contract validation protect the transport boundary.
+
+Cloud catalog discovery uses authenticated configured Codex/API providers with bounded concurrency and timeouts. Discovered models remain unconfigured/access-unverified; no prompts or auto-enablement. Scoped remote projections and local-only mode do not broaden discovery. Partial discovery is labeled.
