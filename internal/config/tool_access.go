@@ -56,6 +56,11 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	if next.SkillsEnabled && (next.SkillsRoot == "" || next.SkillsScope == "") {
 		return ToolAccess{}, "", ErrConfigWrite
 	}
+	unlock, err := lockProjectUpdate(path)
+	if err != nil {
+		return ToolAccess{}, "", err
+	}
+	defer unlock()
 	data, mode, err := readWritableProject(path)
 	if err != nil {
 		return ToolAccess{}, "", err
