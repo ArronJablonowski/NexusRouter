@@ -26,10 +26,21 @@
   const keep=new Set();
   for(const m of info.models){
    keep.add(m.id);let row=h.rows.get(m.id);
-   if(!row){const el=node('li'),details=node('details'),summary=node('summary'),facts=node('p');el.className='model-card';details.append(summary,facts);el.append(details);h.list.append(el);if(window.NexusModelUse)window.NexusModelUse.attach(el,info.instance,m.id);row={el,summary,facts};h.rows.set(m.id,row);}
+   if(!row){
+    const el=node('li'),heading=node('button'),identity=node('span'),name=node('strong'),provider=node('span'),badges=node('span'),availability=node('span'),locality=node('span'),disclosure=node('span','+'),facts=node('dl');
+    el.className='model-card';heading.className='model-card-toggle';heading.type='button';heading.setAttribute('aria-expanded','false');
+    identity.className='model-card-identity';name.className='model-card-name';provider.className='model-card-provider';badges.className='model-badges';availability.className='model-badge';locality.className='model-badge';disclosure.className='model-disclosure';disclosure.setAttribute('aria-hidden','true');facts.className='model-details';facts.hidden=true;
+    facts.id='remote-model-details-'+info.instance+'-'+h.rows.size+'-'+Math.random().toString(36).slice(2);heading.setAttribute('aria-controls',facts.id);
+    identity.append(name,provider);badges.append(availability,locality);heading.append(identity,badges,disclosure);el.append(heading,facts);
+    heading.addEventListener('click',()=>{const open=heading.getAttribute('aria-expanded')!=='true';heading.setAttribute('aria-expanded',String(open));facts.hidden=!open;el.classList.toggle('expanded',open);set(disclosure,open?'−':'+');});
+    h.list.append(el);if(window.NexusModelUse)window.NexusModelUse.attach(el,info.instance,m.id);row={el,name,provider,availability,locality,facts,values:new Map()};h.rows.set(m.id,row);
+   }
    const observation=m.observation?.state||'unknown';
-   set(row.summary,m.model+' · '+(m.local?'Remote local model':'Remote cloud model')+' · '+(observation==='present'?'Present':observation==='absent'?'Not present':'Availability unknown'));
-   set(row.facts,'Provider: '+m.provider+' · Model ID: '+m.id+' · Context: '+(m.context_tokens||'Unknown')+' · Capabilities: '+(m.capabilities?.join(', ')||'None declared')+(m.observation?' · Observed '+new Date(m.observation.checked_at).toLocaleString():''));
+   set(row.name,m.model);set(row.provider,m.provider);
+   set(row.availability,observation==='present'?'Present':observation==='absent'?'Not present':'Availability unknown');set(row.locality,m.local?'Remote local':'Remote cloud');
+   for(const [label,value] of [['Host',info.hostname||info.instance],['Model ID',m.id],['Context',m.context_tokens?m.context_tokens.toLocaleString()+' tokens':'Unknown'],['Capabilities',m.capabilities?.join(', ')||'None declared'],['Observed',m.observation?new Date(m.observation.checked_at).toLocaleString():'Unknown']]){
+    let field=row.values.get(label);if(!field){field=node('dd');row.facts.append(node('dt',label),field);row.values.set(label,field);}set(field,value);
+   }
   }
   for(const [key,row]of h.rows)if(!keep.has(key)){row.el.remove();h.rows.delete(key);}
   if(!info.models.length)set(h.status,'No models shared with this connection. Checked '+new Date(v.observed_at).toLocaleString());

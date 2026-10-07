@@ -60,10 +60,10 @@ func TestChromeRemoteModelsAndStatusSeparation(t *testing.T) {
  await cdp('Page.navigate',{url:origin+'/app/models'});
  await eventually('document.querySelector("#remote-model-hosts").textContent.includes("remote-worker")','remote inventory absent');
  if(!await evaluate('document.querySelector("#chat-view").hidden&&document.querySelector("#status-view").hidden&&!document.querySelector("#models-view").hidden&&document.querySelector("#remote-model-hosts").textContent.includes("not permitted")&&!document.querySelector("#model-list")'))throw Error('separation or permissions');
- await evaluate('window.row=document.querySelector("#remote-model-hosts li");window.detail=row.querySelector("details");detail.open=true;fetch("/fixture/advance")');
+ await evaluate('window.row=document.querySelector("#remote-model-hosts li");window.detail=row.querySelector(".model-details");row.querySelector(".model-card-toggle").click();fetch("/fixture/advance")');
  await evaluate('document.querySelector("#refresh-models").click()');
  await eventually('document.querySelector("#remote-model-hosts").textContent.includes("spark-renamed")','hostname did not refresh');
- if(!await evaluate('row===document.querySelector("#remote-model-hosts li")&&detail.open'))throw Error('refresh rebuilt cards');
+ if(!await evaluate('row===document.querySelector("#remote-model-hosts li")&&!detail.hidden&&row.querySelector(".model-card-toggle").getAttribute("aria-expanded")==="true"'))throw Error('refresh rebuilt cards');
  await evaluate('fetch("/fixture/advance")');await evaluate('document.querySelector("#refresh-models").click()');
  await eventually('document.querySelector("#remote-model-hosts").textContent.includes("Inventory unavailable")','failure not explicit');
  if(!await evaluate('document.querySelectorAll("#remote-model-hosts li").length===0'))throw Error('stale availability');
