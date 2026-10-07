@@ -12,7 +12,7 @@ import (
 // It never displays their payload, changes policy,
 // or treats a notice as model output or successful work.
 func (s *Session) compatibilityNotice(e codexrpc.Envelope) bool {
-	if s.launchFeatures == nil || s.thread == "" {
+	if s.launchFeatures == nil || (s.thread == "" && e.Method != "deprecationNotice") {
 		return false
 	}
 	has := func(name string) bool {

@@ -304,6 +304,15 @@ func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
 		if s.allowDisabledStatus && kind == codexrpc.Notification && e.Method == "remoteControl/status/changed" && disabledRemoteControl(e.Params) {
 			continue
 		}
+		// Checked launch deprecations may precede the thread/start response.
+		// They are informational only, bounded, and never establish a thread.
+		if method == "thread/start" && kind == codexrpc.Notification && e.Method == "deprecationNotice" && s.compatibilityNotice(e) {
+			notices++
+			if notices > 16 {
+				return nil, failure(s.emitted)
+			}
+			continue
+		}
 		if method == "turn/steer" && kind == codexrpc.Notification {
 			if !s.steeringNotice(e) {
 				return nil, failure(s.emitted)

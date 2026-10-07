@@ -149,7 +149,7 @@ func TestCodexDurableSteeringAtNativeBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 			svc.profile = func(context.Context) (resources.Snapshot, error) {
-				return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 8 << 30, AvailableRAM: 7 << 30}, nil
+				return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 64 << 30, AvailableRAM: 56 << 30, SwapUsed: new(uint64)}, nil
 			}
 			svc.codexLauncher = func(ctx context.Context, spec codexbridge.LaunchSpec) (taskProvider, error) {
 				return codexbridge.NewSession(ctx, wire, codexbridge.Options{Model: spec.Model, CWD: spec.CWD})

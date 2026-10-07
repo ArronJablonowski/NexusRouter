@@ -47,8 +47,8 @@ func TestCompatibilityNoticeRequiresCheckedProfile(t *testing.T) {
 		}
 		s.launchFeatures = noticeFeatures()
 		s.thread = ""
-		if s.compatibilityNotice(e) {
-			t.Fatal("notice accepted before thread binding")
+		if s.compatibilityNotice(e) != (e.Method == "deprecationNotice") {
+			t.Fatal("unexpected pre-thread notice classification")
 		}
 	}
 }
@@ -176,5 +176,38 @@ func TestCompatibilityAccountUpdateIsInformational(t *testing.T) {
 	s.launchFeatures = nil
 	if s.compatibilityNotice(sessionNotice("account/updated", `{"authMode":null,"planType":null}`)) {
 		t.Fatal("unchecked notice admitted")
+	}
+}
+
+func TestThreadStartDeprecationsBoundedAndChecked(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		count   int
+		checked bool
+		want    bool
+	}{{"checked", 1, true, true}, {"limit", 16, true, true}, {"flood", 17, true, false}, {"unchecked", 1, false, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			var frames []codexrpc.Envelope
+			for i := 0; i < tc.count; i++ {
+				frames = append(frames, knownNotices()[1])
+			}
+			frames = append(frames, sessionPrefix()[1])
+			w := &scriptedSessionWire{frames: frames, closed: make(chan struct{})}
+			s, err := NewSession(context.Background(), w, Options{Model: "gpt-5.6-sol", CWD: t.TempDir()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			if tc.checked {
+				s.launchFeatures = noticeFeatures()
+			}
+			_, err = s.call("2", "thread/start", map[string]any{})
+			if (err == nil) != tc.want {
+				t.Fatalf("result %v", err)
+			}
+			if s.thread != "" || s.emitted || len(w.sent()) != 1 {
+				t.Fatal("notice changed execution state")
+			}
+		})
 	}
 }

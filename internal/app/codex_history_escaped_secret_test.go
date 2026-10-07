@@ -50,7 +50,7 @@ func TestCodexContinuationRedactsEscapedRotatedToolOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.profile = func(context.Context) (resources.Snapshot, error) {
-		return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 8 << 30, AvailableRAM: 7 << 30}, nil
+		return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 64 << 30, AvailableRAM: 56 << 30, SwapUsed: new(uint64)}, nil
 	}
 	first := &codexTaskFixture{}
 	svc.codexLauncher = func(context.Context, codexbridge.LaunchSpec) (taskProvider, error) { return first, nil }
