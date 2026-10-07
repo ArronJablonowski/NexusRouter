@@ -35,6 +35,9 @@ func TestChromeHostMentionsRouting(t *testing.T) {
  if(!await evaluate("NexusHostMentions.prepare('hello user@example.com','', 'fixture')==='hello user@example.com'&&NexusHostMentions.prepare('@unknown task','','fixture')===null&&NexusHostMentions.prepare('@bad! task','','fixture')===null&&sent.length===0"))throw Error('mention boundary or fail closed broken');
  await evaluate("box.value='@mini.local test task';box.dispatchEvent(new Event('input'));document.querySelector('#host-model').value='m';NexusHostMentions.prepare(box.value,'existing-chat','fixture');");
  if(!await evaluate('sent.length===0'))throw Error('rerouted existing local chat');
+ await evaluate("window.originalNow=Date.now;Date.now=()=>originalNow()+20000;box.dispatchEvent(new Event('input')); ");
+ await eventually("document.querySelector('#host-model').value==='m'",'host refresh lost selected model');
+ await evaluate("Date.now=originalNow");
  await evaluate("NexusHostMentions.prepare(box.value,'','fixture');NexusHostMentions.prepare(box.value,'','fixture');");
  await eventually('sent.length===1&&Boolean(window.recovered)','dispatch recovery missing');
  if(!await evaluate("sent[0].instance==='mini'&&sent[0].task.version===1&&sent[0].task.prompt==='test task'&&sent[0].task.private&&sent[0].task.model_id==='m'&&location.hash.includes(sent[0].request_id)&&recovered.task.request_id===sent[0].request_id"))throw Error('incorrect bound payload/recovery');

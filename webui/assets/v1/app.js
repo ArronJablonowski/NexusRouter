@@ -970,6 +970,7 @@
 		try { selectChat(decodeURIComponent(routeMatch[1])); } catch (_) { showNotice(transcriptState, "The chat address is invalid.", true); }
 	}
 	if (!dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
+	document.querySelector("#chat-view").hidden = false;
 	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
  window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage,busy:value=>{loadingPage=value;},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
 	fetch(base + "/api/v1/session/csrf", {

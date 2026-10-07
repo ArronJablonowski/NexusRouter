@@ -2576,3 +2576,6 @@ Added a separate trusted-evaluator correction policy for originally misattribute
 
 ### October7 code QA follow-up
 Confirmed and fixed settings snapshot/digest inconsistency under concurrent atomic file replacement, and false dirty detection for displayed memory defaults that blocked clean settings refresh. Added snapshot regression and reviewed changed asset digest. Corrected remote integration fixture RAM and missing swap metadata; runtime safeguards unchanged. Configuration,remote,routing,evaluation,and WebUI race suites passed; targeted application ranking/settings boundary tests and vet passed. Not a full repository suite or exhaustive review.
+
+### Browser UI QA — 2026-10-07
+Live browser checks completed local chat and explicit Spark/Mac mini mentions with exact expected replies; exercised workboard/card creation, card details/list presentation, model disclosure, status refresh and navigation. Fixed narrow chat-list min-height overflowing its grid row, remote host refresh resetting a still-permitted model selection, and initial Chats flash on non-chat routes. Full webui package race tests passed; this is scoped UI validation, not a full repository gate. Service start/stop, pairing/access changes and destructive operations were not invoked on production for QA.

@@ -308,6 +308,7 @@ input, select { padding: .55rem .7rem; }
   .rail a { flex:0 0 auto; margin: 0; }
   main { padding: .75rem; }
   .chat-view { grid-template: minmax(14rem, 35vh) minmax(22rem, 1fr) / 1fr; height: auto; min-height: calc(100vh - 9.5rem); }
+  .chat-index { min-height: 0; }
   .transcript { min-height: 18rem; }
   .inspector, #task-inspector { display: block; }
   .inspector-details { grid-template-columns: 1fr; gap: 0; }

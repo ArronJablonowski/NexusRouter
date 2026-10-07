@@ -34,7 +34,10 @@ window.NexusHostMentions = (() => {
     const host={id:peer.id,name:peer.id,peer,info:null};next.push(host);
     try{const p=await json('remote-inspection',{version:1,instance:peer.id,view:'info'});if(p.version===1&&p.info?.instance===peer.id&&Array.isArray(p.info.models)){host.info=p.info;if(hostname.test(p.info.hostname)&&p.info.hostname!=='local')host.name=p.info.hostname;}}catch{}
    }
-   hosts=next;loadedAt=Date.now();selected='';sync();draw();
+   const previousHost=selected,previousModel=models.value;
+   hosts=next;loadedAt=Date.now();selected='';sync();
+   if(selected===previousHost&&Array.from(models.options).some(option=>option.value===previousModel))models.value=previousModel;
+   draw();
   }catch{message('Host lookup unavailable. Remote mentions cannot be sent until hosts are verified.');}finally{loading=false;}
  }
  input.addEventListener('input',()=>{sync();draw();if(input.value.startsWith('@'))load();});input.addEventListener('click',draw);
