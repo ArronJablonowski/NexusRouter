@@ -546,3 +546,5 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .model-use-control input:disabled { opacity: .5; cursor: not-allowed; }
 .model-use-control [role=status] { font-size: .85rem; color: #9bbfc7; }
 .dependency-hosts{display:grid;gap:1.75rem}.dependency-host{min-width:0}.dependency-host>h2{color:#68e4e5;border-bottom:1px solid #12626b;padding-bottom:.6rem}.dependency-host .logging-card h3{font-size:1.1rem;margin-top:0}.logging-card.dependency-missing{border-left:4px solid #ff7659}.logging-card.dependency-unverified{border-left:4px solid #e7bb54}
+
+.remote-host-address { margin: .4rem 0; color: #e5f7f8; font-size: .9rem; overflow-wrap: anywhere; }

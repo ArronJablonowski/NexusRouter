@@ -2589,3 +2589,7 @@ Added persistent, runtime model-use policy and accessible switches on local/clou
 ## 2026-10-07 dependency host groups
 
 Dependencies now display stable hostname sections for this host and paired hosts with inspection permission. Missing tools use orange vertical accents; unavailable/environment-dependent checks use amber and retain their explicit status. Added a bounded remote dependency inspection endpoint without expanding peer permissions; older/offline hosts show unavailable. Web UI, remote protocol and browser API race suites passed, along with focused visual/refresh, hostname, permission and metadata tests and vet. Live three-host display verification follows deployment.
+
+## 2026-10-07 Routing Grid host IP
+
+Connected Systems cards now show a separate Host IP from the paired endpoint, preserving the distinct controlling commander address. Hostname-based endpoints explicitly report that their IP is not supplied rather than guessing. Web UI race suite passed, including both fixture host IP labels; live verification follows deployment.

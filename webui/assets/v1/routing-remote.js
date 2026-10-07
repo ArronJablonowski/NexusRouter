@@ -22,6 +22,7 @@
   for(const [capability,models] of [...groups].sort(([a],[b])=>a.localeCompare(b))){const card=node('article','specialist-card'),heading=node('div','specialist-heading'),stack=node('div','route-stack');heading.append(node('h3','',capability));for(const model of models){const row=node('div','route-model remote-model-entry');row.append(node('strong','',model.model),node('small','',model.provider+' · '+(model.local?'Local':'Cloud')+' · '+(model.context_tokens||'Unknown')+' context'));stack.append(row);}card.append(heading,stack);remoteGrid.append(card);}
   if(!groups.size)remoteStatus.textContent='No models visible to this paired connection.';
  }
+ function hostAddress(endpoint){try{const host=new URL(endpoint).hostname.replace(/^\[|\]$/g,'');return /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(host)||/^[0-9a-fA-F:]+$/.test(host)&&host.includes(':')?'Host IP: '+host:'Host address: '+host+' (IP not reported)';}catch{return 'Host IP: unavailable';}}
  const hostnameSafe=value=>typeof value==='string'&&/^[A-Za-z0-9._-]{1,253}$/.test(value);
  const text=(value,max=512)=>typeof value==='string'&&value.length>0&&value.length<=max&&!/[\x00-\x1f\x7f]/.test(value);
  function node(tag,cls,value){const el=document.createElement(tag);el.className=cls;if(value!==undefined)el.textContent=value;return el;}
@@ -45,7 +46,7 @@
   el.type='button';el.setAttribute('aria-haspopup','dialog');el.setAttribute('aria-label','Open '+peer.id+' specialist grid');el.dataset.instance=peer.id;const title=node('h3','',peer.id);heading.append(title,badge);
   const path=node('p','remote-route-path','Commander → '+(peer.transport||'https').toUpperCase()+' → '+peer.id+' → models');
   const endpoint=node('p','remote-route-endpoint',peer.endpoint),detail=node('p','route-empty','Checking the paired system…'),models=node('ul','remote-route-models');
-  const rings=node('span','core-rings');rings.setAttribute('aria-hidden','true');for(let i=0;i<3;i++)rings.append(node('span',''));const controllerLabel=node('p','remote-controller','Controlling commander: checking…');el.append(heading,rings,controllerLabel,node('span','remote-open-grid','Open specialist grid →'));grid.append(el);const view={el,title,badge,detail,models,controllerLabel,peer,info:null};el.addEventListener('click',()=>{selected=peer.id;showGrid(view);dialog.showModal();});return view;
+  const rings=node('span','core-rings');rings.setAttribute('aria-hidden','true');for(let i=0;i<3;i++)rings.append(node('span',''));const controllerLabel=node('p','remote-controller','Controlling commander: checking…');el.append(heading,rings,node('p','remote-host-address',hostAddress(peer.endpoint)),controllerLabel,node('span','remote-open-grid','Open specialist grid →'));grid.append(el);const view={el,title,badge,detail,models,controllerLabel,peer,info:null};el.addEventListener('click',()=>{selected=peer.id;showGrid(view);dialog.showModal();});return view;
  }
  async function load(){
   const current=++generation;if(controller)controller.abort();controller=new AbortController();const signal=controller.signal;
