@@ -227,7 +227,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			break
 		}
 	}
-	if !found || (r.LocalRequired && model.Locality != "local") || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
+	if !found || !config.ModelUseAllowed(s.Telemetry.Database, "local", model.ID) || (r.LocalRequired && model.Locality != "local") || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
 		return result, ErrAdmission
 	}
 	// Explicit selection bypasses ranking, not requested admission constraints.

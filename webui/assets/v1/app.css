@@ -535,3 +535,13 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 #host-receipt { overflow-wrap: anywhere; }
 #host-receipt pre { white-space: pre-wrap; }
 .remote-controller { margin: .5rem 0; color: #9fdade; font-size: .85rem; overflow-wrap: anywhere; }
+
+.model-use-control { padding: .75rem 1rem; border-top: 1px solid #12616d; display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; }
+.model-use-control label { display: inline-flex; gap: .6rem; align-items: center; cursor: pointer; }
+.model-use-control input { appearance: none; width: 2.5rem; height: 1.35rem; border-radius: 1rem; background: #334155; border: 1px solid #64748b; position: relative; cursor: pointer; }
+.model-use-control input::after { content: ''; position: absolute; width: .95rem; height: .95rem; top: .13rem; left: .15rem; border-radius: 50%; background: #d5f5f8; }
+.model-use-control input:checked { background: #007a82; border-color: #00e5ed; }
+.model-use-control input:checked::after { left: 1.25rem; }
+.model-use-control input:focus-visible { outline: 2px solid #00e5ed; outline-offset: 3px; }
+.model-use-control input:disabled { opacity: .5; cursor: not-allowed; }
+.model-use-control [role=status] { font-size: .85rem; color: #9bbfc7; }

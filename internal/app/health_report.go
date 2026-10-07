@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"math"
 	"strings"
 	"sync"
@@ -145,7 +146,7 @@ func (s *Service) healthReportScoped(outer context.Context, supervisor health.Ch
 	enabled := make([]bool, len(s.settings.Models))
 	policyBlocked := make([]bool, len(s.settings.Models))
 	for i, m := range s.settings.Models {
-		enabled[i] = (s.settings.Mode != "local_only" || m.Locality == "local") && (s.settings.Mode != "cloud_only" || m.Locality == "cloud") && (allowed == nil || allowed[m.ID])
+		enabled[i] = config.ModelUseAllowed(s.settings.Telemetry.Database, "local", m.ID) && (s.settings.Mode != "local_only" || m.Locality == "local") && (s.settings.Mode != "cloud_only" || m.Locality == "cloud") && (allowed == nil || allowed[m.ID])
 		if enabled[i] {
 			for _, p := range s.settings.Providers {
 				if p.ID == m.Provider {

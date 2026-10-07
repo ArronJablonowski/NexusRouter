@@ -26,7 +26,7 @@
   const keep=new Set();
   for(const m of info.models){
    keep.add(m.id);let row=h.rows.get(m.id);
-   if(!row){const el=node('li'),details=node('details'),summary=node('summary'),facts=node('p');el.className='model-card';details.append(summary,facts);el.append(details);h.list.append(el);row={el,summary,facts};h.rows.set(m.id,row);}
+   if(!row){const el=node('li'),details=node('details'),summary=node('summary'),facts=node('p');el.className='model-card';details.append(summary,facts);el.append(details);h.list.append(el);if(window.NexusModelUse)window.NexusModelUse.attach(el,info.instance,m.id);row={el,summary,facts};h.rows.set(m.id,row);}
    const observation=m.observation?.state||'unknown';
    set(row.summary,m.model+' · '+(m.local?'Remote local model':'Remote cloud model')+' · '+(observation==='present'?'Present':observation==='absent'?'Not present':'Availability unknown'));
    set(row.facts,'Provider: '+m.provider+' · Model ID: '+m.id+' · Context: '+(m.context_tokens||'Unknown')+' · Capabilities: '+(m.capabilities?.join(', ')||'None declared')+(m.observation?' · Observed '+new Date(m.observation.checked_at).toLocaleString():''));

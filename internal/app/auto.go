@@ -513,7 +513,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		if c.ContextTokens == 0 {
 			c.ContextTokens = 1
 		}
-		c.PolicyAllowed = m.ContextTokens > 0 && m.EstimatedCost != nil
+		c.PolicyAllowed = m.ContextTokens > 0 && m.EstimatedCost != nil && config.ModelUseAllowed(cfg.Telemetry.Database, "local", m.ID)
 		if r.contextEstimator != nil && (contextEstimates[m.ID] < 1 || contextEstimates[m.ID] > m.ContextTokens) {
 			c.PolicyAllowed = false
 		}

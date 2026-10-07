@@ -97,6 +97,10 @@ func (c *Client) DiscoverCandidates(ctx context.Context, request harness.Request
 			if total > 4096 {
 				return CandidateDiscovery{}, ErrInvalid
 			}
+			if c.ModelAllowed != nil && !c.ModelAllowed(p.ID, h.ModelID) {
+				exclude(p, h.ModelID, h.ID, "disabled_by_policy")
+				continue
+			}
 			m, ok := models[h.ModelID]
 			if !ok {
 				exclude(p, h.ModelID, h.ID, "missing_model")

@@ -23,6 +23,7 @@ import (
 )
 
 type MutationServices struct {
+	ModelUse        func(context.Context, string, string, *bool) (any, error)
 	Chat            func(context.Context, string, contract.ChatRequest) (contract.ChatMutationReceipt, error)
 	Cancel          func(context.Context, string, contract.ChatRequest) (contract.CancellationReceipt, error)
 	Steer           func(context.Context, string, contract.ChatRequest) (contract.SteeringReceipt, error)
@@ -42,6 +43,9 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 	base := h.basePath + "/api/v1"
 	path := request.URL.Path
 	switch {
+	case path == base+"/model-use":
+		h.serveModelUse(writer, request)
+		return true
 	case path == base+"/workboards" && request.Method == http.MethodPost:
 		h.serveWorkboardMutation(writer, request, "", contract.BoardCreate)
 		return true
@@ -632,4 +636,28 @@ func operationQuery(raw string) (string, int, error) {
 		return "", 0, errors.New("invalid query")
 	}
 	return after, limit, nil
+}
+
+func (h *Handler) serveModelUse(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMutationAuthority(w, r) {
+		return
+	}
+	var input struct {
+		Version int    `json:"version"`
+		Host    string `json:"host"`
+		Model   string `json:"model"`
+		Enabled *bool  `json:"enabled"`
+	}
+	if r.Method != http.MethodPost || decodeMutationJSON(r, &input, 4096) != nil || input.Version != 1 || h.mutations.ModelUse == nil {
+		h.writeError(w, r, 400, "invalid_request")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	out, err := safeCall(func() (any, error) { return h.mutations.ModelUse(ctx, input.Host, input.Model, input.Enabled) })
+	if err != nil {
+		h.writeError(w, r, 409, "model_policy_unavailable")
+		return
+	}
+	h.writeJSON(w, 200, out)
 }

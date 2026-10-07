@@ -301,7 +301,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		var remoteInspector webuiapp.RemoteInspector
 		var remoteTaskController webuiapp.RemoteTaskController
 		if c := s.WebUI.RemoteClient; c != nil {
-			client := &remote.Client{UsageFile: s.WebUI.RemoteTrustFile + ".usage.db", Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
+			client := &remote.Client{ModelAllowed: func(host, model string) bool { return config.ModelUseAllowed(s.Telemetry.Database, host, model) }, UsageFile: s.WebUI.RemoteTrustFile + ".usage.db", Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
 			remoteInspector = client
 			remoteUsageClient = client
 			if dir := s.WebUI.RemoteDispatchDirectory; dir != "" {
@@ -356,6 +356,33 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
 			Operations: browserMutations.Operations, Submission: browserMutations.Submission,
 			UpdateSettings: updateSettings,
+			ModelUse: func(ctx context.Context, host, model string, enabled *bool) (any, error) {
+				if enabled == nil {
+					return config.ReadModelUse(s.Telemetry.Database)
+				}
+				found := false
+				if host == "local" {
+					for _, m := range s.Models {
+						if m.ID == model {
+							found = true
+						}
+					}
+				} else if remoteInspector != nil {
+					info, err := remoteInspector.Info(ctx, host)
+					if err != nil {
+						return nil, err
+					}
+					for _, m := range info.Models {
+						if m.ID == model {
+							found = true
+						}
+					}
+				}
+				if !found {
+					return nil, errors.New("model unavailable")
+				}
+				return config.UpdateModelUse(s.Telemetry.Database, host, model, *enabled)
+			},
 		}, Reads: webuiapp.ReadServices{
 			JobTasks: service.ListJobTasks, Submissions: service.ListSubmissions, Tasks: service.ListTasks, Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {

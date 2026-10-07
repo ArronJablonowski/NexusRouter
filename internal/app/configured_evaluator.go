@@ -17,7 +17,7 @@ import (
 // and authenticate that evidence; this does not import a remote task as local.
 // Hosts must install their shared resource coordinator before invoking it.
 func (s *Service) ConfiguredEvaluator(reviewerID string, maxCost float64, private bool) (evaluation.Evaluator, bool, error) {
-	if s == nil || !s.settings.Evaluation.Judge || reviewerID == "" || maxCost < 0 || maxCost > evaluation.MaxReviewCost || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
+	if s == nil || !s.settings.Evaluation.Judge || reviewerID == "" || !config.ModelUseAllowed(s.settings.Telemetry.Database, "local", reviewerID) || maxCost < 0 || maxCost > evaluation.MaxReviewCost || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
 		return nil, false, ErrAdmission
 	}
 	var model config.Model
@@ -71,7 +71,7 @@ type configuredEvaluator struct {
 func (e *configuredEvaluator) Descriptor() evaluation.EvaluatorDescriptor { return e.descriptor }
 func (e *configuredEvaluator) Evaluate(ctx context.Context, input evaluation.EvaluatorRequest) (evaluation.EvaluatorResponse, error) {
 	bad := func() (evaluation.EvaluatorResponse, error) { return evaluation.EvaluatorResponse{}, ErrAdmission }
-	if ctx == nil || ctx.Err() != nil || input.Validate() != nil {
+	if ctx == nil || ctx.Err() != nil || input.Validate() != nil || !config.ModelUseAllowed(e.service.settings.Telemetry.Database, "local", e.model.ID) {
 		return bad()
 	}
 	current, err := settingsConfigID(e.service.settings)

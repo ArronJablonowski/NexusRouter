@@ -86,7 +86,7 @@
 			disclosure.textContent = next ? "−" : "+";
 			if (next) expanded.add(item.id); else expanded.delete(item.id);
 		});
-		node.append(details); return node;
+		node.append(details); if(window.NexusModelUse)window.NexusModelUse.attach(node,"local",item.id,item.configured); return node;
 	}
 	function render(page) {
 		const locals = page.models.filter(item => item.locality === "local"), clouds = page.models.filter(item => item.locality === "cloud");

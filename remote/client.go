@@ -19,6 +19,7 @@ import (
 )
 
 type Client struct {
+	ModelAllowed func(string, string) bool
 	// UsageFile enables durable caller-side remote usage receipts.
 	UsageFile string
 
@@ -76,6 +77,9 @@ func (c *Client) call(ctx context.Context, destination, op, method, path string,
 func (c *Client) callPinned(ctx context.Context, destination, op, method, path string, task *Task, headers map[string]string, out any, callerPin string) error {
 	if c == nil || ctx == nil || !id(destination) {
 		return ErrInvalid
+	}
+	if task != nil && c.ModelAllowed != nil && !c.ModelAllowed(destination, task.ModelID) {
+		return ErrDenied
 	}
 	r, err := c.Trust.Read()
 	if err != nil {

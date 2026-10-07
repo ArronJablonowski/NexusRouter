@@ -106,12 +106,16 @@ func (s *Service) browserModelsScoped(ctx context.Context, report health.Report,
 		if fact.status != "healthy" && fact.status != "degraded" && fact.status != "unavailable" && fact.status != "disabled" {
 			fact.status = "unknown"
 		}
-		enabled := (s.settings.Mode != "local_only" || model.Locality == "local") && (s.settings.Mode != "cloud_only" || model.Locality == "cloud")
+		enabled := config.ModelUseAllowed(s.settings.Telemetry.Database, "local", model.ID) && (s.settings.Mode != "local_only" || model.Locality == "local") && (s.settings.Mode != "cloud_only" || model.Locality == "cloud")
 		out.Models[i] = browserModel(model, fact.status)
 		out.Models[i].ContextSelectionStatus = "unavailable"
 		if observed {
 			checked := report.CheckedAt
 			out.Models[i].HealthCheckedAt = &checked
+		}
+		if !enabled {
+			fact.status, fact.code = "disabled", "disabled_by_policy"
+			out.Models[i].Health = "disabled"
 		}
 		out.Models[i].Configured, out.Models[i].Enabled = true, enabled
 		out.Models[i].Usable, out.Models[i].StatusCode = enabled && fact.status == "healthy", fact.code
