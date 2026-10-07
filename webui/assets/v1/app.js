@@ -207,7 +207,7 @@
 			if (status.chatID) {
 				queuedSubmissionID = "";
 				queuedSubmissionCanCancel = false;
-				showMutation("Submission " + stateLabel(status.state) + ".", false, false);
+				showMutation(["queued", "running"].includes(status.state) ? "Submission accepted. Live task status is shown above." : "Submission " + stateLabel(status.state) + ".", false, false);
 				if (!selectedChat && submissionShouldNavigate) selectChat(status.chatID, status.state);
 				else if (selectedChat === status.chatID) loadHistory(status.chatID, "", true, false);
 				refreshChats();
