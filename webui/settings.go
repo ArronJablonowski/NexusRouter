@@ -25,10 +25,14 @@ type ToolAccessSettings struct {
 	ToolsEnabled          bool                       `json:"tools_enabled"`
 	DelegateReadTools     bool                       `json:"delegate_read_tools"`
 	ReadRoot              string                     `json:"read_root"`
+	CommanderModel        string                     `json:"commander_model"`
 	SpecialistsAllowCloud bool                       `json:"specialists_allow_cloud"`
 }
 
 func (s ToolAccessSettings) Validate() error {
+	if !optionalModelID(s.CommanderModel) {
+		return ErrContract
+	}
 	if !finiteNonnegative(s.MacMemoryPercent) || s.MacMemoryPercent > 100 || !finiteNonnegative(s.MacSwapGrowthGB) || s.MacSwapGrowthGB > 1024 {
 		return ErrContract
 	}

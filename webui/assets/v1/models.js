@@ -13,7 +13,7 @@
 	const digestPattern = /^[0-9a-f]{64}$/;
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 	const expanded = new Set();
-	let modelSignature = "";
+	let modelSignature = "", commanderID="";
 	let timer = 0, refreshMS = 10000, loading = false, loaded = false, stopped = false;
 	chat.hidden = true; workboards.hidden = true; settings.hidden = true; view.hidden = false;
 
@@ -86,12 +86,23 @@
 			disclosure.textContent = next ? "−" : "+";
 			if (next) expanded.add(item.id); else expanded.delete(item.id);
 		});
-		node.append(details); if(window.NexusModelUse)window.NexusModelUse.attach(node,"local",item.id,item.configured); return node;
+		node.append(details);
+        if(item.id===commanderID) badges.append(badge("Commander","usable"));
+        if(item.configured&&item.enabled&&item.capabilities.includes("chat")&&item.id!==commanderID){
+          const choose=element("button","commander-choice","Set as commander"),message=element("span","model-use-feedback");choose.type="button";message.setAttribute("role","status");node.append(choose,message);
+          choose.addEventListener("click",async()=>{choose.disabled=true;message.textContent="Saving commander…";try{
+           const get=await window.NexusLive.fetch(base+"/api/v1/settings",{credentials:"same-origin",cache:"no-store"});if(!get.ok)throw Error();const current=await get.json();
+           const tokenResponse=await window.NexusLive.fetch(base+"/api/v1/session/csrf",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({version:1})});if(!tokenResponse.ok)throw Error();const token=await tokenResponse.json();
+           const response=await window.NexusLive.fetch(base+"/api/v1/settings",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Darwin-CSRF":token.csrf_token},body:JSON.stringify({version:1,expected_digest:current.digest,settings:{...current.saved,commander_model:item.id}})});if(!response.ok)throw Error();const saved=await response.json();message.textContent=saved.restart_required?"Commander saved. Restart NexusRouter when idle to activate.":"Commander selected.";
+          }catch{message.textContent="Could not save commander. Refresh and try again.";}finally{choose.disabled=false;}});
+        }
+        if(window.NexusModelUse)window.NexusModelUse.attach(node,"local",item.id,item.configured); return node;
 	}
 	function render(page) {
 		const locals = page.models.filter(item => item.locality === "local"), clouds = page.models.filter(item => item.locality === "cloud");
 		const present = new Set(page.models.map(item => item.id)); expanded.forEach(id => { if (!present.has(id)) expanded.delete(id); });
-		const signature = JSON.stringify(page.models);
+		commanderID=page.commander_id||"";
+		const signature = JSON.stringify([page.models,commanderID]);
 		if (signature !== modelSignature && !localList.contains(document.activeElement) && !cloudList.contains(document.activeElement)) { localList.replaceChildren(...locals.map(card)); cloudList.replaceChildren(...clouds.map(card)); modelSignature = signature; }
 		localCount.textContent = String(locals.length); cloudCount.textContent = String(clouds.length);
 		localState.hidden = locals.length > 0; cloudState.hidden = clouds.length > 0 && page.cloud_discovery_status === undefined;

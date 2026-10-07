@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestEmbeddedModelInventoryIsDynamicBoundedAndReadOnly(t *testing.T) {
+func TestEmbeddedModelInventoryAndCommanderSelection(t *testing.T) {
 	script, err := embeddedShellAssets.ReadFile("assets/v1/models.js")
 	if err != nil {
 		t.Fatal(err)
@@ -20,13 +20,13 @@ func TestEmbeddedModelInventoryIsDynamicBoundedAndReadOnly(t *testing.T) {
 		`node.textContent = value`, `locality === "local"`, `locality === "cloud"`, `const expanded = new Set()`,
 		`heading.setAttribute("aria-expanded", String(open))`, `details.hidden = !open`, `expanded.add(item.id)`,
 		`expanded.delete(item.id)`, `if (!present.has(id)) expanded.delete(id)`, `model-status-badge`, `model-install-badge`,
-		`model-config-badge`, `model-size-badge`,
+		`model-config-badge`, `model-size-badge`, `"X-Darwin-CSRF":token.csrf_token`, `expected_digest:current.digest`, `commander_model:item.id`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("model inventory client lost required guard %q", required)
 		}
 	}
-	for _, forbidden := range []string{"innerHTML", "api_key", "Authorization", "POST", "DELETE", "PUT"} {
+	for _, forbidden := range []string{"innerHTML", "api_key", "Authorization", "DELETE", "PUT"} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("model inventory client contains unsafe primitive %q", forbidden)
 		}

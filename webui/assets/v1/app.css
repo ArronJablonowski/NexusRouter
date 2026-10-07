@@ -561,3 +561,5 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .model-use-feedback { display:block; padding:0 .7rem .5rem; font-size:.85rem; color:#9bbfc7; }
 .model-use-feedback:empty { display:none; }
 .model-card-with-switch > details > summary { padding:.6rem .7rem; overflow-wrap:anywhere; }
+
+.commander-choice { grid-column:1 / -1; margin:.4rem .7rem; justify-self:start; }

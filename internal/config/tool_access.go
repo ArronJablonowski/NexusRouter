@@ -34,6 +34,7 @@ type ToolAccess struct {
 	Enabled               bool
 	DelegateReadTools     bool
 	ReadRoot              string
+	CommanderModel        string
 	SpecialistsAllowCloud bool
 }
 
@@ -92,6 +93,7 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	setConfigScalar(root, []string{"tools", "enabled"}, "!!bool", boolText(next.Enabled))
 	setConfigScalar(root, []string{"tools", "read_root"}, "!!str", next.ReadRoot)
 	setConfigScalar(root, []string{"workers", "delegate_read_tools"}, "!!bool", boolText(next.DelegateReadTools))
+	setConfigScalar(root, []string{"web_ui", "default_model"}, "!!str", next.CommanderModel)
 	setConfigScalar(root, []string{"web_ui", "specialists_allow_cloud"}, "!!bool", boolText(next.SpecialistsAllowCloud))
 	setConfigScalar(root, []string{"skills", "enabled"}, "!!bool", boolText(next.SkillsEnabled))
 	setConfigScalar(root, []string{"skills", "auto_draft"}, "!!bool", boolText(next.SkillsAutoDraft))
@@ -175,7 +177,7 @@ func setConfigScalar(node *yaml.Node, path []string, tag, value string) {
 }
 
 func toolAccess(settings Settings) ToolAccess {
-	return ToolAccess{MacMemoryPercent: settings.Hardware.MacMemoryPercent, MacSwapGrowthGB: settings.Hardware.MacSwapGrowthGB, DNSLogging: settings.Telemetry.DNSLogging, RemoteAdvertisement: settings.RemoteAdvertisement, SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
+	return ToolAccess{CommanderModel: settings.WebUI.DefaultModel, MacMemoryPercent: settings.Hardware.MacMemoryPercent, MacSwapGrowthGB: settings.Hardware.MacSwapGrowthGB, DNSLogging: settings.Telemetry.DNSLogging, RemoteAdvertisement: settings.RemoteAdvertisement, SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
 }
 
 func boolText(value bool) string {
