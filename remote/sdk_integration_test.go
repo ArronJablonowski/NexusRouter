@@ -30,7 +30,8 @@ import (
 type fixtureProfiler struct{}
 
 func (fixtureProfiler) Measure(context.Context) (resources.Measurement, error) {
-	return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{Time: time.Now().UTC(), CPUs: 2, TotalRAM: 8 << 30, AvailableRAM: 8 << 30, Source: "remote-fixture"}}, nil
+	var swap uint64
+	return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{Time: time.Now().UTC(), CPUs: 2, TotalRAM: 64 << 30, AvailableRAM: 56 << 30, SwapUsed: &swap, Source: "remote-fixture"}}, nil
 }
 
 func TestRemoteSDKDispatchResultEventsAndQueuedCancellation(t *testing.T) {

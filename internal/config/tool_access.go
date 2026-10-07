@@ -42,7 +42,7 @@ func ReadProjectToolAccess(path string) (ToolAccess, string, error) {
 	if err != nil {
 		return ToolAccess{}, "", err
 	}
-	settings, err := Load(Options{ProjectFile: path})
+	settings, err := loadWithReader(Options{ProjectFile: path}, func(string) ([]byte, error) { return data, nil })
 	if err != nil {
 		return ToolAccess{}, "", err
 	}

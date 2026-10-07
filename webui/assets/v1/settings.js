@@ -53,7 +53,7 @@
 		syncDependency(); validation.hidden = true;
 		setStatus(value.restart_required ? "Settings are saved. Restart the owning service to activate them; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
 	}
-	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="dns_logging"?(projection.saved[key]||""):projection.saved[key]));}
+	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]));}
  function load() {
   if(dirty()){setStatus("Your unsaved edits are preserved. Use Reset changes before refreshing saved settings.",false);return Promise.resolve();}
 		setBusy(true); setStatus("Loading settings…", false);
@@ -97,7 +97,7 @@
    const value=await response.json();if(!validProjection(value))throw Error();
    if(value.digest===projection.digest&&JSON.stringify(value.active)===JSON.stringify(projection.active))return;
    // Keep the original digest while a draft is dirty, so save still detects conflicts.
-   if(Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="dns_logging"?(projection.saved[key]||""):projection.saved[key]))){setStatus("Settings changed elsewhere. Your unsaved edits are preserved; use Reset or Refresh to load current settings.",false);return;}
+   if(Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]))){setStatus("Settings changed elsewhere. Your unsaved edits are preserved; use Reset or Refresh to load current settings.",false);return;}
    render(value);
   }catch{setStatus("Live settings check unavailable. Your edits are preserved; reconnecting automatically.",true);return false;}
   finally{liveSettingsBusy=false;}

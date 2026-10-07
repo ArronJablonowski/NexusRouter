@@ -2573,3 +2573,6 @@ Reproduced panic when a config section edited by the settings writer is a YAML s
 
 ### Benchmark objective attribution correction
 Added a separate trusted-evaluator correction policy for originally misattributed user feedback. It preserves original and revised records, verdict, scope and all measurements, and retains one sample. Subjective feedback cannot create objective evidence; objective evidence cannot be downgraded. Revision/history/context/observation readers recognize the correction. Targeted race regressions and vet passed. Deployment and the Mac mini269-record import/routing verification are pending; older readers must be upgraded before corrections are written.
+
+### October7 code QA follow-up
+Confirmed and fixed settings snapshot/digest inconsistency under concurrent atomic file replacement, and false dirty detection for displayed memory defaults that blocked clean settings refresh. Added snapshot regression and reviewed changed asset digest. Corrected remote integration fixture RAM and missing swap metadata; runtime safeguards unchanged. Configuration,remote,routing,evaluation,and WebUI race suites passed; targeted application ranking/settings boundary tests and vet passed. Not a full repository suite or exhaustive review.

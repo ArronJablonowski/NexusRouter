@@ -24,6 +24,23 @@ type Options struct {
 }
 
 func Load(options Options) (Settings, error) {
+	return loadWithReader(options, readConfigFile)
+}
+
+func readConfigFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, errors.New("cannot open configuration file")
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, MaxFileBytes+1))
+	if err != nil || len(data) > MaxFileBytes {
+		return nil, errors.New("configuration file exceeds limit or cannot be read")
+	}
+	return data, nil
+}
+
+func loadWithReader(options Options, readFile func(string) ([]byte, error)) (Settings, error) {
 	data, _ := yaml.Marshal(Defaults())
 	root, err := parse(data)
 	if err != nil {
@@ -33,14 +50,9 @@ func Load(options Options) (Settings, error) {
 		if path == "" {
 			continue
 		}
-		f, err := os.Open(path)
+		data, err := readFile(path)
 		if err != nil {
-			return Settings{}, errors.New("cannot open configuration file")
-		}
-		data, err := io.ReadAll(io.LimitReader(f, MaxFileBytes+1))
-		f.Close()
-		if err != nil || len(data) > MaxFileBytes {
-			return Settings{}, errors.New("configuration file exceeds limit or cannot be read")
+			return Settings{}, err
 		}
 		n, err := parse(data)
 		if err != nil {
