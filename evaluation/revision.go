@@ -29,3 +29,29 @@ func sameSchema(a, b *bool) bool {
 	}
 	return *a == *b
 }
+
+// ValidateObjectiveCorrection admits an operator/evaluator correction of a
+// misattributed subjective grade. It preserves the verdict and every measured
+// field. Objective evidence can never be revised through this path.
+func ValidateObjectiveCorrection(prior, next Record) error {
+	if next.Validate() != nil || next.AllowJudge || len(next.Checks) != 1 || next.Checks[0].Source != Deterministic {
+		return ErrEvidence
+	}
+	old, err := Resolve(prior.Checks, prior.AllowJudge)
+	if err != nil || old.Source != UserFeedback || old.Accepted != next.Checks[0].Passed {
+		return ErrEvidence
+	}
+	// Reuse identity and measurement invariants without broadening the public
+	// subjective-feedback revision policy.
+	check := next
+	check.Checks = []Check{{Source: UserFeedback, Reference: next.Checks[0].Reference, Passed: next.Checks[0].Passed}}
+	return ValidateRevision(prior, check)
+}
+
+// ValidateStoredRevision recognizes both authorized writer policies.
+func ValidateStoredRevision(prior, next Record) error {
+	if ValidateRevision(prior, next) == nil {
+		return nil
+	}
+	return ValidateObjectiveCorrection(prior, next)
+}

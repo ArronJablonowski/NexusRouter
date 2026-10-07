@@ -12,6 +12,17 @@ import (
 // SupersedeEvaluation replaces only a subjective quality contribution. Original
 // evidence and all revisions remain immutable; fitness retains one sample.
 func (s *Store) SupersedeEvaluation(ctx context.Context, expectedID string, r evaluation.Record) error {
+	return s.supersedeEvaluation(ctx, expectedID, r, evaluation.ValidateRevision)
+}
+
+// CorrectObjectiveAttribution is only for trusted operator/evaluator adapters,
+// never the chat feedback endpoint. Original grades remain in history and the
+// current verdict, scope and measurements cannot change.
+func (s *Store) CorrectObjectiveAttribution(ctx context.Context, expectedID string, r evaluation.Record) error {
+	return s.supersedeEvaluation(ctx, expectedID, r, evaluation.ValidateObjectiveCorrection)
+}
+
+func (s *Store) supersedeEvaluation(ctx context.Context, expectedID string, r evaluation.Record, validate func(evaluation.Record, evaluation.Record) error) error {
 	if expectedID == "" || r.Validate() != nil {
 		return evaluation.ErrEvidence
 	}
@@ -58,8 +69,14 @@ func (s *Store) SupersedeEvaluation(ctx context.Context, expectedID string, r ev
 	if len(history) > 100 {
 		return evaluation.ErrEvidence
 	}
-	if err = evaluation.ValidateRevision(prior, r); err != nil {
+	if err = validate(prior, r); err != nil {
 		return err
+	}
+	// Corrections must also match the original grade so readers which project
+	// base-to-head measurements cannot mistake a changed verdict for attribution.
+	outcome, _ := evaluation.Resolve(r.Checks, r.AllowJudge)
+	if outcome.Source == evaluation.Deterministic && evaluation.ValidateObjectiveCorrection(history[0], r) != nil {
+		return evaluation.ErrEvidence
 	}
 	oldOutcome, _ := evaluation.Resolve(prior.Checks, prior.AllowJudge)
 	newOutcome, _ := evaluation.Resolve(r.Checks, r.AllowJudge)
@@ -157,7 +174,7 @@ func evaluationHistory(ctx context.Context, tx *sql.Tx, task, attempt string) ([
 		}
 		var next evaluation.Record
 		prior := history[len(history)-1]
-		if len(history) > 100 || previous != prior.ID || json.Unmarshal(raw, &next) != nil || next.ID != id || evaluation.ValidateRevision(prior, next) != nil {
+		if len(history) > 100 || previous != prior.ID || json.Unmarshal(raw, &next) != nil || next.ID != id || evaluation.ValidateStoredRevision(prior, next) != nil {
 			return nil, evaluation.ErrEvidence
 		}
 		history = append(history, next)

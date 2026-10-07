@@ -2570,3 +2570,6 @@ Corrected RunSubmission test resource fixture from1000-byte synthetic RAM to64Gi
 
 ### 2026-10-07 settings shape validation
 Reproduced panic when a config section edited by the settings writer is a YAML sequence instead of a mapping. Reject all seven edited section shapes before mutation. Regression checks rejection and unchanged file contents. Full internal/config tests pass with race detection; go vet and diff checks pass. Deployment pending idle boundary.
+
+### Benchmark objective attribution correction
+Added a separate trusted-evaluator correction policy for originally misattributed user feedback. It preserves original and revised records, verdict, scope and all measurements, and retains one sample. Subjective feedback cannot create objective evidence; objective evidence cannot be downgraded. Revision/history/context/observation readers recognize the correction. Targeted race regressions and vet passed. Deployment and the Mac mini269-record import/routing verification are pending; older readers must be upgraded before corrections are written.

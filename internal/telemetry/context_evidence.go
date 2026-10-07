@@ -59,7 +59,7 @@ func (s *Store) contextEvidence(ctx context.Context, model, provider string, key
 			// Context/resource measurements are immutable across corrections.
 			// Check the stored base binding before trusting the current verdict;
 			// a missing or cross-linked head must not erase safety evidence.
-			if !revisionBase.Valid || revisionBase.String != id || json.Unmarshal(revisionBody, &revised) != nil || revised.ID != head.String || evaluation.ValidateRevision(record, revised) != nil {
+			if !revisionBase.Valid || revisionBase.String != id || json.Unmarshal(revisionBody, &revised) != nil || revised.ID != head.String || evaluation.ValidateStoredRevision(record, revised) != nil {
 				return nil, evaluation.ErrEvidence
 			}
 			record = revised

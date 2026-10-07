@@ -217,7 +217,7 @@ func appendFitnessObservations(ctx context.Context, tx *sql.Tx, key routing.Key,
 				break
 			}
 			next, ok := byID[nextID]
-			if !ok || evaluation.ValidateRevision(record, next.record) != nil || next.head != base.head {
+			if !ok || evaluation.ValidateStoredRevision(record, next.record) != nil || next.head != base.head {
 				return evaluation.ErrEvidence
 			}
 			current = next
