@@ -190,11 +190,15 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
  await evaluate('window.fixtureMessages=Array.from({length:40},(_,i)=>({id:"synthetic-"+i,role:"assistant",text:"Synthetic scrolling message "+i+" text".repeat(80)}));window.NexusChatRender.messages(document.querySelector("#transcript"),fixtureMessages,true);document.querySelector("#transcript").style.height="300px";document.querySelector("#transcript").style.flex="none";document.querySelector("#transcript").scrollTop=350;window.savedTop=document.querySelector("#transcript").scrollTop;window.savedMessage=document.querySelector("#transcript").children[2]');
  await evaluate('window.NexusChatRender.messages(document.querySelector("#transcript"),fixtureMessages.concat([{id:"new",role:"assistant",text:"New streamed result"}]),true)');
  if(!await evaluate('Math.abs(document.querySelector("#transcript").scrollTop-savedTop)<2&&document.querySelector("#transcript").children[2]===savedMessage'))throw Error('background update moved reading position');
+ await evaluate('window.fixtureBeforeReload=true');
  await cdp('Page.reload');
+ await eventually('!window.fixtureBeforeReload&&document.readyState==="complete"','new document did not finish loading');
  await eventually('document.querySelector(".approval-result")?.textContent.includes("revoked")','recorded decision did not survive reload');
  if(!await evaluate('document.querySelectorAll(".approval-message").length===1&&document.querySelector("[data-approval-action=allow]").hidden&&document.querySelector("[data-approval-action=deny]").hidden&&document.querySelector("[data-approval-action=revoke]").hidden'))throw Error('resolved approval offered duplicate authority');
  await evaluate('fetch("/fixture/empty-approvals")');
+ await evaluate('window.fixtureBeforeReload=true');
  await cdp('Page.reload');
+ await eventually('!window.fixtureBeforeReload&&document.readyState==="complete"','new document did not finish loading');
  await eventually('!!document.querySelector("#composer-text")&&!document.querySelector("#composer-text").disabled','empty chat controls not ready');
  await eventually('document.querySelector("#approval-panel").hidden&&document.querySelector("#approval-panel").offsetHeight===0','empty approval object occupies space');
  socket.close();`

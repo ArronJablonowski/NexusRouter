@@ -22,10 +22,13 @@ gate; the durable claim is acquired before provider construction or streaming.
 Active daemons renew claims before expiry. Losing renewal cancels primary model
 execution, but capacity is not released until the provider call has returned and
 the renewal worker has joined. A killed process leaves its claim fenced. A later
-daemon may recover it early only while holding positive `processguard` evidence
+daemon may recover it only while holding positive `processguard` evidence
 that the exact owner stopped; damaged or unverifiable evidence remains fenced
-until expiry. Released and expired reservation identities are tombstones and can
-never be replayed as fresh authorization.
+after expiry. Expired claims continue charging RAM, VRAM and concurrency until
+the exact owner releases after joining execution, or stopped-owner recovery
+commits. Late owner release persists cleanup but returns the expiry error so it
+cannot turn lease loss into successful execution. Released and expired
+reservation identities can never be replayed as fresh authorization.
 
 Fixed and adaptive coordinators persist one exact host policy. A daemon with
 incompatible concurrency, percentage, age, or adaptive settings fails closed
@@ -35,7 +38,9 @@ needed, and select a new empty coordinator database deliberately.
 
 Health reports include an identifier-free `resources/reservations` check.
 Metrics add only fixed aggregate gauges for coordinator availability, active,
-expired and released claims, and reserved RAM/VRAM. Reservation IDs, task IDs,
+expired and released claims, and reserved RAM/VRAM. Byte totals and device-pool
+holder counts include expired, unreleased claims; the top-level active count
+continues to describe unexpired grants. Reservation IDs, task IDs,
 process paths, model/provider names, devices, endpoints, configuration digests,
 prompts, outputs, and credentials are never exported by those surfaces.
 

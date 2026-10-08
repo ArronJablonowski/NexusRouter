@@ -142,20 +142,28 @@ func TestInMemoryCoordinatorExpiryTombstoneAndSnapshot(t *testing.T) {
 	if _, err = coordinator.Renew(context.Background(), request.ReservationID, request.Owner, binding.ExpiresAt, time.Second); !errors.Is(err, ErrReservationExpired) {
 		t.Fatal("expired reservation revived", err)
 	}
-	if _, err = coordinator.Release(context.Background(), request.ReservationID, request.Owner, binding.ExpiresAt); !errors.Is(err, ErrReservationExpired) {
-		t.Fatal("expired reservation relabeled by release", err)
-	}
 	replayAt := binding.ExpiresAt.Add(8 * time.Second)
 	duplicate, err := coordinator.Acquire(context.Background(), snapshot, request, replayAt)
 	if !errors.Is(err, ErrReservationExpired) || duplicate != binding {
 		t.Fatal("terminal tombstone returned an authorizing binding", duplicate, err)
 	}
 	next := coordinatorRequest(replayAt, "after-expiry")
+	if _, err = coordinator.Acquire(context.Background(), snapshot, next, replayAt); !errors.Is(err, ErrCapacity) {
+		t.Fatal("expired live reservation lost its capacity charge", err)
+	}
+	held, err := coordinator.Snapshot(context.Background(), replayAt)
+	if err != nil || held.Active != 0 || held.Expired != 1 || held.RAMBytes != request.RAMBytes {
+		t.Fatal("expired held capacity missing", held, err)
+	}
+	released, err := coordinator.Release(context.Background(), request.ReservationID, request.Owner, replayAt)
+	if !errors.Is(err, ErrReservationExpired) || released.State != ReservationReleased {
+		t.Fatal("expired owner could not release after execution returned", released, err)
+	}
 	if _, err = coordinator.Acquire(context.Background(), snapshot, next, replayAt); err != nil {
-		t.Fatal("expired capacity remained occupied", err)
+		t.Fatal("released capacity remained occupied", err)
 	}
 	final, err := coordinator.Snapshot(context.Background(), replayAt)
-	if err != nil || final.Active != 1 || final.Expired != 1 || final.RAMBytes != next.RAMBytes {
+	if err != nil || final.Active != 1 || final.Expired != 0 || final.Released != 1 || final.RAMBytes != next.RAMBytes {
 		t.Fatal("terminal snapshot mismatch", final, err)
 	}
 }

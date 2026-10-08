@@ -8,7 +8,7 @@ import (
 func TestRemoteEventsBrowserPaginationAndFailure(t *testing.T) {
 	script := string(mustAsset(t, "assets/v1/remote-events.js"))
 	runRoutingMapScript(t, `const vm=require('vm');function el(){return {children:[],handlers:{},hidden:false,setAttribute(){},replaceChildren(){this.children=[]},append(...x){this.children.push(...x)},addEventListener(k,f){this.handlers[k]=f}}};
- const parent=el(),document={createElement:el},window={};let calls=[],fail=false,malformed=false;
+ const parent=el(),document={createElement:el},window={NexusLive:{fetch:async()=>({ok:true,json:async()=>({version:1,csrf_token:'fresh'})})}};let calls=[],fail=false,malformed=false;
  const fetch=async(url,opts)=>{const b=JSON.parse(opts.body);calls.push(b);if(fail)return {ok:false};return {ok:true,json:async()=>({version:1,instance:'node-a',request_id:'request-existing-0001',task_id:'task-1',state:'running',from_sequence:b.after,next_sequence:b.after+1,head_sequence:2,has_more:b.after===0,events:[{sequence:malformed?9:b.after+1,kind:'<script>event</script>',time:'2026-10-01T00:00:00Z'}]})}};
  vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch});window.NexusRemoteEvents.attach(parent,'node-a','request-existing-0001','task-1','/app','csrf');
  const [title,refresh,next,status,list]=parent.children[0].children,tick=()=>new Promise(r=>setImmediate(r));

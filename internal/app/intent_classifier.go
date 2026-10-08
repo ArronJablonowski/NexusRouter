@@ -38,6 +38,9 @@ func (s *Service) prepareAuxiliaryIntent(ctx context.Context, db *telemetry.Stor
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	if state.loaded {
+		if state.skipped {
+			return r, nil
+		}
 		if state.attempt.Status == classification.AttemptCompleted {
 			return bindClassificationState(r, state)
 		}
@@ -82,7 +85,9 @@ func (s *Service) prepareAuxiliaryIntent(ctx context.Context, db *telemetry.Stor
 			return Request{}, errors.Join(ErrAdmission, ErrClassification)
 		}
 	}
-	if (r.LocalRequired && model.Locality != "local") || r.MaxCost < *model.EstimatedCost {
+	// Reconcile durable attempts above without redispatch. New auxiliary
+	// attempts obey the same dynamic model-use policy as primary admissions.
+	if !config.ModelUseAllowed(s.settings.Telemetry.Database, "local", model.ID) || (r.LocalRequired && model.Locality != "local") || r.MaxCost < *model.EstimatedCost {
 		state.loaded, state.skipped = true, true
 		return r, nil
 	}

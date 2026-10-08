@@ -15,6 +15,11 @@ window.NexusRemoteTaskControls = (()=>{
    if(busy||(action==="cancel"&&!current))return;
    const expected=current&&current.submission_id;if(!background)current=null;lock(true);if(!background)result.textContent="";status.textContent=action==="cancel"?"Requesting cancellation…":"Loading current remote status…";
    try{
+    // Other tabs and inventory polls may evict an older bounded CSRF grant.
+    // Acquire authority before this operation; never replay an uncertain cancel.
+    const grant=await window.NexusLive.fetch(base+"/api/v1/session/csrf",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({version:1})});
+    if(!grant.ok)throw Error();const session=await grant.json();
+    if(session.version!==1||typeof session.csrf_token!=="string"||!session.csrf_token||session.csrf_token.length>4096)throw Error();csrf=session.csrf_token;
     const body={version:1,instance:peer.id,request_id:task.request_id,action};if(action==="cancel")body.expected_submission_id=expected;
     const response=await window.NexusLive.fetch(base+"/api/v1/remote-task-control",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify(body)});
     if(!response.ok)throw Error();const value=await response.json();

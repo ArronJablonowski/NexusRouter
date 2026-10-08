@@ -16,6 +16,10 @@ window.NexusRemoteEvents=(()=>{
   async function load(after,live=false){
    if(busy)return;const epoch=generation;busy=true;refresh.disabled=next.disabled=true;next.hidden=true;list.replaceChildren();status.textContent="Loading progress…";
    try{
+    const grant=await window.NexusLive.fetch(base+"/api/v1/session/csrf",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({version:1})});
+    if(!grant.ok)throw Error();const session=await grant.json();
+    if(session.version!==1||typeof session.csrf_token!=="string"||!session.csrf_token||session.csrf_token.length>4096)throw Error();csrf=session.csrf_token;
+    if(epoch!==generation)return;
     const response=await fetch(base+"/api/v1/remote-task-events",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,instance,request_id:request,task_id:task,after})});
     if(!response.ok)throw Error();const p=await response.json();
     if(epoch!==generation)return;

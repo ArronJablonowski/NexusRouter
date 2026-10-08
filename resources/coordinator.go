@@ -53,14 +53,17 @@ func (s ReservationStatus) Validate() error {
 	return nil
 }
 
-// ReservationPoolSnapshot reports one anonymized device pool. Pool ordering is
+// ReservationPoolSnapshot reports one anonymized device pool. Active counts
+// unreleased capacity holders, including expired executions. Pool ordering is
 // deterministic, but no stable hardware identifier is disclosed.
 type ReservationPoolSnapshot struct {
 	Active    int    `json:"active"`
 	VRAMBytes uint64 `json:"vram_bytes"`
 }
 
-// ReservationSnapshot is an identifier-free coordinator observation.
+// ReservationSnapshot is an identifier-free coordinator observation. Expired
+// execution authority does not release capacity: byte totals include expired,
+// unreleased holders, while Active counts only unexpired execution grants.
 type ReservationSnapshot struct {
 	Version            int                       `json:"version"`
 	ObservedAt         time.Time                 `json:"observed_at"`
@@ -200,17 +203,18 @@ func (c *InMemoryCoordinator) Release(ctx context.Context, reservationID string,
 	if record.binding.Request.Owner != owner {
 		return ReservationStatus{}, ErrReservationOwner
 	}
-	if record.state == ReservationExpired {
-		return statusFromRecord(record), ErrReservationExpired
-	}
+	expired := record.state == ReservationExpired
 	if now.Before(record.binding.AcquiredAt.Add(-reservationClockSkew)) {
 		return ReservationStatus{}, ErrReservation
 	}
-	if record.state == ReservationActive {
+	if record.state == ReservationActive || expired {
 		record.release()
 		record.release = nil
 		record.state = ReservationReleased
 		record.updated = reservationUpdateTime(record.binding.AcquiredAt, now)
+	}
+	if expired {
+		return statusFromRecord(record), ErrReservationExpired
 	}
 	return statusFromRecord(record), nil
 }
@@ -243,11 +247,13 @@ func (c *InMemoryCoordinator) Snapshot(ctx context.Context, now time.Time) (Rese
 		switch record.state {
 		case ReservationReleased:
 			result.Released++
-		case ReservationExpired:
-			result.Expired++
-		case ReservationActive:
+		case ReservationExpired, ReservationActive:
 			request := record.binding.Request
-			result.Active++
+			if record.state == ReservationExpired {
+				result.Expired++
+			} else {
+				result.Active++
+			}
 			var ok bool
 			result.RAMBytes, ok = addReservationBytes(result.RAMBytes, request.RAMBytes)
 			if !ok {
@@ -287,8 +293,8 @@ func (c *InMemoryCoordinator) Snapshot(ctx context.Context, now time.Time) (Rese
 func (c *InMemoryCoordinator) expireLocked(now time.Time) {
 	for _, record := range c.records {
 		if record.state == ReservationActive && !now.Before(record.binding.ExpiresAt) {
-			record.release()
-			record.release = nil
+			// Retain the budget charge until the exact owner joins execution
+			// and releases it. Cancellation/expiry is not termination proof.
 			record.state = ReservationExpired
 			record.updated = now
 		}

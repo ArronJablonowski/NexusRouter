@@ -201,17 +201,15 @@ func setSettingsValue(root map[string]any, path []string, value any) {
 }
 
 func saveSettingsMenu(path string, original []byte, exists bool, draft map[string]any) (string, error) {
-	// A private exclusive lock prevents concurrent menu saves. Recheck bytes before
-	// replacement as web settings and external editors need not take this lock.
+	// Share the Web settings writer's lock through comparison and replacement.
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return "", fmt.Errorf("cannot create configuration directory")
 	}
-	lock, err := os.OpenFile(path+".menu.lock", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	unlock, err := config.LockProjectUpdate(path)
 	if err != nil {
 		return "", fmt.Errorf("cannot lock configuration; ensure its parent directory exists and no other editor is saving")
 	}
-	_ = lock.Close()
-	defer os.Remove(path + ".menu.lock")
+	defer unlock()
 	check := func() bool {
 		info, e := os.Lstat(path)
 		if !exists {

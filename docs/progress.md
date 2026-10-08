@@ -1,3 +1,9 @@
+## 2026-10-07 — Verified QA fixes for admission, settings and Web UI
+
+Validated five review findings with failing deterministic regressions before fixing them: expired live reservations lost their capacity fence; a disabled auxiliary classifier still ran; CLI and Web settings writers used different locks; remote controls retained evicted CSRF grants; and an older model-use refresh could overwrite a successful toggle. Both durable and in-memory reservations now retain capacity until owner cleanup (or proven stopped-owner recovery), classifiers respect model-use policy, built-in settings writers share the update lock, remote controls/events obtain fresh grants, and model-use reads are fenced against saves.
+
+Scoped race, provider stream, build, vet, embedded asset and real-Chrome checks passed. Two existing test fixtures were corrected without relaxing production safeguards or approval assertions: missing known-zero swap telemetry and a reload wait that could observe the previous document. See [validation evidence](validation/2026-10-07-qa-fixes.md) for commands, source state, initial failures and coverage limits. Linear requirements could not be refreshed because the connector required reauthentication; checked-in PRD and progress were used. No live router, model inference, deployment, service or configuration changes were performed. This is scoped verification, not a full `make check` or an MVP completion claim.
+
 ## 2026-10-02 — Spark review fixes: bounded live responses and configurable deadlines
 
 Muse's remote review of commit496458c identified that the live WebUI response limit was checked only after the entire body was buffered. Confirmed with a20MiB streaming fixture: baseline consumed21 stream reads; the fix cancels/aborts at the first byte-count overflow after9 reads. Both absent and misleading Content-Length are bounded by the streamed byte count. Existing authenticated CSS and draft-preservation behavior stays intact.

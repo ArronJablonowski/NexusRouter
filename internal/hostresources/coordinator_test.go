@@ -205,7 +205,7 @@ func TestExpiryBoundaryReuseAndClockRollback(t *testing.T) {
 		t.Fatalf("before expiry=%v", err)
 	}
 	at := request(t, "at", now.Add(time.Second))
-	if _, err := b.Acquire(context.Background(), snapshot(at.RequestedAt), at, at.RequestedAt); err != nil {
+	if _, err := b.Acquire(context.Background(), snapshot(at.RequestedAt), at, at.RequestedAt); !errors.Is(err, resources.ErrCapacity) {
 		t.Fatalf("at expiry=%v", err)
 	}
 	status, err := a.Status(context.Background(), r.ReservationID, at.RequestedAt)

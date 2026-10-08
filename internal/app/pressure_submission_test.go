@@ -18,6 +18,15 @@ func TestSubmissionPressureTimeoutAndCancellationBeforeDispatch(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			s, db, calls := recoveryFixture(t)
+			// This fixture models contention, not unknown swap telemetry. The
+			// loopback backend-managed admission requires a measured baseline.
+			profile := func(ctx context.Context) (resources.Snapshot, error) {
+				snapshot, err := healthProfile(ctx)
+				zero := uint64(0)
+				snapshot.SwapUsed = &zero
+				return snapshot, err
+			}
+			s.profile = profile
 			s.settings.Hardware.LocalPressurePolicy = "wait"
 			s.settings.Hardware.LocalQueueTimeout = "100ms"
 			if cancelSubmission {
@@ -34,7 +43,7 @@ func TestSubmissionPressureTimeoutAndCancellationBeforeDispatch(t *testing.T) {
 				case profiled <- struct{}{}:
 				default:
 				}
-				return healthProfile(ctx)
+				return profile(ctx)
 			}
 			claim := recoveryClaim(t, s, db)
 			d := &Dispatcher{db: db, renewInterval: 10 * time.Millisecond}

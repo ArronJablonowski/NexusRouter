@@ -19,6 +19,11 @@ var (
 	ErrConfigWrite    = errors.New("configuration update failed")
 )
 
+// LockProjectUpdate serializes built-in configuration writers across atomic
+// replacements. Hold the returned lock through comparison, rename and sync.
+// External editors that do not take this lock remain outside the protocol.
+func LockProjectUpdate(path string) (func(), error) { return lockProjectUpdate(path) }
+
 // ToolAccess is the deliberately small project-file surface exposed to the
 // local operator UI. It includes the adjacent specialist-locality policy but
 // is not a general-purpose configuration editor.

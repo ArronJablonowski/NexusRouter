@@ -443,7 +443,9 @@ func (c *Coordinator) admit(ctx context.Context, conn *sql.Conn, s resources.Sna
 		if readErr != nil {
 			return resources.ErrReservation
 		}
-		if old.request.HostScope != r.HostScope || old.state != "active" || !now.Before(old.expires) {
+		// Expiry revokes execution authority, not the outstanding capacity
+		// charge. A live or paused owner may still have a provider call in flight.
+		if old.request.HostScope != r.HostScope || old.state != "active" {
 			continue
 		}
 		if _, err = b.Reserve(s, resources.Need{BackendManagedRAM: old.request.BackendManagedRAM, RAM: old.request.RAMBytes, VRAM: old.request.VRAMBytes, Device: old.request.GPUDevice}, now); err != nil {
@@ -523,9 +525,7 @@ func (c *Coordinator) Release(ctx context.Context, id string, owner resources.Re
 	if row.processID != ref.ID || row.request.Owner != owner {
 		return resources.ReservationStatus{}, resources.ErrReservationOwner
 	}
-	if row.state == "active" && !now.Before(row.expires) {
-		return row.status(now), resources.ErrReservationExpired
-	}
+	expired := row.state == "active" && !now.Before(row.expires)
 	if row.state == "active" {
 		rev := row.revision + 1
 		result, e := tx.conn.ExecContext(ctx, "UPDATE reservations SET revision=?,state='released',terminal_at_ns=? WHERE id=? AND revision=? AND state='active'", rev, now.UnixNano(), id, row.revision)
@@ -542,6 +542,11 @@ func (c *Coordinator) Release(ctx context.Context, id string, owner resources.Re
 	}
 	if err = tx.commit(ctx); err != nil {
 		return resources.ReservationStatus{}, err
+	}
+	// The exact owner releases only after its execution returns. Preserve the
+	// expiry failure for its caller while durably removing the capacity charge.
+	if expired {
+		return row.status(now), resources.ErrReservationExpired
 	}
 	return row.status(now), nil
 }
@@ -593,11 +598,15 @@ func (c *Coordinator) Snapshot(ctx context.Context, now time.Time) (resources.Re
 			out.Released++
 			continue
 		}
-		if state == "recovered" || now.UnixNano() >= exp {
+		if state == "recovered" {
 			out.Expired++
 			continue
 		}
-		out.Active++
+		if now.UnixNano() >= exp {
+			out.Expired++
+		} else {
+			out.Active++
+		}
 		var ok bool
 		if out.RAMBytes, ok = add(out.RAMBytes, r.RAMBytes); !ok {
 			rows.Close()
