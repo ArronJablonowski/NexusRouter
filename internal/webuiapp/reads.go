@@ -15,6 +15,7 @@ import (
 )
 
 type ReadServices struct {
+	ChatPreference  func(context.Context, string) (sessions.ChatPreference, error)
 	JobTasks        func(context.Context, sessions.TaskListOptions) (sessions.TaskPage, error)
 	Submissions     func(context.Context, submissions.ListOptions) (submissions.Page, error)
 	Tasks           func(context.Context, sessions.TaskListOptions) (sessions.TaskPage, error)

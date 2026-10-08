@@ -50,9 +50,10 @@ window.NexusLive = (() => {
     const response=await request(base+"/api/v1/chats?limit=25",{credentials:"same-origin",cache:"no-store"});if(!response.ok)throw Error();const page=await response.json();if(page.version!==1||!Array.isArray(page.items)||page.items.length>25)throw Error();
     for(const item of [...page.items].reverse()){
      const button=Array.from(list.querySelectorAll("button[data-chat-id]")).find(n=>n.dataset.chatId===item.chat_id);
-     if(button){const label=button.querySelector(".chat-meta span");if(label)label.textContent=stateLabel(item.state);}
+     if(button){renderChat(item);}
      else if(total()<max&&renderChat(item)){added();list.prepend(list.lastElementChild);}
     }
+    if(window.NexusChatDescriptions)window.NexusChatDescriptions.order(list,page.items.map(item=>item.chat_id));
     done();
    }catch{return false;}finally{busy(false);}
   });

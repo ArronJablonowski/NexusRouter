@@ -337,7 +337,6 @@
 			setBusy(true);
 		});
 	}
-	function formatTime(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString(); }
 	function stateLabel(value) { return typeof value === "string" && value ? value.replaceAll("_", " ") : "unknown"; }
 	const chatDescription = id => window.NexusChatDescriptions.get(id);
 	function renderChat(item) {
@@ -349,14 +348,17 @@
 		button.dataset.chatId = item.chat_id;
 		button.setAttribute("aria-current", item.chat_id === selectedChat ? "true" : "false");
 		window.NexusChatDescriptions.decorate(button, item);
-		if (item.chat_id === selectedChat) setTaskState(item.state);
+		if (item.chat_id === selectedChat) {setTaskState(item.state);chatDescription(item.chat_id).then(text=>{if(selectedChat===item.chat_id)title.textContent=text;});}
 		button.dataset.state = item.state;
 		if (!existing) button.addEventListener("click", () => selectChat(item.chat_id, button.dataset.state));
-		row.append(button);
-		list.append(row);
+		if(!existing)row.append(button);
+ window.NexusChatDescriptions.actions(row,item);
+ if(!existing)list.append(row);
 		return true;
 	}
-	function loadChats(after, reset = false) {
+	let reloadChats=false;
+ function loadChats(after, reset = false) {
+ if(loadingPage&&reset){reloadChats=true;return;}
 		if (loadingPage || !reset && chatTotal >= maxChats) return;
 		loadingPage = true;
 		loadMore.disabled = true;
@@ -370,17 +372,20 @@
 			let added = 0;
 			for (const item of page.items.slice(0, maxChats - chatTotal)) if (renderChat(item)) added++;
 			chatTotal += added;
-			list.scrollTop = oldScroll;
+			window.NexusChatDescriptions.order(list,page.items.map(item=>item.chat_id));
+ list.scrollTop = oldScroll;
 			nextCursor = page.has_more && typeof page.next_cursor === "string" && chatTotal < maxChats ? page.next_cursor : "";
 			chatCount.textContent = String(chatTotal);
 			listState.hidden = chatTotal > 0;
 			if (chatTotal === 0) showNotice(listState, "No chats yet.", false);
 			loadMore.hidden = !nextCursor;
 		}).catch(() => {
-			showNotice(listState, chatTotal ? "Could not load more chats." : "Chats could not be loaded.", true);
+			showNotice(listState, chatTotal ? "Could not load more chats. Refreshing the list…" : "Chats could not be loaded.", true);
+ if(after)reloadChats=true;
 		}).finally(() => {
 			loadingPage = false;
 			loadMore.disabled = false;
+ if(reloadChats){reloadChats=false;loadChats("",true);}
 		});
 	}
 	function messageText(message) { return !message || typeof message !== "object" ? "" : boundedText(message.text); }
@@ -393,7 +398,6 @@
 	function appendMessage(message) {
 		if (transcript.children.length < maxMessages) window.NexusChatRender.messages(transcript, [message], false);
 	}
-
 	function applyHistoryPage(body, reset) {
 		if (!body || body.version !== 1 || body.chat_id !== selectedChat || typeof body.task_id !== "string" || !body.task_id || !Array.isArray(body.messages) || body.messages.length > historyPageLimit ||
 			!Number.isSafeInteger(body.head_revision) || body.head_revision < 1 || typeof body.has_more !== "boolean" ||
@@ -959,7 +963,8 @@
 			first.focus();
 		}
 	});
-	loadMore.addEventListener("click", () => loadChats(nextCursor));
+	window.addEventListener("nexus-chat-preference",event=>{if(selectedChat===event.detail.id)chatDescription(selectedChat).then(text=>{if(selectedChat===event.detail.id)title.textContent=text;});loadChats("",true);});
+ loadMore.addEventListener("click", () => loadChats(nextCursor));
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
 	const relativePath = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
@@ -972,7 +977,7 @@
 	if (!dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
 	document.querySelector("#chat-view").hidden = false;
 	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
- window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage,busy:value=>{loadingPage=value;},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
+ window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage&&!window.NexusChatDescriptions.busy(),busy:value=>{loadingPage=value;if(!value&&reloadChats){reloadChats=false;loadChats("",true);}},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{window.NexusChatDescriptions.order(list);chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
 		body: JSON.stringify({version: 1}), cache: "no-store"

@@ -12,12 +12,15 @@ const MaxChatPageBytes = 1 << 20
 var presentationIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 
 type ChatSummary struct {
-	Version      int       `json:"version"`
-	ChatID       string    `json:"chat_id"`
-	LatestTaskID string    `json:"latest_task_id"`
-	State        string    `json:"state"`
-	Revision     int64     `json:"revision"`
-	StartedAt    time.Time `json:"started_at"`
+	Title              string    `json:"title,omitempty"`
+	Pinned             bool      `json:"pinned,omitempty"`
+	PreferenceRevision int64     `json:"preference_revision,omitempty"`
+	Version            int       `json:"version"`
+	ChatID             string    `json:"chat_id"`
+	LatestTaskID       string    `json:"latest_task_id"`
+	State              string    `json:"state"`
+	Revision           int64     `json:"revision"`
+	StartedAt          time.Time `json:"started_at"`
 }
 
 type ChatPage struct {
@@ -33,13 +36,15 @@ type ChatListOptions struct {
 }
 
 type ChatListCursor struct {
-	Version   int   `json:"version"`
-	Last      int64 `json:"last"`
-	HighWater int64 `json:"high_water"`
+	LastPinned  bool   `json:"last_pinned,omitempty"`
+	OrderDigest string `json:"order_digest,omitempty"`
+	Version     int    `json:"version"`
+	Last        int64  `json:"last"`
+	HighWater   int64  `json:"high_water"`
 }
 
 func EncodeChatListCursor(cursor ChatListCursor) (string, error) {
-	if cursor.Version != 1 || cursor.Last < 1 || cursor.HighWater < cursor.Last {
+	if (cursor.OrderDigest != "" && len(cursor.OrderDigest) != 64) || cursor.Version != 1 || cursor.Last < 1 || cursor.HighWater < cursor.Last {
 		return "", ErrTaskList
 	}
 	body, err := json.Marshal(cursor)
@@ -78,7 +83,7 @@ func (options ChatListOptions) Validate() error {
 }
 
 func (summary ChatSummary) Validate() error {
-	if summary.Version != 1 || !presentationIDPattern.MatchString(summary.ChatID) || !presentationIDPattern.MatchString(summary.LatestTaskID) || !ValidTaskState(summary.State) || summary.Revision < 1 || summary.Revision > MaxTaskEvents || summary.StartedAt.IsZero() {
+	if !ValidChatTitle(summary.Title) || summary.PreferenceRevision < 0 || summary.PreferenceRevision > 9007199254740991 || summary.Version != 1 || !presentationIDPattern.MatchString(summary.ChatID) || !presentationIDPattern.MatchString(summary.LatestTaskID) || !ValidTaskState(summary.State) || summary.Revision < 1 || summary.Revision > MaxTaskEvents || summary.StartedAt.IsZero() {
 		return ErrTaskList
 	}
 	return nil

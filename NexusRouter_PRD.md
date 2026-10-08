@@ -433,6 +433,13 @@ tokens, or authoritative task state. Fully local mode vendors all UI assets and
 applies the same zero-egress transport policy; no CDN, font, analytics, or
 service-worker escape is permitted.
 
+Chat titles expose a three-dot menu with Rename and Pin/Unpin. Custom names and
+pins are durable per-instance preferences shared across authenticated browsers.
+Pinned chats remain at the top across pagination and refresh, with newest-first
+ordering within each group. Renaming updates the list and conversation heading;
+concurrent edits must report a conflict without discarding the user's draft.
+These presentation changes do not alter task history or authorize execution.
+
 The accepted implementation boundary, operation map, streaming semantics,
 workboard state ownership, and concrete browser controls are recorded in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md). Its versioned Go types,

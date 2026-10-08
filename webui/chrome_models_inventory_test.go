@@ -31,7 +31,17 @@ func TestChromeModelInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 	var requests atomic.Int32
+	var stage atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if strings.HasPrefix(request.URL.Path, "/fixture/models-stage/") {
+			value, err := strconv.Atoi(strings.TrimPrefix(request.URL.Path, "/fixture/models-stage/"))
+			if err != nil || value < 0 || value > 3 {
+				http.Error(writer, "invalid fixture stage", 400)
+				return
+			}
+			stage.Store(int32(value))
+			return
+		}
 		if request.URL.Path != "/app/api/v1/models" {
 			shell.ServeHTTP(writer, request)
 			return
@@ -41,12 +51,14 @@ func TestChromeModelInventory(t *testing.T) {
 			return
 		}
 		writer.Header().Set("Content-Type", "application/json")
-		switch requests.Add(1) {
-		case 1:
+		requests.Add(1)
+		// Automatic refreshes must not advance the fixture past the stage being asserted.
+		switch stage.Load() {
+		case 0:
 			_, _ = writer.Write([]byte(chromeModelsPopulatedFixture))
-		case 2:
+		case 1:
 			http.Error(writer, "private upstream failure", http.StatusServiceUnavailable)
-		case 3:
+		case 2:
 			_, _ = writer.Write([]byte(chromeModelsRecoveredFixture))
 		default:
 			_, _ = writer.Write([]byte(chromeModelsEmptyFixture))
@@ -94,12 +106,15 @@ const initial = await evaluate('({total:document.querySelector("#local-model-tot
 if (!initial.total.includes('3') || !initial.detail.includes('Partial logical total.') || !initial.detail.includes('ollama-backup') || !initial.detail.includes('1 model size is unknown') || !initial.overflow || initial.expanded !== 'false') throw new Error('partial or narrow presentation is incorrect: ' + JSON.stringify(initial));
 await evaluate('document.querySelector("#local-model-list .model-card-toggle").click()');
 await eventually('document.querySelector("#local-model-list .model-card-toggle").getAttribute("aria-expanded") === "true" && !document.querySelector("#local-model-list .model-details").hidden && document.querySelector("#local-model-list .model-details").textContent.includes("Health checked")', 'compact model card did not disclose details');
+await evaluate('fetch("/fixture/models-stage/1")');
 await evaluate('document.querySelector("#refresh-models").click()');
 await eventually('document.querySelector("#models-live-status").textContent.includes("Showing the last verified snapshot")', 'failed refresh did not preserve and label the verified snapshot');
 const stale = await evaluate('({locals:document.querySelectorAll("#local-model-list .model-card").length,clouds:document.querySelectorAll("#cloud-model-list .model-card").length,private:document.body.textContent.includes("private upstream failure")})');
 if (stale.locals !== 2 || stale.clouds !== 1 || stale.private) throw new Error('failed refresh lost data or leaked provider failure: ' + JSON.stringify(stale));
+await evaluate('fetch("/fixture/models-stage/2")');
 await evaluate('document.querySelector("#refresh-models").click()');
 await eventually('document.querySelectorAll("#local-model-list .model-card").length === 1 && document.querySelectorAll("#cloud-model-list .model-card").length === 0 && document.querySelector("#local-model-total-detail").textContent.includes("Complete provider-reported logical total.") && !document.querySelector("#models-live-status").classList.contains("error")', 'inventory did not recover from a transient failure');
+await evaluate('fetch("/fixture/models-stage/3")');
 await evaluate('document.querySelector("#refresh-models").click()');
 await eventually('document.querySelectorAll(".model-card").length === 0 && document.querySelector("#local-model-state").textContent.includes("No local models") && document.querySelector("#cloud-model-state").textContent.includes("No cloud models")', 'empty inventory state did not render');
 socket.close();

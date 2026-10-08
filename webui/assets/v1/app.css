@@ -563,3 +563,16 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .model-card-with-switch > details > summary { padding:.6rem .7rem; overflow-wrap:anywhere; }
 
 .commander-choice { grid-column:1 / -1; margin:.4rem .7rem; justify-self:start; }
+
+.chat-row { display: grid; grid-template-columns: minmax(0,1fr) 2.5rem; position: relative; align-items: start; }
+.chat-row > button { min-width: 0; }
+.chat-actions { position: relative; padding-top: .45rem; }
+.chat-list .chat-more { padding: .35rem; text-align: center; font-size: 1.4rem; line-height: 1.2; min-height: 2.5rem; }
+.chat-action-menu { position: absolute; right: 0; top: 100%; z-index: 5; width: 9rem; padding: .3rem; border: 1px solid #66799b; border-radius: .65rem; background: #17223a; box-shadow: 0 .5rem 1rem #0006; }
+.chat-action-feedback { grid-column: 1 / -1; color: #ffb6b6; font-size: .8rem; overflow-wrap: anywhere; }
+.chat-action-feedback:empty { display: none; }
+.chat-rename-dialog { width: min(28rem,calc(100vw - 2rem)); color: #e8edf8; background: #17223a; border: 1px solid #66799b; border-radius: 1rem; padding: 1.5rem; }
+.chat-rename-dialog::backdrop { background: #0009; }
+.chat-rename-dialog label { display: block; margin-bottom: .5rem; }
+.chat-rename-buttons { display: flex; justify-content: flex-end; gap: .75rem; }
+.chat-rename-buttons button { padding: .6rem 1rem; border-radius: .5rem; }

@@ -35,6 +35,31 @@ Do not expose this HTTP listener through a non-loopback bind or an unreviewed
 reverse proxy. TLS termination, forwarded hosts, and remote-browser deployment
 are not supported by the stock daemon.
 
+## Rename and pin chats
+
+Use the three-dot button beside a chat title to choose **Rename** or **Pin**.
+Pinned chats appear before unpinned chats, including older chats outside the first
+page. Choose **Unpin** to return a chat to its normal recency position. Within
+each group, the existing newest-first ordering is preserved. A renamed chat uses
+its saved name in both the list and conversation heading.
+
+Names and pins are shared by authenticated browsers connected to this daemon
+and survive refresh/restart. Renaming accepts a nonempty name of up to 100
+characters. If another browser changes the same chat while a rename is open,
+the save reports a conflict and preserves the draft. Close the dialog and refresh
+before applying it again. Failed or uncertain writes are never automatically
+replayed. Keyboard users can open the menu with Enter/Space, use arrow keys to
+move between actions, and press Escape to return focus to the three-dot button.
+
+Include `<telemetry.database>.chat-preferences.json` in backups/restores alongside
+the task database. This private file contains the custom titles, pins and edit
+revisions; it does not change task history or execution state. Writes use a
+shared file lock and atomic replacement with file/directory sync. The file is
+bounded to 1 MiB and 1,000 customized chats; missing files mean default names and
+no pins, while corrupt files fail closed. This feature requires the updated
+daemon and a newly loaded Web UI document; replacing CSS alone does not load
+new JavaScript.
+
 ## Authorize a browser
 
 An unauthenticated browser receives a short-lived one-time challenge and shows

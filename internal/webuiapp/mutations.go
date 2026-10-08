@@ -18,11 +18,13 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 type MutationServices struct {
+	ChatPreference  func(context.Context, sessions.ChatPreferenceUpdate) (sessions.ChatPreference, error)
 	ModelUse        func(context.Context, string, string, *bool) (any, error)
 	Chat            func(context.Context, string, contract.ChatRequest) (contract.ChatMutationReceipt, error)
 	Cancel          func(context.Context, string, contract.ChatRequest) (contract.CancellationReceipt, error)
@@ -43,6 +45,12 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 	base := h.basePath + "/api/v1"
 	path := request.URL.Path
 	switch {
+	case strings.HasPrefix(path, base+"/chat-preferences/"):
+		h.readChatPreference(writer, request, strings.TrimPrefix(path, base+"/chat-preferences/"))
+		return true
+	case path == base+"/chat-preferences":
+		h.serveChatPreference(writer, request)
+		return true
 	case path == base+"/model-use":
 		h.serveModelUse(writer, request)
 		return true

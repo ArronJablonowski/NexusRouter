@@ -350,7 +350,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		if s.WebUI.RemoteDiscoveryInterface != "" {
 			remoteDiscoverer = webuiapp.InterfaceRemoteDiscoverer{Interface: s.WebUI.RemoteDiscoveryInterface}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{ChatPreference: service.ChatPreference,
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
@@ -383,7 +383,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				}
 				return config.UpdateModelUse(s.Telemetry.Database, host, model, *enabled)
 			},
-		}, Reads: webuiapp.ReadServices{
+		}, Reads: webuiapp.ReadServices{ChatPreference: service.ReadChatPreference,
 			JobTasks: service.ListJobTasks, Submissions: service.ListSubmissions, Tasks: service.ListTasks, Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
 				return db.ReadCommittedEventPage(ctx, options)
