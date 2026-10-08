@@ -59,7 +59,7 @@ Usage:
   nexus approvals show --db path --task id --id approval-id
   nexus approvals execution --db path --task id --id approval-id
   nexus approval-decision --config path < decision.json
-  nexus web approve --config path CHALLENGE_ID.DISPLAY_CODE
+  nexus web approve [--config path] [--service label] CHALLENGE_ID.DISPLAY_CODE
   nexus serve --config path  Run the authenticated loopback HTTP service
   nexus daemon start|status|stop --config path  Control an authenticated local daemon
   nexus memory list|show|put|delete --config path

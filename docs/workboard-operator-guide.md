@@ -45,6 +45,33 @@ the same host, copy the complete value into:
 go run ./cmd/nexus web approve --config examples/local.yaml CHALLENGE_ID.DISPLAY_CODE
 ```
 
+For an installed macOS service, the browser's `nexus web approve CODE`
+command discovers the current user's running `com.nexusrouter.*` (or legacy
+`com.darwinrouter.*`) service executing `nexus serve`. It uses that service's
+actual configuration path, configuration environment overrides and API token,
+including custom paths and paths containing spaces. It does not start or restart
+services. If several daemons are running, select one explicitly with
+`nexus web approve --service com.nexusrouter.commander CODE`, or `--config`.
+Service discovery does not inspect archives or task databases and never prints
+the token or raw service environment.
+
+On every platform, `--config` overrides `NEXUS_CONFIG` (legacy `DARWIN_CONFIG`
+is also accepted). With an explicit configuration and `NEXUS_API_TOKEN` in the
+trusted terminal environment, no service discovery is needed. Linux/systemd and
+other service managers require that explicit environment setup; automatic
+credential retrieval is currently macOS-only. Without an explicit path or a
+running macOS match, approval checks the standard `~/.NexusRouter/config`
+configuration files, the OS user configuration directories for `nexusrouter`
+and `darwinrouter`, and legacy `live-test` locations. Multiple eligible files
+require explicit selection. An invalid explicit configuration never falls back
+to another daemon. Example for a custom installation:
+
+```sh
+export NEXUS_CONFIG="/absolute/private/location/router.yaml"
+# Supply NEXUS_API_TOKEN through your trusted secret-management setup.
+nexus web approve CHALLENGE_ID.DISPLAY_CODE
+```
+
 Verify the browser and terminal display the same value before approving. The
 command uses `NEXUS_API_TOKEN` to contact the loopback daemon; the token never
 enters the browser. A successful challenge creates an HttpOnly,
