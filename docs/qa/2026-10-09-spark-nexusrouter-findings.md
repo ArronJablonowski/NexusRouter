@@ -111,3 +111,9 @@ Recovery output proposed three claims, none verified after tracing pinned source
 - UTF-8 truncation claim lacks a reachable oversized input: `approvals/approval.go:73` limits the admitted scope to 256 UTF-8 bytes, while `webui/mutations.go:9` sets the summary limit to 4096. Ordinary scope alone cannot hit the claimed cutoff. Secret-redaction expansion may alter lengths; no admitted expansion reproducer establishing invalid UTF-8 has been supplied. This is not accepted as the model's claimed confirmed defect. Do not apply its suggested truncation snippet without independent verification.
 
 qwen batch 13 and Laguna batch 14 also reported no verified defects with caller/implementation gaps. Temperature sample: GPU 81°C; hottest thermal zone 89.6°C. Retained sampled peaks 85°C / 93.3°C. Code/source inspection only; no tests run or product fixes. Raw model report and recovered request metadata remain in the private campaign workspace; dispositions copied here for later review.
+
+## Workflow checkpoint — 2026-10-09 19:58 UTC
+
+19/634 unique primary batches succeeded. qwen batch 19 failed with terminal empty_output (campaign status and complete event page checked); original receipt retained and one same-model recovery queued after active Laguna batch 20. The earlier batch 10 recovery succeeded. Future task prompts explicitly require nonempty final reports, without changing provider/model settings or safeguards. Worker restarted safely; Python helper syntax check passed. No task with uncertain delivery was replayed, and active Laguna was not canceled.
+
+Latest completed Muse/Laguna batches 18–19 in the user-facing ordinal sequence reported NO_VERIFIED_BUGS with absent implementation/caller context. No new candidate or verified defect. Cross-reviews not started. Current sample: GPU 69°C, hottest thermal zone 76.4°C; sampled peaks 85°C / 93.3°C. Documentation diff checks only; no product source or service changes.

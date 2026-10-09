@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA second empty-output recovery
+
+19/634 successful unique primary batches. qwen batch 19 has confirmed terminal empty_output; one same-model recovery queued after active Laguna batch 20, preserving the failed receipt. Previous recovery succeeded. Strengthened future final-report instructions and safely restarted the worker, with helper syntax validation. [Workflow evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records pending recovery and coverage. No new verified defect or product/provider/service/config change; documentation diff checks passed.
+
 ## 2026-10-09 — Spark QA recovery succeeded
 
 qwen's one recovery attempt succeeded; original empty-output receipt retained. Unique successful coverage 15/634, Muse batch 15 running. New recovery claims are unverified: zero feedback revision is rejected at contract admission, follow-up query is explicitly newest-first, and the truncation claim omits the 256-byte input bound versus 4096-byte summary cap. [Recovery/candidate evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records redaction-expansion uncertainty and missing reproducer. No verified defect or product change; worker healthy. Documentation diff checks only.
