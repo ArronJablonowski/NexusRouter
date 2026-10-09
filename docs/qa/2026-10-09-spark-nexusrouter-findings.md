@@ -123,3 +123,7 @@ Latest completed Muse/Laguna batches 18–19 in the user-facing ordinal sequence
 Claimed double cleanup in configured evaluator is rejected by omitted helper context: `internal/app/resource_reservation.go:184` returns a closure guarded by sync.Once (line 188), caching its release error. Manual and deferred invocations of the reassigned closure do not execute close/release twice. Removing the explicit call would also remove its immediate cleanup-error check. No confirmed defect; no test or product change.
 
 Successful unique primary coverage 21/634. Laguna batch 20 reported no verified bug with missing implementation context. qwen's single recovery of batch 19 is still running; no new primary failures. Worker healthy; cross-reviews not started. Sampled GPU 79°C / hottest zone 86.5°C; retained sampled peaks 85°C / 93.3°C.
+
+## Second recovery completed — 2026-10-09 20:18 UTC
+
+qwen's single recovery of batch 19 succeeded with a nonempty report: NO_VERIFIED_BUGS for skill generation/protocol/redaction source and tests, with explicit missing caller/helper coverage. Both empty-output gaps now have successful same-model recovery reports; original failed receipts remain preserved. Unique successful primary coverage 22/634; qwen batch 22 running, worker alive, cross-reviews not started. No new failures, candidate or verified defect. GPU 78°C / hottest thermal zone 86.2°C now; sampled peaks remain 85°C / 93.3°C. No product/source/service/configuration change or test execution; documentation diff checks only.

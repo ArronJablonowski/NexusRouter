@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA both recovery gaps covered
+
+Both terminal empty-output requests now have successful same-model recovery reports, with original receipts retained. Unique successful primary coverage 22/634; qwen batch 22 running. No new actionable candidate/verified defect, failure or product change. [Recovery checkpoint](qa/2026-10-09-spark-nexusrouter-findings.md) records scope and missing callers; documentation diff checks only.
+
 ## 2026-10-09 — Spark QA cleanup candidate rejected
 
 21/634 unique primary batches succeeded; qwen recovery for batch 19 running. Muse batch 21's double-cleanup claim is contradicted by the sync.Once helper in pinned resource_reservation.go. No new confirmed defect or product change. [Disposition](qa/2026-10-09-spark-nexusrouter-findings.md) saved with active recovery and temperature evidence. Documentation diff checks only.
