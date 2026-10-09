@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA empty-output recovery scheduled
+
+qwen batch 10 failed terminally with empty_output, confirmed through campaign status/events. Original receipt retained; one new same-model recovery attempt scheduled after active Muse batch 12. Worker safely restarted with recovery priority; helper syntax checked. Primary successful coverage 11/634; failure is not counted as reviewed. No replay of uncertain delivery, product/model/service/configuration change or new verified defect. [Recovery evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records remaining gaps. Documentation diff checks passed.
+
 ## 2026-10-09 — Spark QA nine-batch checkpoint
 
 Primary coverage 9/634; Muse batch 9 running. Three new Muse batch 6 claims were rejected/unsupported after reading the omitted caller context: unknown-profile capacity denial is tested policy, configuration appends use cloned local slices, and executionCtx is initialized before selection. No new confirmed bugs; the earlier redaction hypothesis remains unverified. qwen/Laguna batches 7–8 reported no verified defects. [Triage evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved; documentation diff checks only, with no source/configuration/service changes.

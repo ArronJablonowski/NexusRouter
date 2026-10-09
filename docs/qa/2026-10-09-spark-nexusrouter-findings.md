@@ -81,3 +81,9 @@ Three new model claims are not supported by the full pinned caller context (`7d4
 - **Nil recursive execution context:** rejected. `internal/app/auto.go:428` initializes executionCtx from the incoming ctx, before candidate selection/reservation. The slice sent to Muse omitted this line. No nil-context trigger is demonstrated.
 
 No tests were run and no product code changed. Claims remain in raw model output for the later second-model cross-review; zero newly verified defects. qwen batch 7 and Laguna batch 8 reported NO_VERIFIED_BUGS with missing implementation/caller gaps. Primary coverage is 9/634; Muse batch 9 is running. Cross-reviews have not started. Worker healthy, no new failures. Spark sample: GPU 81°C; hottest thermal zone 89.3°C. Retained sampled peaks: 85°C GPU / 93.3°C thermal zone.
+
+## Workflow recovery — 2026-10-09 19:18 UTC
+
+Primary coverage: 11/634 succeeded, one primary failure (qwen batch 10), Muse batch 12 running. Laguna batch 11 reported no verified bugs. Campaign-owned NexusRouter status and complete event page confirm qwen batch 10 terminated with `empty_output` after a completed turn; this is not uncertain delivery. Retained original receipt; queued one new same-model recovery task for the same input, asking explicitly for a nonempty final report. The worker will run it after the active Muse task and before subsequent primary work. No automatic model fallback, configuration change or task cancellation. Failed coverage is not counted as reviewed; recovery outcome remains pending.
+
+Worker was safely restarted with a priority for the recovery job, and Python syntax validation passed. Current GPU 81°C / hottest thermal zone 89.3°C; retained sampled peaks 85°C / 93.3°C. No new bug candidate or verified defect at this check. Source remains pinned at `7d4b7aac`; documentation-only diff validation.
