@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA recovery succeeded
+
+qwen's one recovery attempt succeeded; original empty-output receipt retained. Unique successful coverage 15/634, Muse batch 15 running. New recovery claims are unverified: zero feedback revision is rejected at contract admission, follow-up query is explicitly newest-first, and the truncation claim omits the 256-byte input bound versus 4096-byte summary cap. [Recovery/candidate evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records redaction-expansion uncertainty and missing reproducer. No verified defect or product change; worker healthy. Documentation diff checks only.
+
 ## 2026-10-09 — Spark QA recovery running and preview triage
 
 Successful primary coverage 12/634; qwen's one same-model recovery of batch 10 is running. Muse batch 12 raised five preview candidates: duplicate-provider contamination and shared-policy mutation are contradicted by pinned validation/value semantics; three availability claims remain unverified hypotheses. No confirmed defect. [Candidate dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) preserve boundaries and cross-review gaps. Worker healthy; no new primary failure. Documentation diff checks only.

@@ -99,3 +99,15 @@ Five model candidates, no confirmed defect. Read only the pinned source (`7d4b7a
 - MaxInspectionModels overflow: unverified bounded-inventory availability hypothesis. The preview rejects an oversized projection; no admitted deployment exceeding the cap was reproduced. Truncation and visibility semantics need requirements/evidence before calling this a defect.
 
 The original candidate report remains in live Markdown for later second-model cross-review. Primary successful coverage: 12/634. qwen's single recovery of failed batch 10 is running; original failed receipt retained. No new primary failure. Worker healthy. Current sample: GPU 79°C; hottest thermal zone 86.1°C; sampled peaks 85°C / 93.3°C.
+
+## qwen batch 10 recovery completed — 2026-10-09 19:38 UTC
+
+The one same-model recovery completed successfully. Original failed receipt is retained as history; unique successful primary coverage is now 15/634, including recovered batch 10. Muse batch 15 running; no new failure or service/configuration change. Cross-reviews not started.
+
+Recovery output proposed three claims, none verified after tracing pinned source:
+
+- Zero-revision feedback panic is rejected before indexing: `webui/contract.go:160` requires revise ExpectedRevision >=1; `internal/app/browser_mutations.go:248` invokes validation before opening the mutation. The zero-revision contract fixture is also present in `webui/contract_test.go`.
+- Follow-up oldest-task assumption is false: `internal/telemetry/session_tasks.go:46` explicitly orders rowid DESC, so Limit 1 returns newest, matching `internal/app/browser_mutations.go:112`.
+- UTF-8 truncation claim lacks a reachable oversized input: `approvals/approval.go:73` limits the admitted scope to 256 UTF-8 bytes, while `webui/mutations.go:9` sets the summary limit to 4096. Ordinary scope alone cannot hit the claimed cutoff. Secret-redaction expansion may alter lengths; no admitted expansion reproducer establishing invalid UTF-8 has been supplied. This is not accepted as the model's claimed confirmed defect. Do not apply its suggested truncation snippet without independent verification.
+
+qwen batch 13 and Laguna batch 14 also reported no verified defects with caller/implementation gaps. Temperature sample: GPU 81°C; hottest thermal zone 89.6°C. Retained sampled peaks 85°C / 93.3°C. Code/source inspection only; no tests run or product fixes. Raw model report and recovered request metadata remain in the private campaign workspace; dispositions copied here for later review.
