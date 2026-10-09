@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA cleanup candidate rejected
+
+21/634 unique primary batches succeeded; qwen recovery for batch 19 running. Muse batch 21's double-cleanup claim is contradicted by the sync.Once helper in pinned resource_reservation.go. No new confirmed defect or product change. [Disposition](qa/2026-10-09-spark-nexusrouter-findings.md) saved with active recovery and temperature evidence. Documentation diff checks only.
+
 ## 2026-10-09 — Spark QA second empty-output recovery
 
 19/634 successful unique primary batches. qwen batch 19 has confirmed terminal empty_output; one same-model recovery queued after active Laguna batch 20, preserving the failed receipt. Previous recovery succeeded. Strengthened future final-report instructions and safely restarted the worker, with helper syntax validation. [Workflow evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records pending recovery and coverage. No new verified defect or product/provider/service/config change; documentation diff checks passed.

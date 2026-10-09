@@ -117,3 +117,9 @@ qwen batch 13 and Laguna batch 14 also reported no verified defects with caller/
 19/634 unique primary batches succeeded. qwen batch 19 failed with terminal empty_output (campaign status and complete event page checked); original receipt retained and one same-model recovery queued after active Laguna batch 20. The earlier batch 10 recovery succeeded. Future task prompts explicitly require nonempty final reports, without changing provider/model settings or safeguards. Worker restarted safely; Python helper syntax check passed. No task with uncertain delivery was replayed, and active Laguna was not canceled.
 
 Latest completed Muse/Laguna batches 18–19 in the user-facing ordinal sequence reported NO_VERIFIED_BUGS with absent implementation/caller context. No new candidate or verified defect. Cross-reviews not started. Current sample: GPU 69°C, hottest thermal zone 76.4°C; sampled peaks 85°C / 93.3°C. Documentation diff checks only; no product source or service changes.
+
+## Muse batch 21 triage — 2026-10-09 20:08 UTC
+
+Claimed double cleanup in configured evaluator is rejected by omitted helper context: `internal/app/resource_reservation.go:184` returns a closure guarded by sync.Once (line 188), caching its release error. Manual and deferred invocations of the reassigned closure do not execute close/release twice. Removing the explicit call would also remove its immediate cleanup-error check. No confirmed defect; no test or product change.
+
+Successful unique primary coverage 21/634. Laguna batch 20 reported no verified bug with missing implementation context. qwen's single recovery of batch 19 is still running; no new primary failures. Worker healthy; cross-reviews not started. Sampled GPU 79°C / hottest zone 86.5°C; retained sampled peaks 85°C / 93.3°C.
