@@ -1,3 +1,7 @@
+## 2026-10-09 — Exact targeting deployed locally
+
+Deployed application source `cef3150a` to the existing local commander with a fresh consistent private backup and idle-boundary checks. Configuration was preserved. The new process reports ready; authenticated chat page, configured target catalogue and reviewed script bytes passed verification without inference. Collaboration remains enabled, central logging retained its process and the stopped local remote service remains stopped. Remote hosts were not deployed and need targeting-version-1 updates for exact remote model-name assignment. See [deployment receipt](validation/2026-10-09-exact-target-deployment.md). Reload existing browser tabs and renew approval if prompted. This is a local deployment with scoped validation, not full release/MVP qualification.
+
 ## 2026-10-09 — Exact host/model mentions
 
 Added two-stage host/model autocomplete and leading `@hostname/model-ID` assignments in new Web UI chats, including this host's configured models. The composer resolves unique names to stable IDs, displays the destination, strips the assignment from task text and preserves uncertainty/recovery controls. Local manual selections now persist a no-fallback flag; remote explicit tasks cannot activate a commander's default fallback. Updated remote SDK capability/name checking rejects a changed alias before admission. Private zero-cost remote policy, context limits and no history/file transfer remain explicit. README and [assignment guide](host-model-assignments.md) document the supported forms.
