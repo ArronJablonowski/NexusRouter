@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark policy/run-path candidates traced
+
+63/634 primary batches succeeded, Muse batch 63 active. Malformed-duration and nil-policy/race claims omit validation, nil-safe policy handling and locked/local state; remaining commit-acknowledgment claim is unverified without observable corruption or replay. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records dispositions. No new source-supported/reproduced defect or failure, cost reproduction pending. Worker healthy; documentation checks only.
+
 ## 2026-10-09 — Spark remote commander claim checked
 
 59/634 primary batches succeeded; Laguna batch 59 running. Empty-specialist panic claim is blocked by RemoteExecution.Validate before commander admission. [Pinned validator evidence](qa/2026-10-09-spark-nexusrouter-findings.md) recorded; no new confirmed defect, failure or product change. Cost-budget reproduction remains pending. Worker healthy; documentation diff checks only.
