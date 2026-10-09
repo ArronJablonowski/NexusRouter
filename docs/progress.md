@@ -1,3 +1,7 @@
+## 2026-10-09 — Local commander deployment
+
+Deployed source `d8a3007a` to the existing macOS commander after scoped checks, an idle-boundary recheck and a consistent private backup. Enabled model collaboration in its runtime configuration. The new process reports ready; authenticated collaboration page/API, reviewed script bytes and active settings were verified without inference. Historical unfinished records were preserved. Central logging kept its process; the already stopped local remote host was not started. Remote systems were not deployed. See [deployment receipt](validation/2026-10-09-local-deployment.md) for backup/verification details and limits. Existing browser tabs need reload and renewed approval after restart. This is not signed-release or full-MVP qualification.
+
 ## 2026-10-09 — Persistent model collaboration
 
 Added an authenticated Model collaboration page and a private SQLite/WAL message journal. Opt-in task tools let configured models address a recipient or shared topic and read messages during later tasks, without starting recipients. A three-task fixture verifies idea, reply and read-back. Each message records host-issued hostname, harness/registration, runner, provider/model IDs and name, task/session, privacy and UTC timestamp. Serving runner metadata is distinct from the harness; compatible endpoints mark unknown upstreams explicitly or use configured provider `runner` metadata.
