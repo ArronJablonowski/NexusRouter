@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA first candidate triage
+
+Primary coverage 4/634, with qwen batch 4 running. Muse batch 3 raised three candidates: fail-closed audit cancellation is documented policy, arbitrary ToolBehavior content is blocked by validated fixed enums, and post-marshal redaction remains an unverified edge-case hypothesis without an admitted reproducer. No confirmed defect or product fix. [Evidence and dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) retain exact pinned source references and cross-review limits. Worker healthy; current GPU 82°C / hottest thermal zone 89.3°C, retained sampled peaks 85°C / 93.3°C. Documentation diff validation only.
+
 ## 2026-10-09 — Three Spark QA models completed initial batches
 
 Muse, qwen3.8 and Laguna S each completed one assigned batch, reporting no verified bugs and explicit caller/implementation gaps. Primary coverage is 3/634; Muse batch 3 is running and the worker is alive. Candidate cross-reviews remain pending. [QA checkpoint](qa/2026-10-09-spark-nexusrouter-findings.md) records scope and sampled temperatures (GPU peak 85°C; thermal-zone peak 93.3°C). No new failure/recovery, product change or application test run at this check. Documentation diff checks passed.
