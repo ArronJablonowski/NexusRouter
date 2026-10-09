@@ -8,10 +8,10 @@ Built in Go, with a CLI, an authenticated Web UI, an HTTP API, and an embeddable
 
 ## What it does
 
-- **Adaptive routing:** Select eligible models using task requirements, resource limits, privacy policy, and recorded quality evidence.
+- **Accuracy-first automatic routing:** Rank eligible models by evidence-supported task accuracy. Lower cost or latency cannot outweigh better accuracy; explicit model selections remain pinned. Task requirements, resource limits, privacy, and authorization still constrain eligibility.
 - **External harnesses:** Integrate Hermes Agent, OpenClaw, Pi Agent, Goose, and OpenHands. Model and harness versions are tracked together so feedback applies to the combination that produced the result.
 - **Secure remote execution:** Dispatch, inspect, and cancel tasks on trusted NexusRouter instances through HTTPS or SSH, with explicit pairing and scoped authorization.
-- **Web UI and Kanban:** Chat, inspect models and routing decisions, manage durable work, and review task evidence in an authenticated browser interface.
+- **Web UI and Kanban:** Chat, rename or pin chats from their three-dot menus, inspect models and routing decisions, manage durable work, and review task evidence in an authenticated browser interface. Saved names and pins survive refresh and daemon restart.
 - **Persistent history and learning:** Retain task events, feedback, scoped memory, and versioned skills in durable local storage.
 - **Controlled tools:** Apply explicit filesystem scope, network policy, resource admission, and approval requirements to supported operations.
 
@@ -59,7 +59,9 @@ printf '%s\n' 'Explain how a work queue works in three sentences.' | \
 ./bin/nexus chat --config examples/local.yaml --model auto
 ```
 
-`local-fast` is the configured model alias in the example. `auto` selects from eligible configured models.
+`local-fast` is the configured model alias in the example. `auto` selects from eligible configured models using recorded task-quality evidence, adjusted for confidence and recency. Unknown models retain a neutral prior; model names and sizes do not establish accuracy. Ordinary requests do not explore weaker alternatives. An explicit model choice, including a configured commander default, remains pinned under the existing explicit fallback rules.
+
+Configured-provider routing and paired-remote automatic dispatch currently use separate candidate pools. An ordinary chat does not yet compare every model on every paired host. See [accuracy-first routing](docs/accuracy-first-routing.md) for the implemented behavior and remaining integration work.
 
 ### 4. Open the Web UI
 
@@ -69,13 +71,26 @@ Set `NEXUS_API_TOKEN` to a securely generated secret of at least 32 characters, 
 ./bin/nexus serve --config examples/local.yaml
 ```
 
-With the example configuration, open **http://127.0.0.1:7788/app** and authenticate. The stock daemon listens on loopback. For remote execution, configure the separate trusted remote-routing service using the [secure remote routing guide](docs/secure-remote-routing.md).
+With the example configuration, open **http://127.0.0.1:7788/app**. Approve the browser's one-time challenge in a trusted terminal on the same host, with the daemon's `NEXUS_API_TOKEN` available in that terminal environment:
+
+```sh
+./bin/nexus web approve --config examples/local.yaml CHALLENGE_ID.DISPLAY_CODE
+```
+
+Replace `CHALLENGE_ID.DISPLAY_CODE` with the complete value shown in the browser. The API token stays in the trusted terminal/service environment and must never be pasted into the browser. Browser sessions expire and require a new approval after daemon restart.
+
+For an installed macOS service, `nexus web approve CHALLENGE_ID.DISPLAY_CODE` discovers the running user's service configuration and credential. If multiple services match, select one with `--service com.nexusrouter.commander` or provide its actual `--config` path. On Linux and other platforms, use an explicit configuration and token environment; automatic service credential retrieval is currently macOS-only. See [browser authorization](docs/workboard-operator-guide.md#authorize-a-browser) for custom installations.
+
+Use the three-dot menu beside a chat title to **Rename**, **Pin**, or **Unpin** it. Pinned chats stay above unpinned chats, with newest-first ordering within each group. Preferences are shared by authenticated browsers on the same daemon. Include `<telemetry.database>.chat-preferences.json` alongside the task database in backups; see [chat preferences](docs/workboard-operator-guide.md#rename-and-pin-chats).
+
+The stock daemon listens on loopback. For remote execution, configure the separate trusted remote-routing service using the [secure remote routing guide](docs/secure-remote-routing.md).
 
 ## Documentation
 
 | Start here | Guide |
 | --- | --- |
 | Browser chat, boards, settings, and operations | [Web UI and Workboard operator guide](docs/workboard-operator-guide.md) |
+| Accuracy-first selection and current cross-host limits | [Automatic routing](docs/accuracy-first-routing.md) |
 | Model and harness selection, feedback, and adapters | [External harness routing](docs/external-harness-routing.md) |
 | Pairing systems and using HTTPS or SSH | [Secure remote routing](docs/secure-remote-routing.md) |
 | Embed NexusRouter in a Go application | [Go SDK](sdk/v1/README.md) · [Compilable example](examples/sdk/main.go) |
@@ -93,6 +108,8 @@ make check
 
 This checks formatting, enforces the 1,000-line limit on handwritten Go files, runs `go vet` and race tests, and builds every package. Race tests require a supported platform toolchain, and the full suite can take substantial time. See [test-suite timing](docs/test-suite-timing.md).
 
+For routine changes, use the change-scoped validation in [AGENTS.md](AGENTS.md); a full `make check` is required for major releases, broad refactors, uncertain cross-system impact, or an explicit request for full validation. Documentation-only changes need diff review and `git diff --check`. Targeted checks do not establish a full-suite pass.
+
 Use `make fmt` to apply Go formatting and `make build` to build the CLI. Follow [AGENTS.md](AGENTS.md) for the project workflow.
 
 | Directory | Purpose |
@@ -108,7 +125,7 @@ Use `make fmt` to apply Go formatting and `make build` to build the CLI. Follow 
 
 NexusRouter is under active development. The repository includes working routing, harness, remote-execution, and Web UI implementations, but development test results do not establish production release readiness.
 
-The v1.0.1 release qualification remains in progress, including native-platform evidence, dependency-notice review, production signing, independent verification, and publication approval. General patch editing, delegated writes, and unattended write approvals also remain unfinished.
+The v1.0.1 release qualification remains in progress, including native-platform evidence, dependency-notice review, production signing, independent verification, and publication approval. General patch editing, delegated writes, unattended write approvals, and unified automatic selection across configured and paired-remote models also remain unfinished.
 
 See [implementation evidence](docs/progress.md) for specific completed work and remaining limitations, and the [Linear project](https://linear.app/nexusrouter/project/nexusrouter-mvp-fc9fe6d48fda) for the delivery backlog.
 

@@ -1,3 +1,9 @@
+## 2026-10-08 — README aligned with current routing and Web UI
+
+Reviewed the README against source commit `765f552c`, the checked-in PRD, current routing notes, browser approval discovery, chat preferences and the project workflow. Updated automatic-selection semantics and its separate candidate-pool limitation, terminal browser approval and platform-specific discovery, durable chat rename/pin behavior and backup guidance, and change-scoped validation. Release and cross-host integration gaps remain explicit. Linear could not be refreshed in the preceding requirements review because its connection required reauthentication; this update uses the checked-in requirements and source evidence.
+
+Documentation-only verification: reviewed the diff, checked README relative file links and guide anchors, and ran `git diff --check`. No application tests, live inference or service changes were needed or performed for this update; this is not a full-suite or release-qualification pass.
+
 ## 2026-10-08 — Accuracy-first scoring for automatic requests
 
 Updated ordinary model routing so evidence-supported task quality determines the score; lower latency/cost cannot outweigh better accuracy. Ordinary requests no longer explore weaker models, while explicit evaluation callers retain bounded exploration. Domain/profile isolation, decay, prior shrinkage, advisory limits and independent invalid-output penalties remain intact. New route explanations record the policy flag; historical weighted policies remain readable. Explicit model choices and configured commander pins are preserved.
