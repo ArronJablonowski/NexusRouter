@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA source-supported recovery-cost candidate
+
+27/634 primary batches succeeded. qwen batch 25's cost claim has a concrete explicit-model caller path: exhausted positive recovery budget becomes zero, while explicit admission treats zero as an override. Recorded as P2 source-supported candidate pending isolated reproduction and total-budget policy verification, not a reproduced defect. Missing-summary claim rejected by sql.ErrNoRows return. [Evidence and suggested test](qa/2026-10-09-spark-nexusrouter-findings.md) saved. Worker healthy, Muse batch 27 running, no new failures or product changes. Documentation checks only.
+
 ## 2026-10-09 — Spark QA both recovery gaps covered
 
 Both terminal empty-output requests now have successful same-model recovery reports, with original receipts retained. Unique successful primary coverage 22/634; qwen batch 22 running. No new actionable candidate/verified defect, failure or product change. [Recovery checkpoint](qa/2026-10-09-spark-nexusrouter-findings.md) records scope and missing callers; documentation diff checks only.

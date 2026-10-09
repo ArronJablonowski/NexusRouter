@@ -127,3 +127,15 @@ Successful unique primary coverage 21/634. Laguna batch 20 reported no verified 
 ## Second recovery completed — 2026-10-09 20:18 UTC
 
 qwen's single recovery of batch 19 succeeded with a nonempty report: NO_VERIFIED_BUGS for skill generation/protocol/redaction source and tests, with explicit missing caller/helper coverage. Both empty-output gaps now have successful same-model recovery reports; original failed receipts remain preserved. Unique successful primary coverage 22/634; qwen batch 22 running, worker alive, cross-reviews not started. No new failures, candidate or verified defect. GPU 78°C / hottest thermal zone 86.2°C now; sampled peaks remain 85°C / 93.3°C. No product/source/service/configuration change or test execution; documentation diff checks only.
+
+## qwen batch 25 triage — 2026-10-09 20:48 UTC
+
+### P2 source-supported candidate: exhausted explicit recovery budget becomes override
+
+Pinned `7d4b7aac`: `internal/app/context_overflow_recovery.go:47` subtracts the failed route estimate from a positive request MaxCost, rejects only negative remaining cost, then assigns zero at line 56. `internal/app/auto.go:204` sends that recovered request through runRouteChain. For an explicit model, `internal/app/run.go:242` documents zero as the legacy operator override and line 252 checks cost only if MaxCost >0. Thus a positive budget exactly equal to the failed paid route estimate can become the explicit zero-cost override on the recovery attempt.
+
+Trigger requires an explicitly pinned paid model, AutoApprovedCompaction enabled, eligible continuation with approved summary, and a verified output-free provider context_overflow failure. Impact: the second inference is not constrained by the original exhausted positive estimate ceiling. Automatic routing instead treats zero as strict zero cost (`routing/router.go:182`), so the model's broad claim must be narrowed to explicit recovery. Code-path evidence is present; a complete isolated integration reproduction and intended total-budget policy validation remain pending. This is not yet reported as a reproduced/verified defect.
+
+Suggested fix for later review: preserve a distinction between an operator's originally unspecified explicit budget and an exhausted positive recovery budget; deny a paid recovery with no remaining budget (or enforce an explicit strict-zero ceiling), retaining permitted genuinely zero-cost recovery. Test using an isolated existing overflow/approved-summary fixture with an explicit paid-model cost equal to MaxCost; assert no second paid call. No product changes made.
+
+The missing-summary candidate is rejected: `internal/telemetry/summary_review.go:159` returns sql.ErrNoRows when no approved summary exists; the caller checks err and stops recovery. Muse/Laguna's other latest report found no verified bug. Primary successful coverage 27/634; Muse batch 27 running. Worker healthy; no new failures. Cross-reviews not started. Temperature sample GPU 81°C / hottest zone 89.5°C; retained peaks 85°C / 93.3°C.
