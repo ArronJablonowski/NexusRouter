@@ -160,3 +160,12 @@ Two model claims remain unverified/rejected against pinned caller evidence:
 ## Workflow checkpoint — 2026-10-09 21:48 UTC
 
 39/634 unique primary batches succeeded, qwen batch 40 running. qwen batch 37 failed terminally with empty_output, confirmed through its status and full event page. One same-model recovery queued using existing bounded recovery instructions; original receipt retained and active task uninterrupted. No model/provider/configuration change. Worker alive; both prior recoveries succeeded. Muse/Laguna latest reports contain no actionable candidates. No new reproduced defect; cost-candidate reproduction pending. Cross-reviews not started. GPU 77°C / hottest thermal zone 87.3°C, sampled peaks 85°C / 93.3°C. Documentation diff checks only.
+
+## Collaboration candidate triage — 2026-10-09 22:28 UTC
+
+qwen batch 46 reported two privacy/pagination candidates; both claimed outcomes are contradicted by the omitted store boundary in pinned source.
+
+- Negative Before cursor: `internal/agentchat/store.go:169` validates CollaborationOptions before querying, so the tool-facing call does not bypass validation. The query also has LIMIT 51 at line 172. No unbounded page/retrieval trigger demonstrated.
+- Private broadcast leaks to cloud: line 172 filters `(local OR private=0)` regardless of recipient '*' versus named recipient. Private broadcast remains invisible to nonlocal readers; `internal/agentchat/store_test.go:64` and line 75 exercise private/addressed visibility restrictions. No cloud-leak path established by the model report. Do not replace the visibility rule merely because broadcast is admitted.
+
+46/634 successful primary batches; qwen's one recovery of batch 43 running. Worker healthy, no new failures. Cross-reviews not started. No new verified/reproduced defect; recovery-cost candidate still pending reproduction. GPU 81°C / hottest zone 87.7°C; retained sampled peaks 85°C / 93.3°C. Source read only, documentation diff checks; no product changes or tests executed.

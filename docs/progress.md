@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark collaboration claims checked at store boundary
+
+46/634 primary batches succeeded; qwen recovery of batch 43 running. Negative-cursor/unbounded-read and private-broadcast leak claims are contradicted by store-side option validation, bounded query and private visibility filtering. [Source evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new verified defect/product change or failure; worker healthy. Documentation diff checks only.
+
 ## 2026-10-09 — Spark QA third bounded response recovery
 
 39/634 successful primary batches; qwen batch 40 running. Batch 37 has confirmed terminal empty_output; one same-model recovery queued, preserving the original receipt and active task. Two earlier recoveries succeeded. No new actionable candidate/reproduced defect or product change. [Workflow evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved; documentation checks only.
