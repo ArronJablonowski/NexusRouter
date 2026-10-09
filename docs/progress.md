@@ -1,3 +1,7 @@
+## 2026-10-09 — Three Spark QA models completed initial batches
+
+Muse, qwen3.8 and Laguna S each completed one assigned batch, reporting no verified bugs and explicit caller/implementation gaps. Primary coverage is 3/634; Muse batch 3 is running and the worker is alive. Candidate cross-reviews remain pending. [QA checkpoint](qa/2026-10-09-spark-nexusrouter-findings.md) records scope and sampled temperatures (GPU peak 85°C; thermal-zone peak 93.3°C). No new failure/recovery, product change or application test run at this check. Documentation diff checks passed.
+
 ## 2026-10-09 — Spark QA first completed batch
 
 Muse batch 0 completed with no actionable candidate and explicit missing cross-file caller evidence. NexusRouter status confirms qwen batch 1 running; the sequential worker is alive. Corrected a coverage omission by scheduling two fragments of the minified SPDX schema with original line/character offsets, bringing planned primary batches to 634. The two image assets remain excluded. Sanitized model report saved in [QA findings](qa/2026-10-09-spark-nexusrouter-findings.md). No verified defect or product change is established; 633 primary batches and candidate cross-reviews remain incomplete. Documentation-only diff checks passed; no application tests were rerun.

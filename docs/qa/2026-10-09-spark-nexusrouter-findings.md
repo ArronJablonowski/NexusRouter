@@ -9,7 +9,7 @@ Host: `spark-9c8a`, paired instance `dgx-spark`. NexusRouter direct remote tasks
 
 ## Status and findings
 
-Campaign in progress; no validated bugs recorded yet. Muse batch 0 completed without an actionable candidate and explicitly identified missing caller evidence. qwen batch 1 is running; Laguna follows sequentially and has not yet completed a code review. 634 primary batches cover tracked UTF-8 text at the pinned commit, including source, tests, requirements and documentation. The two binary image assets are excluded. An overlong minified SPDX schema is split into two additional fragments with original line/character offsets; those fragments are still pending. Models rotate across batches: this is distributed coverage, not three independent full-repository audits. Candidate-bearing reports receive a second-model cross-review, with subsequent caller tracing needed to establish verified defects. Do not equate scheduling or a successful model response with complete coverage.
+Campaign in progress; no validated bugs recorded yet. Muse batch 0 completed without an actionable candidate and explicitly identified missing caller evidence. qwen batch 1 and Laguna batch 2 have also completed; Muse batch 3 is running. 634 primary batches cover tracked UTF-8 text at the pinned commit, including source, tests, requirements and documentation. The two binary image assets are excluded. An overlong minified SPDX schema is split into two additional fragments with original line/character offsets; those fragments are still pending. Models rotate across batches: this is distributed coverage, not three independent full-repository audits. Candidate-bearing reports receive a second-model cross-review, with subsequent caller tracing needed to establish verified defects. Do not equate scheduling or a successful model response with complete coverage.
 
 Live Markdown findings and the coverage manifest are maintained outside the repository:
 
@@ -51,3 +51,13 @@ Gaps / missing caller evidence preventing a verified bug claim:
 * Provider estimator `providers.EstimateWith` and `request.contextEstimator` visibility not verifiable here.
 
 No concrete behavioral bug with sufficient evidence to claim severity, trigger, impact and a minimal fix within the provided slice was identified.
+
+## Checkpoint — 2026-10-09 18:28 UTC
+
+All three named models have completed one assigned batch. Primary coverage: 3/634 succeeded, one running, 630 pending. Cross-reviews have not started; their eventual total depends on candidate-bearing reports. No new primary failure or recovery was required at this check. The sequential worker is alive, and NexusRouter inspection confirms Muse batch 3 running.
+
+qwen batch 1 reviewed `internal/app/audit.go` lines 1–422, `audit_behavior_test.go` lines 1–157, `audit_delegate.go` lines 1–231 and `audit_delegate_count.go` lines 1–92. It reported NO_VERIFIED_BUGS. Its missing evidence includes telemetry review atomicity, cancellation monitoring, replay invariants, redaction helpers and harness outcome validation. Its non-bug observations are not treated as actionable findings.
+
+Laguna batch 2 reviewed audit delegation parsing, child-success/failure evidence and batch-bound tests. It reported NO_VERIFIED_BUGS, with gaps in caller context, runtime audit validation and event-ID validation. These are limited model reviews, not independent confirmation that the implementation is bug-free.
+
+Spark read-only temperature sampling at 18:28 UTC: GPU 84°C; hottest reported ACPI thermal zone 92.8°C. Retained sampled peaks since tracking began: GPU 85°C and thermal zone 93.3°C (initial sample's zone identity was not captured). These are intermittent samples, not continuous maxima or CPU-package identification. Timestamped per-sensor readings remain in the private QA workspace. No model services, safeguards or source were changed. Documentation diff verification only.
