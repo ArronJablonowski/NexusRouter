@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA cross-review classification corrected
+
+30/634 primary batches succeeded. Delegation lifetime-budget and recoverable-success claims are unsupported by task-scoped registration and outcome invariants. Corrected the campaign's cross-review classifier to retain explicit candidate reports even when they also include NO_VERIFIED_BUGS; tested mixed/noncandidate reports and helper syntax. Active task preserved during worker restart. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records cost-candidate reproduction gap. No new verified defect or product change; documentation checks passed.
+
 ## 2026-10-09 — Spark QA source-supported recovery-cost candidate
 
 27/634 primary batches succeeded. qwen batch 25's cost claim has a concrete explicit-model caller path: exhausted positive recovery budget becomes zero, while explicit admission treats zero as an override. Recorded as P2 source-supported candidate pending isolated reproduction and total-budget policy verification, not a reproduced defect. Missing-summary claim rejected by sql.ErrNoRows return. [Evidence and suggested test](qa/2026-10-09-spark-nexusrouter-findings.md) saved. Worker healthy, Muse batch 27 running, no new failures or product changes. Documentation checks only.
