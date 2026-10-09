@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA third bounded response recovery
+
+39/634 successful primary batches; qwen batch 40 running. Batch 37 has confirmed terminal empty_output; one same-model recovery queued, preserving the original receipt and active task. Two earlier recoveries succeeded. No new actionable candidate/reproduced defect or product change. [Workflow evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved; documentation checks only.
+
 ## 2026-10-09 — Spark feedback candidates checked against replay
 
 37/634 primary batches succeeded; qwen batch 37 running. Completed-plus-pending feedback trigger is rejected by replay invariants; empty-domain route feedback remains an unverified custom-producer edge because the real application emitter supplies domain/profile. [Caller evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. Worker healthy; no new failures or reproduced defects, cost-candidate reproduction pending. Documentation diff checks only.
