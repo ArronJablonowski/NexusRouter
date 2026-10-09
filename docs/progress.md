@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA recovery running and preview triage
+
+Successful primary coverage 12/634; qwen's one same-model recovery of batch 10 is running. Muse batch 12 raised five preview candidates: duplicate-provider contamination and shared-policy mutation are contradicted by pinned validation/value semantics; three availability claims remain unverified hypotheses. No confirmed defect. [Candidate dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) preserve boundaries and cross-review gaps. Worker healthy; no new primary failure. Documentation diff checks only.
+
 ## 2026-10-09 — Spark QA empty-output recovery scheduled
 
 qwen batch 10 failed terminally with empty_output, confirmed through campaign status/events. Original receipt retained; one new same-model recovery attempt scheduled after active Muse batch 12. Worker safely restarted with recovery priority; helper syntax checked. Primary successful coverage 11/634; failure is not counted as reviewed. No replay of uncertain delivery, product/model/service/configuration change or new verified defect. [Recovery evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records remaining gaps. Documentation diff checks passed.

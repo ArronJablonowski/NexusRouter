@@ -87,3 +87,15 @@ No tests were run and no product code changed. Claims remain in raw model output
 Primary coverage: 11/634 succeeded, one primary failure (qwen batch 10), Muse batch 12 running. Laguna batch 11 reported no verified bugs. Campaign-owned NexusRouter status and complete event page confirm qwen batch 10 terminated with `empty_output` after a completed turn; this is not uncertain delivery. Retained original receipt; queued one new same-model recovery task for the same input, asking explicitly for a nonempty final report. The worker will run it after the active Muse task and before subsequent primary work. No automatic model fallback, configuration change or task cancellation. Failed coverage is not counted as reviewed; recovery outcome remains pending.
 
 Worker was safely restarted with a priority for the recovery job, and Python syntax validation passed. Current GPU 81°C / hottest thermal zone 89.3°C; retained sampled peaks 85°C / 93.3°C. No new bug candidate or verified defect at this check. Source remains pinned at `7d4b7aac`; documentation-only diff validation.
+
+## Muse batch 12 triage — 2026-10-09 19:28 UTC
+
+Five model candidates, no confirmed defect. Read only the pinned source (`7d4b7aac`); no tests or product changes.
+
+- Provider-key observation contamination: rejected claimed trigger. `internal/app/federated_routing.go:72` rejects duplicate synthetic provider keys before browser ranking consumes the candidates. Same-provider/different-model input cannot pass that boundary as alleged.
+- Shared Exploration mutation: rejected. `internal/app/routing_policy.go:10` returns a `routing.Policy` value built from `routing.Defaults`, not a shared policy pointer. Assigning the returned value's Exploration field is local.
+- Remote error aborting preview: unverified availability hypothesis. `internal/app/browser_rankings.go:58` propagates failed candidate collection into failed inspection; no real paired-host failure reproducer or collector error classification was supplied. The top-three retry requirement governs execution, not this read-only preview; the model's asserted requirement violation is unsupported.
+- Database error aborting preview: unverified availability hypothesis. Evidence-store errors return failed inspection rather than a possibly misleading partial ranking. No requirement or failure-path test establishes that skipping damaged evidence is the correct behavior; do not weaken this boundary based on the claim alone.
+- MaxInspectionModels overflow: unverified bounded-inventory availability hypothesis. The preview rejects an oversized projection; no admitted deployment exceeding the cap was reproduced. Truncation and visibility semantics need requirements/evidence before calling this a defect.
+
+The original candidate report remains in live Markdown for later second-model cross-review. Primary successful coverage: 12/634. qwen's single recovery of failed batch 10 is running; original failed receipt retained. No new primary failure. Worker healthy. Current sample: GPU 79°C; hottest thermal zone 86.1°C; sampled peaks 85°C / 93.3°C.
