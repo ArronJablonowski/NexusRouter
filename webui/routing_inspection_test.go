@@ -17,3 +17,21 @@ func TestRoutingInspectionRejectsUnpermittedIdentity(t *testing.T) {
 		t.Fatal("ranked model leaked")
 	}
 }
+
+func TestRemoteModelProvenanceRejectsHostMarkup(t *testing.T) {
+	model := ModelInspection{ID: "paired-coder", Provider: "paired-coder", Model: "Coder", RemoteInstance: "spark", Hostname: "spark-host", Locality: "local", Configured: true, Enabled: true, Usable: true, Health: "healthy", Capabilities: []string{"code"}}
+	if model.Validate() != nil {
+		t.Fatal("remote provenance rejected")
+	}
+	for _, host := range []string{"<img src=x>", "host name", "host/secret", "host\nname"} {
+		model.Hostname = host
+		if model.Validate() == nil {
+			t.Fatal("unsafe hostname accepted", host)
+		}
+	}
+	model.Hostname = "spark-host"
+	model.RemoteInstance = ""
+	if model.Validate() == nil {
+		t.Fatal("host without paired identity accepted")
+	}
+}

@@ -121,6 +121,29 @@ func TestRecordedDispatchLostResponseCannotChangeDestination(t *testing.T) {
 		t.Fatal("changed payload", err)
 	}
 }
+func TestRecordedDispatchPinsRankedCallerBeforeSending(t *testing.T) {
+	f := setup(t)
+	store, err := OpenRouteStore(filepath.Join(t.TempDir(), "routes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "recorded-ranked-caller-01"
+	cert, _, err := f.client.Credentials.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller := certificateDigest(cert.Certificate[0])
+	if _, err := f.client.DispatchRecordedAs(context.Background(), store, "node-a", key, testTask(), strings.Repeat("0", 64)); !errors.Is(err, ErrConflict) || f.backend.creates != 0 {
+		t.Fatal("changed caller reached dispatch", err, f.backend.creates)
+	}
+	if _, err := store.Lookup(key); err == nil {
+		t.Fatal("rejected caller created a binding")
+	}
+	if _, err := f.client.DispatchRecordedAs(context.Background(), store, "node-a", key, testTask(), caller); err != nil || f.backend.creates != 1 {
+		t.Fatal("unchanged caller rejected", err, f.backend.creates)
+	}
+}
+
 func TestRouteStoreRejectsUnsafeFiles(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "routes")
 	s, err := OpenRouteStore(dir)

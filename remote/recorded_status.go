@@ -51,3 +51,21 @@ func (c *Client) InspectRecorded(ctx context.Context, routes *RouteStore, key st
 	}
 	return RecordedRequestStatus{Version: Version, RequestID: key, Destination: binding.Destination, Status: status}, nil
 }
+
+// CancelRecorded cancels only the original destination with the original caller
+// certificate. A rotated credential or changed binding never gains retry authority.
+func (c *Client) CancelRecorded(ctx context.Context, routes *RouteStore, key string) (submissions.Status, error) {
+	if c == nil || ctx == nil || ctx.Err() != nil || routes == nil || !requestID(key) {
+		return submissions.Status{}, ErrInvalid
+	}
+	binding, err := routes.Lookup(key)
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	var status submissions.Status
+	err = c.callPinned(ctx, binding.Destination, "cancel", "POST", "/v1/remote/tasks/"+key+"/cancel", nil, nil, &status, binding.CallerFingerprint)
+	if err == nil && (status.Version != 1 || !name(status.ID) || !slices.Contains([]string{"queued", "running", "succeeded", "failed", "canceled"}, status.State)) {
+		return submissions.Status{}, ErrUnavailable
+	}
+	return status, err
+}

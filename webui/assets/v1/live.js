@@ -21,10 +21,11 @@ window.NexusLive = (() => {
   return ()=>{job.active=false;clearTimeout(job.timer);if(jobs.get(name)===job)jobs.delete(name);};
  }
  function wake(){for(const job of jobs.values()){clearTimeout(job.timer);if(visible())schedule(job,100);}}
- async function request(url,options={}){
+ async function request(url,options={},timeoutMs=12000){
+  if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1000||timeoutMs>60000)throw Error("Invalid reconciliation deadline");
   const controller=new AbortController(),abort=()=>controller.abort();
   const signal=options.signal;if(signal){signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();}
-  const timeout=setTimeout(abort,12000);
+  const timeout=setTimeout(abort,timeoutMs);
   try{
    const response=await fetch(url,{...options,signal:controller.signal}),limit=8*1024*1024;
    // Bound bytes while streaming, including decoded/compressed responses whose

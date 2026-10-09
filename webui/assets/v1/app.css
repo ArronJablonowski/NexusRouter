@@ -576,3 +576,8 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .chat-rename-dialog label { display: block; margin-bottom: .5rem; }
 .chat-rename-buttons { display: flex; justify-content: flex-end; gap: .75rem; }
 .chat-rename-buttons button { padding: .6rem 1rem; border-radius: .5rem; }
+
+.remote-specialist-model { border-left-color:#ffe56a; background:#27250e; }
+.remote-specialist-model .route-rank,.remote-specialist-model strong,.remote-specialist-host { color:#ffe56a; }
+.remote-specialist-host { display:block; overflow-wrap:anywhere; }
+.remote-specialist-model .route-model-facts { grid-template-columns:repeat(auto-fit,minmax(min(8rem,100%),1fr)); }

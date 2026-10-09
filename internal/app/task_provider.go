@@ -12,6 +12,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/policy"
 	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 type taskProvider interface {
@@ -191,6 +192,16 @@ func safeTaskProviderCleanup(cleanup func()) {
 func prepareTaskProvider(s config.Settings, provider config.Provider, model config.Model, r Request, messages []providers.Message, privacy, key string, purpose providers.Purpose) (taskProviderOpen, func(), error) {
 	if purpose == "" {
 		purpose = providers.PurposeExecution
+	}
+	if r.federated != nil {
+		if r.federation == nil || purpose != providers.PurposeExecution || r.taskID == "" {
+			return nil, nil, ErrAdmission
+		}
+		request := routing.Request{Mode: s.Mode, Domain: r.Domain, Profile: r.Profile, LocalRequired: r.LocalRequired, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost}
+		return func(ctx context.Context) (providers.Provider, func(), error) {
+			p, err := r.federation.Open(ctx, *r.federated, r.taskID, request)
+			return p, nil, err
+		}, func() {}, nil
 	}
 	if provider.Kind != "codex_app_server" {
 		endpoint := provider.ResolvedEndpoint()

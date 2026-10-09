@@ -16,6 +16,7 @@ import (
 )
 
 type InspectionServices struct {
+	Routing      func(context.Context) (contract.ModelInspectionPage, error)
 	Dependencies func(context.Context) (contract.DependencyInventory, error)
 	Logging      func(context.Context) (contract.LoggingPage, error)
 	Schedules    func(context.Context) (contract.SchedulePage, error)
@@ -68,6 +69,13 @@ func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.R
 		h.serveStats(writer, request)
 	case path == base+"/models/deprecation":
 		h.serveDeprecationInspection(writer, request)
+	case path == base+"/routing-grid":
+		serveInspection(h, writer, request, "routing_unavailable", func(ctx context.Context) (contract.ModelInspectionPage, error) {
+			if h.inspections.Routing == nil {
+				return contract.ModelInspectionPage{}, errors.New("unavailable")
+			}
+			return h.inspections.Routing(ctx)
+		}, 45*time.Second)
 	case path == base+"/models":
 		serveInspection(h, writer, request, "models_unavailable", func(ctx context.Context) (contract.ModelInspectionPage, error) {
 			if h.inspections.Models == nil {
@@ -200,11 +208,15 @@ type inspectionResponse interface {
 	contract.DependencyInventory | contract.LoggingPage | scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
 }
 
-func serveInspection[T inspectionResponse](h *Handler, writer http.ResponseWriter, request *http.Request, code string, read func(context.Context) (T, error)) {
+func serveInspection[T inspectionResponse](h *Handler, writer http.ResponseWriter, request *http.Request, code string, read func(context.Context) (T, error), timeouts ...time.Duration) {
 	if !h.prevalidateInspectionGET(writer, request) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
+	timeout := 5 * time.Second
+	if len(timeouts) > 0 {
+		timeout = timeouts[0]
+	}
+	ctx, cancel := context.WithTimeout(request.Context(), timeout)
 	defer cancel()
 	value, err := safeInspection(ctx, read)
 	if err != nil || inspectionInvalid(value) {

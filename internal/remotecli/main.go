@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/ArronJablonowski/NexusRouter/internal/gridcollab"
+	"github.com/ArronJablonowski/NexusRouter/internal/gridroute"
 	"io"
 	"net"
 	"net/http"
@@ -385,6 +386,9 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	if err := gridcollab.Install(service, cfg); err != nil {
 		return err
 	}
+	if err := gridroute.Install(service, cfg); err != nil {
+		return err
+	}
 	// Remote execution must contend with other local daemons, not just the
 	// requests handled by this server. Install before starting any dispatcher.
 	closeResources, err := app.InstallHostResourceCoordinator(ctx, service, instance)
@@ -403,6 +407,13 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	}, JobHistory: service.ChatHistory, RunnerModelID: cfg.VLLM.ModelID, ControlRunner: vllmController(cfg, service), Routing: service.RemoteRoutingInspection, ReadStatus: service.SubmissionStatus, Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
+	}
+	for _, m := range cfg.Models {
+		id := harness.DirectRegistration(m.ID)
+		identity, err := service.NativeHarnessIdentity(m.ID, id, min(m.ContextTokens, 32768))
+		if err == nil {
+			backend.Harnesses = append(backend.Harnesses, remote.Harness{ID: id, ModelID: m.ID, Kind: "nexus-direct", ModelRevision: identity.ModelRevision})
+		}
 	}
 	for _, h := range cfg.NativeHarnesses {
 		backend.Harnesses = append(backend.Harnesses, remote.Harness{ID: h.ID, ModelID: h.ModelID, Kind: h.Kind, ModelRevision: h.ModelRevision, NativeTools: h.NativeTools})

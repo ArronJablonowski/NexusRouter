@@ -13,6 +13,19 @@ func certificateDigest(der []byte) string { s := sha256.Sum256(der); return hex.
 // before sending. It never reroutes, deletes a binding or retries automatically.
 // On uncertain delivery use Lookup and the same destination/key/task/credential.
 func (c *Client) DispatchRecorded(ctx context.Context, store *RouteStore, destination, key string, task Task) (submissions.Status, error) {
+	return c.dispatchRecorded(ctx, store, destination, key, task, "")
+}
+
+// DispatchRecordedAs also pins the caller identity that supplied routing evidence.
+// Rotation between ranking and dispatch must not attribute execution to the old caller.
+func (c *Client) DispatchRecordedAs(ctx context.Context, store *RouteStore, destination, key string, task Task, caller string) (submissions.Status, error) {
+	if !hexDigest(caller) {
+		return submissions.Status{}, ErrInvalid
+	}
+	return c.dispatchRecorded(ctx, store, destination, key, task, caller)
+}
+
+func (c *Client) dispatchRecorded(ctx context.Context, store *RouteStore, destination, key string, task Task, caller string) (submissions.Status, error) {
 	var out submissions.Status
 	if c == nil || store == nil || ctx == nil || ctx.Err() != nil || !requestID(key) || task.Validate() != nil {
 		return out, ErrInvalid
@@ -34,6 +47,9 @@ func (c *Client) DispatchRecorded(ctx context.Context, store *RouteStore, destin
 		return out, ErrDenied
 	}
 	pin := certificateDigest(cert.Certificate[0])
+	if caller != "" && pin != caller {
+		return out, ErrConflict
+	}
 	binding := RouteBinding{Version, key, destination, pin, hash(task)}
 	if err = store.Bind(binding); err != nil {
 		return out, err

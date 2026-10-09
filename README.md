@@ -61,7 +61,7 @@ printf '%s\n' 'Explain how a work queue works in three sentences.' | \
 
 `local-fast` is the configured model alias in the example. `auto` selects from eligible configured models using recorded task-quality evidence, adjusted for confidence and recency. Unknown models retain a neutral prior; model names and sizes do not establish accuracy. Ordinary requests do not explore weaker alternatives. An explicit model choice, including a configured commander default, remains pinned under the existing explicit fallback rules.
 
-Configured-provider routing and paired-remote automatic dispatch currently use separate candidate pools. An ordinary chat does not yet compare every model on every paired host. See [accuracy-first routing](docs/accuracy-first-routing.md) for the implemented behavior and remaining integration work.
+With configured pairing and durable remote evidence storage, the commander daemon and CLI compare eligible configured and paired models for ordinary automatic requests. A confirmed remote failure can advance through the original top three models within the task budget. Remote tools and some specialized API paths remain outside this unified path; see [accuracy-first routing](docs/accuracy-first-routing.md) for requirements and limits.
 
 ### 4. Open the Web UI
 
@@ -80,6 +80,8 @@ With the example configuration, open **http://127.0.0.1:7788/app**. Approve the 
 Replace `CHALLENGE_ID.DISPLAY_CODE` with the complete value shown in the browser. The API token stays in the trusted terminal/service environment and must never be pasted into the browser. Browser sessions expire and require a new approval after daemon restart.
 
 For an installed macOS service, `nexus web approve CHALLENGE_ID.DISPLAY_CODE` discovers the running user's service configuration and credential. If multiple services match, select one with `--service com.nexusrouter.commander` or provide its actual `--config` path. On Linux and other platforms, use an explicit configuration and token environment; automatic service credential retrieval is currently macOS-only. See [browser authorization](docs/workboard-operator-guide.md#authorize-a-browser) for custom installations.
+
+The Command grid shows the top three eligible specialist model deployments. A preferred remote model appears with its hostname in yellow; expand it to inspect routing evidence. The grid is a policy preview, and dispatch rechecks task-specific admission.
 
 Use the three-dot menu beside a chat title to **Rename**, **Pin**, or **Unpin** it. Pinned chats stay above unpinned chats, with newest-first ordering within each group. Preferences are shared by authenticated browsers on the same daemon. Include `<telemetry.database>.chat-preferences.json` alongside the task database in backups; see [chat preferences](docs/workboard-operator-guide.md#rename-and-pin-chats).
 
@@ -125,7 +127,7 @@ Use `make fmt` to apply Go formatting and `make build` to build the CLI. Follow 
 
 NexusRouter is under active development. The repository includes working routing, harness, remote-execution, and Web UI implementations, but development test results do not establish production release readiness.
 
-The v1.0.1 release qualification remains in progress, including native-platform evidence, dependency-notice review, production signing, independent verification, and publication approval. General patch editing, delegated writes, unattended write approvals, and unified automatic selection across configured and paired-remote models also remain unfinished.
+The v1.0.1 release qualification remains in progress, including native-platform evidence, dependency-notice review, production signing, independent verification, and publication approval. General patch editing, delegated writes, unattended write approvals, and broader remote tool integration also remain unfinished.
 
 See [implementation evidence](docs/progress.md) for specific completed work and remaining limitations, and the [Linear project](https://linear.app/nexusrouter/project/nexusrouter-mvp-fc9fe6d48fda) for the delivery backlog.
 

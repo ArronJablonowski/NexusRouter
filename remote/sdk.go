@@ -77,7 +77,7 @@ func (b *SDKBackend) info(ctx context.Context, configured []Model) (Info, error)
 		return Info{}, ErrUnavailable
 	}
 	models := cloneModels(configured)
-	out := Info{HybridVersion: 2, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
+	out := Info{ConversationVersion: 1, HybridVersion: 2, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
 	if b.Schedules != nil {
 		page, err := b.Schedules(ctx)
 		if err != nil || page.Validate() != nil {
@@ -187,7 +187,11 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	if execution == nil {
 		execution = &runtime.RemoteExecution{Mode: "direct", Depth: 1}
 	}
-	return b.Client.Submit(ctx, key, sdk.Request{RemoteExecution: execution, Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
+	prompt := t.Prompt
+	if len(t.Messages) > 0 {
+		prompt = ""
+	}
+	return b.Client.Submit(ctx, key, sdk.Request{Messages: t.Messages, RemoteExecution: execution, Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
 }
 func (b *SDKBackend) Status(ctx context.Context, id string) (submissions.Status, error) {
 	if b.ReadStatus != nil {

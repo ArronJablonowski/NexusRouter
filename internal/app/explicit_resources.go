@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/resources"
@@ -40,6 +41,17 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithDeadline(ctx, r.RemoteExecution.Deadline)
 		defer cancel()
+	}
+	if r.HarnessID == harness.DirectRegistration(r.ModelID) {
+		if r.RemoteExecution == nil || r.RemoteExecution.Mode != "direct" || r.ExpectedHarnessIdentity == nil {
+			return Result{}, ErrHarnessUnsupported
+		}
+		actual, err := s.directIdentity(r.ModelID, r.ContextTokens)
+		if err != nil || actual != *r.ExpectedHarnessIdentity {
+			return Result{}, ErrHarnessUnsupported
+		}
+		r.HarnessID, r.HarnessDifficulty = "", ""
+		r.ExpectedHarnessIdentity = nil
 	}
 	r.openTaskStore = s.openTaskStore
 	var classifyErr error

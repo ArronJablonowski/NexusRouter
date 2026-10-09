@@ -35,6 +35,29 @@ Do not expose this HTTP listener through a non-loopback bind or an unreviewed
 reverse proxy. TLS termination, forwarded hosts, and remote-browser deployment
 are not supported by the stock daemon.
 
+## Specialist routing preferences
+
+The Command grid compares eligible configured models with paired remote models
+for each displayed evidence scope. A remote row shows its model name and hostname
+in yellow, with **Remote** text so color is not the only cue. Expand the row to
+inspect its paired instance, original model ID and evaluation evidence. Unknown
+hostnames use a labeled instance fallback. The configured Router Commander stays
+an explicit model choice; this preview does not override it.
+
+Unified automatic selection requires paired client/trust configuration and the
+remote dispatch/evidence directories. Upgrade participating peers to support
+conversation version 1. Supported local providers expose a built-in text-only
+route without an external harness; external harness routes still require explicit
+permission. Model availability and admission do not establish accuracy. Neither
+opening the grid nor refreshing it runs model inference.
+
+Confirmed remote failures before a delivered answer may retry the next model
+from the original top three, within remaining budget and attempt/time limits.
+Unconfirmed cancellation/delivery, user cancellation or sink/persistence failure
+stops automatic failover. Shared filesystem/tools and unsupported conversation
+shapes remain outside remote eligibility. See [accuracy-first routing](accuracy-first-routing.md)
+for exact preview constraints, retry ownership and remaining qualification gaps.
+
 ## Rename and pin chats
 
 Use the three-dot button beside a chat title to choose **Rename** or **Pin**.

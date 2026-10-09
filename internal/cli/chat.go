@@ -11,6 +11,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/gridroute"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
@@ -58,6 +59,10 @@ func runChat(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if err != nil {
 		_, _ = io.WriteString(stderr, "darwin: chat service unavailable\n")
+		return 1
+	}
+	if err := gridroute.Install(service, settings); err != nil {
+		_, _ = io.WriteString(stderr, "darwin: cannot initialize unified routing\n")
 		return 1
 	}
 	ctx, cancel := context.WithCancel(context.Background())

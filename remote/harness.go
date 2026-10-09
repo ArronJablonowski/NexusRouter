@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"slices"
 )
 
@@ -25,7 +26,7 @@ func (b *SDKBackend) InfoForHarnesses(ctx context.Context, models []string, clou
 func filterHarnesses(configured []Harness, models []Model, allowed []string, all bool) []Harness {
 	var out []Harness
 	for _, h := range configured {
-		if !all && !slices.Contains(allowed, h.ID) {
+		if !all && !slices.Contains(allowed, h.ID) && !(h.Kind == "nexus-direct" && h.ID == harness.DirectRegistration(h.ModelID) && !h.NativeTools) {
 			continue
 		}
 		for _, m := range models {

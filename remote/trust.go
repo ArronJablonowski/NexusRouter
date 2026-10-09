@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"io"
 	"math"
 	"net"
@@ -192,7 +193,7 @@ func (p Peer) permitsTask(t Task) bool {
 			}
 		}
 	}
-	if (t.HarnessID != "" && !slices.Contains(p.Harnesses, t.HarnessID)) || t.Validate() != nil || !p.permits("dispatch") || !slices.Contains(p.Models, t.ModelID) || t.MaxCost > p.MaxCost || t.ContextTokens > p.MaxContextTokens {
+	if (t.HarnessID != "" && !slices.Contains(p.Harnesses, t.HarnessID) && t.HarnessID != harness.DirectRegistration(t.ModelID)) || t.Validate() != nil || !p.permits("dispatch") || !slices.Contains(p.Models, t.ModelID) || t.MaxCost > p.MaxCost || t.ContextTokens > p.MaxContextTokens {
 		return false
 	}
 	if !t.Private && !p.AllowCloudInference {

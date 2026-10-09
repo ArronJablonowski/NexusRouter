@@ -2861,6 +2861,9 @@
       "additionalProperties": false,
       "required": ["id", "provider", "model", "locality", "configured", "enabled", "installed", "usable", "capabilities", "health"],
       "properties": {
+        "remote_model_id": {"$ref":"#/$defs/model_id"},
+        "remote_instance": {"$ref": "#/$defs/model_id"},
+        "hostname": {"type":"string","maxLength":253,"pattern":"^[A-Za-z0-9._-]*$"},
         "id": {"$ref": "#/$defs/model_id"},
         "provider": {"$ref": "#/$defs/model_id"},
         "model": {"type": "string", "minLength": 1, "maxLength": 512, "x-maxBytes": 512},
@@ -2889,6 +2892,7 @@
         "status_code": {"type": "string", "maxLength": 128, "x-maxBytes": 128}
       },
       "allOf": [
+        {"if":{"required":["hostname"]},"then":{"required":["remote_instance"]}},
         {"if": {"properties": {"usable": {"const": true}}}, "then": {"properties": {"configured": {"const": true}, "enabled": {"const": true}, "health": {"const": "healthy"}}}},
         {"if": {"required": ["context_selection_status"], "properties": {"context_selection_status": {"const": "selected"}}}, "then": {"required": ["selected_context_tokens", "context_tokens"]}},
         {"if": {"required": ["context_selection_status"], "properties": {"context_selection_status": {"enum": ["blocked", "unavailable"]}}}, "then": {"properties": {"selected_context_tokens": false}}},

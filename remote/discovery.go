@@ -24,6 +24,15 @@ type CandidateDiscovery struct {
 // grant trust, infer model quality or dispatch. RankRecordedCandidates rechecks
 // current capacity/readiness and applies caller-owned outcome evidence.
 func (c *Client) DiscoverCandidates(ctx context.Context, request harness.Request) (CandidateDiscovery, error) {
+	return c.discoverCandidates(ctx, request, false)
+}
+
+// DiscoverModelCandidates includes the built-in text-only provider route. The
+// legacy automatic harness API still requires native outcome provenance.
+func (c *Client) DiscoverModelCandidates(ctx context.Context, request harness.Request) (CandidateDiscovery, error) {
+	return c.discoverCandidates(ctx, request, true)
+}
+func (c *Client) discoverCandidates(ctx context.Context, request harness.Request, direct bool) (CandidateDiscovery, error) {
 	var out CandidateDiscovery
 	if c == nil || ctx == nil || ctx.Err() != nil || request.ContextTokens < 8192 || request.ContextTokens > 1<<24 {
 		return out, ErrInvalid
@@ -93,6 +102,9 @@ func (c *Client) DiscoverCandidates(ctx context.Context, request harness.Request
 			continue
 		}
 		for _, h := range info.Harnesses {
+			if h.Kind == "nexus-direct" && !direct {
+				continue
+			}
 			total++
 			if total > 4096 {
 				return CandidateDiscovery{}, ErrInvalid

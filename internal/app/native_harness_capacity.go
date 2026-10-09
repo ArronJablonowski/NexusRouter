@@ -25,6 +25,9 @@ func (s *Service) NativeHarnessCapacity(ctx context.Context, modelID, registrati
 	if s == nil || ctx == nil || ctx.Err() != nil {
 		return identity, need, capacity, ErrAdmission
 	}
+	if registration == harness.DirectRegistration(modelID) {
+		return s.directCapacity(ctx, modelID, tokens)
+	}
 	identity, err = s.NativeHarnessIdentity(modelID, registration, tokens)
 	if err != nil {
 		return

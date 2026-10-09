@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/routing"
 	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
@@ -33,6 +34,10 @@ var specialistScopes = []specialistScope{
 // browserRankings uses current durable observations and the dispatch scorer.
 // Rendering must not consume an exploration draw or reserve hardware.
 func (s *Service) browserRankings(ctx context.Context, models []contract.ModelInspection) []contract.SpecialistRankingInspection {
+	return s.browserRankingsUnified(ctx, &models, false)
+}
+func (s *Service) browserRankingsUnified(ctx context.Context, modelPage *[]contract.ModelInspection, federated bool) []contract.SpecialistRankingInspection {
+	models := *modelPage
 	db, release, err := s.openTaskReadStore(ctx)
 	if err != nil {
 		return nil
@@ -42,12 +47,47 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 	p.Exploration = 0
 	out := []contract.SpecialistRankingInspection{}
 	for _, scope := range specialistScopes {
+		remoteObservations := map[string]routing.ObservationSet{}
+		if federated {
+			tokens := 8192
+			if scope.profile != "default" {
+				tokens = 32768
+			}
+			input := providers.Request{}
+			remotes, err := s.federatedCandidates(ctx, s.settings, Request{Domain: scope.domain, Profile: scope.profile, LocalRequired: !s.settings.WebUI.SpecialistsAllowCloud}, input, tokens)
+			if err != nil {
+				return nil
+			}
+			for _, remote := range remotes {
+				remoteObservations[remote.Model.Provider] = remote.Observations
+				exists := false
+				for _, m := range models {
+					if m.ID == remote.Model.ID {
+						exists = true
+					}
+				}
+				if !exists {
+					if len(models) >= contract.MaxInspectionModels {
+						return nil
+					}
+					tokens := int64(remote.Model.ContextTokens)
+					models = append(models, contract.ModelInspection{ID: remote.Model.ID, Provider: remote.Model.Provider, Model: remote.Model.Model, RemoteInstance: remote.Instance, RemoteModelID: remote.DestinationModel, Hostname: remote.Hostname, Locality: remote.Model.Locality, Configured: true, Enabled: true, Installed: remote.Candidate.Local, Usable: true, Capabilities: remote.Model.Capabilities, ContextTokens: &tokens, EstimatedCost: remote.Model.EstimatedCost, Health: "healthy", FailureDomain: remote.Instance})
+				}
+			}
+			*modelPage = models
+		}
+
 		observations := map[routing.Key]routing.ObservationSet{}
 		validities := map[routing.Key]routing.Validity{}
 		sources := map[routing.Key]routing.Key{}
 		candidates := []routing.Candidate{}
 		ids := map[routing.Key]string{}
 		for _, m := range models {
+			if m.RemoteInstance != "" {
+				if _, ok := remoteObservations[m.Provider]; !ok {
+					continue
+				}
+			}
 			if !m.Configured || !m.Usable || m.ContextSelectionStatus == "blocked" || m.ContextTokens == nil || m.EstimatedCost == nil {
 				continue
 			}
@@ -64,8 +104,12 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 			if err != nil {
 				return nil
 			}
+			if remote, ok := remoteObservations[m.Provider]; ok {
+				set.Fitness = append(set.Fitness, remote.Fitness...)
+				set.Advisory = append(set.Advisory, remote.Advisory...)
+			}
 			source := key
-			if len(set.Fitness) == 0 && len(set.Advisory) == 0 {
+			if m.RemoteInstance == "" && len(set.Fitness) == 0 && len(set.Advisory) == 0 {
 				if domain, profile, ok := s.settings.Routing.EvidenceSource(scope.domain, scope.profile); ok {
 					source.Domain, source.Profile = domain, profile
 					set, err = db.DirectObservationSet(ctx, source)
@@ -86,7 +130,7 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 			}
 			validities[key] = v
 			observations[key], sources[key], ids[key] = set, source, m.ID
-			candidates = append(candidates, routing.Candidate{Model: m.Model, Provider: m.Provider, FailureDomain: m.FailureDomain, Local: m.Locality == "local", Capabilities: m.Capabilities, ContextTokens: int(*m.ContextTokens), Healthy: m.Usable, PolicyAllowed: true, CapacityAvailable: m.Locality != "local" || m.RAMBytes != nil && *m.RAMBytes > 0, EstimatedCost: *m.EstimatedCost})
+			candidates = append(candidates, routing.Candidate{Model: m.Model, Provider: m.Provider, FailureDomain: m.FailureDomain, Local: m.Locality == "local", Capabilities: m.Capabilities, ContextTokens: int(*m.ContextTokens), Healthy: m.Usable, PolicyAllowed: true, CapacityAvailable: m.RemoteInstance != "" || m.Locality != "local" || m.RAMBytes != nil && *m.RAMBytes > 0, EstimatedCost: *m.EstimatedCost})
 		}
 		now := s.routingNow()
 		evidence := map[routing.Key]routing.Evidence{}
@@ -113,9 +157,26 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 		selection, err := routing.Select(routing.Request{Mode: s.settings.Mode, Domain: scope.domain, Profile: scope.profile, LocalRequired: !s.settings.WebUI.SpecialistsAllowCloud, ContextTokens: contextTokens}, p, candidates, evidence, now, 0)
 		row := contract.SpecialistRankingInspection{Key: scope.key, Domain: scope.domain, Profile: scope.profile, RequiresEvidence: scope.profile != "default", Models: []contract.SpecialistRankInspection{}}
 		if err == nil {
+			seenModels := map[string]bool{}
 			for _, rank := range selection.Ranked {
 				key := routing.Key{Model: rank.Model, Provider: rank.Provider, Domain: scope.domain, Profile: scope.profile}
 				source := sources[key]
+				deployment := "local/" + ids[key]
+				for _, m := range models {
+					if m.ID == ids[key] && m.RemoteInstance != "" {
+						alias := m.RemoteModelID
+						if alias == "" {
+							alias = m.Model
+						}
+						deployment = m.RemoteInstance + "/" + alias
+						break
+					}
+				}
+				if seenModels[deployment] {
+					continue
+				}
+				seenModels[deployment] = true
+
 				row.Models = append(row.Models, contract.SpecialistRankInspection{ModelID: ids[key], Domain: source.Domain, Profile: source.Profile, Score: rank.Score, Confidence: rank.Confidence, Samples: rank.Samples})
 				if len(row.Models) == 3 {
 					break

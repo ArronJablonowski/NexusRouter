@@ -19,6 +19,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/gridroute"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
@@ -244,6 +245,10 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	service, err := app.NewService(s, os.Getenv)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid application configuration")
+		return 1
+	}
+	if err := gridroute.Install(service, s); err != nil {
+		fmt.Fprintln(stderr, "cannot initialize unified routing")
 		return 1
 	}
 	closeEvidence, err := attachNativeHarnessEvidence(s, service)

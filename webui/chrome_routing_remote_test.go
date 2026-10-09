@@ -33,8 +33,13 @@ func TestChromeRoutingRemotePaths(t *testing.T) {
 			return
 		}
 		switch r.URL.Path {
-		case "/app/api/v1/models":
-			writeChromeJSON(w, map[string]any{"version": 1, "availability": "available", "models": []any{}, "fitness": []any{}, "rankings": []any{}, "local_concurrency": "auto", "local_pressure_policy": "wait", "local_ram_limit_pct": 80, "local_vram_limit_pct": 85, "managed_residency": false, "specialists_allow_cloud": false})
+		case "/app/api/v1/models", "/app/api/v1/routing-grid":
+			models, rankings := []any{}, []any{}
+			if stage.Load() == 0 {
+				models = []any{map[string]any{"id": "paired-coder", "provider": "paired-coder", "model": "Remote coder <img src=x onerror=alert(1)>", "locality": "local", "usable": true, "capabilities": []string{"code"}, "context_tokens": 131072, "remote_instance": "spark", "hostname": "spark-host"}, map[string]any{"id": "local-coder", "model": "Local coder", "locality": "local", "usable": true, "capabilities": []string{"code"}, "context_tokens": 32768}}
+				rankings = []any{map[string]any{"key": "coding", "domain": "code", "profile": "default", "models": []any{map[string]any{"model_id": "paired-coder", "domain": "code", "profile": "default", "score": .9, "confidence": 1, "samples": 30}, map[string]any{"model_id": "local-coder", "domain": "code", "profile": "default", "score": .6, "confidence": 1, "samples": 30}}}}
+			}
+			writeChromeJSON(w, map[string]any{"version": 1, "availability": "available", "models": models, "fitness": []any{}, "rankings": rankings, "local_concurrency": "auto", "local_pressure_policy": "wait", "local_ram_limit_pct": 80, "local_vram_limit_pct": 85, "managed_residency": false, "specialists_allow_cloud": false})
 		case "/app/api/v1/session/csrf":
 			writeChromeJSON(w, map[string]any{"version": 1, "csrf_token": "fixture-token"})
 		case "/app/api/v1/remote-membership":
@@ -83,6 +88,14 @@ await eventually('document.querySelector("#remote-route-status").textContent.inc
 const result=await evaluate('({cards:document.querySelectorAll(".remote-route-card").length,specialists:document.querySelectorAll("#specialist-grid .specialist-card").length,text:document.querySelector("#remote-route-grid").textContent,below:document.querySelector(".remote-route-section").getBoundingClientRect().top>=document.querySelector("#specialist-grid").getBoundingClientRect().bottom,injected:document.querySelectorAll("#remote-route-grid img").length,branches:document.querySelectorAll("#routing-branches .routing-terminal").length})');
 if(!result.text.includes('Host IP: 10.77.7.202')||!result.text.includes('Host IP: 10.77.7.222'))throw Error('remote host IP missing');
 if(result.cards!==2||result.specialists!==14||!result.below||result.injected||result.branches!==16||!result.text.includes('Connection unavailable'))throw Error(JSON.stringify(result));
+const preference=await evaluate('({text:document.querySelector("#specialist-grid [data-route=coding] .route-stack").textContent,first:document.querySelector("#specialist-grid [data-route=coding] .route-stack").firstElementChild.className,color:getComputedStyle(document.querySelector(".remote-specialist-model strong")).color,injected:document.querySelectorAll("#specialist-grid img").length})');
+if(!preference.text.includes('spark-host')||!preference.text.includes('Remote coder <img')||!preference.first.includes('remote-specialist-model')||preference.color!=='rgb(255, 229, 106)'||preference.injected)throw Error('remote preference missing or unsafe '+JSON.stringify(preference));
+await evaluate('document.querySelector(".remote-specialist-model summary").focus()');
+await cdp('Input.dispatchKeyEvent',{type:'rawKeyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await cdp('Input.dispatchKeyEvent',{type:'char',text:'\r',unmodifiedText:'\r',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+await eventually('document.querySelector(".remote-specialist-model details").open','remote evidence keyboard disclosure unavailable');
+if(process.env.NEXUS_ROUTING_PREFERENCE_SCREENSHOT){const fs=await import('node:fs');await evaluate('document.querySelector("#specialist-grid [data-route=coding]").scrollIntoView({block:"center"})');const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_ROUTING_PREFERENCE_SCREENSHOT+'-desktop.png',Buffer.from(shot.data,'base64'));}
+
+await eventually('Math.abs(document.querySelector(".remote-route-card").getBoundingClientRect().height-Math.max(...[...document.querySelectorAll("#specialist-grid .specialist-card")].map(c=>c.getBoundingClientRect().height)))<=1','expanded specialist height did not reconcile remote cards');
 const sizing=await evaluate('({remote:document.querySelector(".remote-route-card").getBoundingClientRect().width,local:document.querySelector("#specialist-grid .specialist-card").getBoundingClientRect().width,remoteHeight:document.querySelector(".remote-route-card").getBoundingClientRect().height,localHeight:Math.max(...[...document.querySelectorAll("#specialist-grid .specialist-card")].map(c=>c.getBoundingClientRect().height)),color:getComputedStyle(document.querySelector(".remote-route-card")).borderTopColor,animation:getComputedStyle(document.querySelector(".remote-route-card .core-rings span")).animationName})');
 if(Math.abs(sizing.remote-sizing.local)>1||Math.abs(sizing.remoteHeight-sizing.localHeight)>1||sizing.color!=='rgb(255, 229, 106)'||sizing.animation!=='core-pulse')throw Error(JSON.stringify(sizing));
 await evaluate('document.querySelector(".remote-route-card").click()');
@@ -90,11 +103,13 @@ if(!await evaluate('document.querySelector("#remote-grid-dialog").open&&document
 await evaluate('document.querySelector("#remote-grid-close").click()');
 await cdp('Emulation.setDeviceMetricsOverride' ,{width:390,height:844,deviceScaleFactor:1,mobile:false});
 if(await evaluate('document.documentElement.scrollWidth>document.documentElement.clientWidth'))throw Error('mobile overflow');
+if(process.env.NEXUS_ROUTING_PREFERENCE_SCREENSHOT){const fs=await import('node:fs');await evaluate('document.querySelector("#specialist-grid [data-route=coding]").scrollIntoView({block:"center"})');const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_ROUTING_PREFERENCE_SCREENSHOT+'-mobile.png',Buffer.from(shot.data,'base64'));}
+
 await evaluate('document.querySelector(".remote-route-section").scrollIntoView()');
 if(process.env.NEXUS_ROUTING_SCREENSHOT){const fs=await import('node:fs');const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_ROUTING_SCREENSHOT,Buffer.from(shot.data,'base64'));}
 await evaluate('fetch("/fixture/empty").then(()=>document.querySelector("#refresh-routing").click())');
 await eventually('document.querySelector("#remote-route-status").textContent.includes("No remote systems")','empty state absent');
-if(await evaluate('document.querySelector("#remote-route-grid").children.length'))throw Error('stale paired system retained');
+if(await evaluate('document.querySelector("#remote-route-grid").children.length||document.querySelectorAll(".remote-specialist-model").length'))throw Error('stale paired system retained');
 await evaluate('fetch("/fixture/fail").then(()=>document.querySelector("#refresh-routing").click())');
 await eventually('document.querySelector("#remote-route-status").textContent.includes("could not be loaded")','failure state absent');
 if(await evaluate('document.querySelector("#specialist-grid").children.length!==14||document.body.textContent.includes("private error")'))throw Error('failure affected specialists or leaked response');

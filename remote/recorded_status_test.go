@@ -96,3 +96,35 @@ func TestRecordedStatusInspectsAutomaticChoiceWithoutOriginalPrompt(t *testing.T
 		t.Fatal("automatic status rerouted", result, err)
 	}
 }
+
+func TestRecordedCancellationPinsOriginalCallerAndPeer(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	store, err := OpenRouteStore(filepath.Join(t.TempDir(), "routes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "recorded-cancel-0001"
+	if _, err = f.client.DispatchRecorded(ctx, store, "node-a", key, testTask()); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(store.path(key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := f.client.Credentials
+	replacement, _ := f.ca.leaf(t, "replacement-caller")
+	f.client.Credentials = replacement
+	if _, err = f.client.CancelRecorded(ctx, store, key); !errors.Is(err, ErrConflict) {
+		t.Fatal("rotated caller canceled old ownership", err)
+	}
+	f.client.Credentials = original
+	status, err := f.client.CancelRecorded(ctx, store, key)
+	if err != nil || status.State != "canceled" {
+		t.Fatal(status, err)
+	}
+	after, _ := os.ReadFile(store.path(key))
+	if string(before) != string(after) || f.backend.creates != 1 {
+		t.Fatal("cancellation changed or dispatched intent")
+	}
+}

@@ -82,7 +82,7 @@ func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvel
 	}
 	envelope.Request = r
 	envelope.Intent = submissionIntent{Version: submissionIntentVersion, DomainExplicit: r.domainExplicit, CapabilitiesExplicit: r.capabilitiesExplicit, Ambiguous: r.intentAmbiguous}
-	if len(s.toolExtension.Names()) > 0 || s.settings.Tools.ReplaceEnabled {
+	if r.RemoteExecution == nil && (len(s.toolExtension.Names()) > 0 || s.settings.Tools.ReplaceEnabled) {
 		return "", "", nil, ErrAdmission
 	}
 	if len(key) < 16 || len(key) > 128 || strings.ContainsFunc(key, func(c rune) bool { return c < 33 || c > 126 }) || validateInput(r) != nil {

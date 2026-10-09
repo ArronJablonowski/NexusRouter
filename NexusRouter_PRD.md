@@ -1612,9 +1612,15 @@ remote transport with strict host verification and key authentication, retaining
 the same task permissions, audit and retry identity as direct HTTPS. Automatic unpinned requests must compare all eligible local and explicitly
 paired remote candidates using accuracy-first model–harness evidence; execution
 location, idle capacity, price and latency alone must not determine the winner.
-Ordinary configured-model and paired-remote automatic requests currently retain
-separate candidate pools; unified discovery and execution remain an implementation
-gap documented in `docs/accuracy-first-routing.md`. Separate tasks use separate systems; GPU pooling
+The commander daemon and CLI now compare eligible configured and paired models
+for ordinary text-only automatic requests. Their Specialist Cards use the same
+accuracy scorer and show preferred remote models and hostnames in yellow.
+Confirmed failures may advance only through the original top three distinct
+model deployments, preserving retry lineage, budget and manual pins. Uncertain
+delivery must retain ownership until failure/cancellation is confirmed; it never
+authorizes rebinding the same request to another host. Remote tool portability,
+specialized API paths and restart reconciliation remain bounded implementation
+gaps documented in `docs/accuracy-first-routing.md`. Separate tasks use separate systems; GPU pooling
 is outside scope. Protocol and current qualification boundaries are documented in
 `docs/secure-remote-routing.md`.
 

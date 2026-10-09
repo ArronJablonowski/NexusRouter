@@ -20,6 +20,10 @@ func inspectionHandlerFixture(t *testing.T) (*Handler, *atomic.Int32) {
 	calls := &atomic.Int32{}
 	handler := mutationHandlerFixture(t, MutationServices{})
 	handler.inspections = InspectionServices{
+		Routing: func(context.Context) (contract.ModelInspectionPage, error) {
+			calls.Add(1)
+			return contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, LocalProviders: []contract.LocalProviderInspection{}, Models: []contract.ModelInspection{}, Fitness: []contract.ModelFitnessInspection{}}, nil
+		},
 		Models: func(context.Context) (contract.ModelInspectionPage, error) {
 			calls.Add(1)
 			return contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, LocalProviders: []contract.LocalProviderInspection{}, Models: []contract.ModelInspection{}, Fitness: []contract.ModelFitnessInspection{}}, nil
@@ -95,7 +99,7 @@ func TestBrowserDeprecationInspectionIsAuthenticatedAndReadOnly(t *testing.T) {
 func TestInspectionRoutesRequireAuthenticationAndStrictGET(t *testing.T) {
 	handler, calls := inspectionHandlerFixture(t)
 	for _, target := range []string{
-		"/app/api/v1/models", "/app/api/v1/tasks/task/route", "/app/api/v1/tasks/task/usage",
+		"/app/api/v1/models", "/app/api/v1/routing-grid", "/app/api/v1/tasks/task/route", "/app/api/v1/tasks/task/usage",
 		"/app/api/v1/tasks/task/tools?after=1&limit=1", "/app/api/v1/tasks/task/audits", "/app/api/v1/health", "/app/api/v1/resources", "/app/api/v1/settings",
 	} {
 		response := httptest.NewRecorder()
@@ -109,7 +113,7 @@ func TestInspectionRoutesRequireAuthenticationAndStrictGET(t *testing.T) {
 	}
 	cookie, _ := authenticateBrowser(t, handler)
 	for _, target := range []string{
-		"/app/api/v1/models", "/app/api/v1/tasks/task/route", "/app/api/v1/tasks/task/usage",
+		"/app/api/v1/models", "/app/api/v1/routing-grid", "/app/api/v1/tasks/task/route", "/app/api/v1/tasks/task/usage",
 		"/app/api/v1/tasks/task/tools?after=1&limit=1", "/app/api/v1/tasks/task/audits", "/app/api/v1/health", "/app/api/v1/resources", "/app/api/v1/settings",
 	} {
 		response := httptest.NewRecorder()
@@ -118,7 +122,7 @@ func TestInspectionRoutesRequireAuthenticationAndStrictGET(t *testing.T) {
 			t.Fatalf("inspection %s returned %d %s", target, response.Code, response.Body.String())
 		}
 	}
-	if calls.Load() != 8 {
+	if calls.Load() != 9 {
 		t.Fatal("missing inspection callback", calls.Load())
 	}
 

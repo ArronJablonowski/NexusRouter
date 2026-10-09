@@ -20,6 +20,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/resources"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
@@ -52,7 +53,13 @@ func TestRemoteSDKNativeHarnessSSH(t *testing.T) {
 	remoteSDKLifecycle(t, true, true)
 }
 
+func TestRemoteSDKTextConversationPreservesPriorTurns(t *testing.T) {
+	remoteSDKLifecycleConversation(t, false, false, true, true)
+}
 func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations ...config.NativeHarness) {
+	remoteSDKLifecycleConversation(t, interruptedSSH, native, false, false, registrations...)
+}
+func remoteSDKLifecycleConversation(t *testing.T, interruptedSSH, native, conversation, builtin bool, registrations ...config.NativeHarness) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	var calls atomic.Int32
@@ -64,6 +71,10 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		}
 		calls.Add(1)
 		data, _ := io.ReadAll(r.Body)
+		if conversation && strings.Contains(string(data), "conversation-current") && (!strings.Contains(string(data), "conversation-prior") || !strings.Contains(string(data), "conversation-answer")) {
+			t.Error("remote provider lost preceding conversation")
+		}
+
 		if strings.Contains(string(data), "block-request") {
 			close(blocked)
 			<-r.Context().Done()
@@ -82,6 +93,26 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	zero := 0.0
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}, ContextTokens: 8192, EstimatedCost: &zero}}
 	task := testTask()
+	if conversation {
+		task.Prompt = "conversation-current"
+		task.Messages = []providers.Message{{Role: "user", Content: "conversation-prior"}, {Role: "assistant", Content: "conversation-answer"}, {Role: "user", Content: "conversation-current"}}
+		task.Execution = &runtime.RemoteExecution{Mode: "direct", Depth: 1}
+	}
+
+	if builtin {
+		task.HarnessID = harness.DirectRegistration("chat")
+		task.HarnessDifficulty = "unknown"
+		task.ContextTokens = 8192
+		preview, err := app.NewService(cfg, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		identity, err := preview.NativeHarnessIdentity("chat", task.HarnessID, 8192)
+		if err != nil {
+			t.Fatal(err)
+		}
+		task.ExpectedHarnessIdentity = &identity
+	}
 	if native {
 		var registration config.NativeHarness
 		if len(registrations) == 0 {
@@ -145,6 +176,12 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	f := setup(t)
 	f.http.Close()
 	backend := &SDKBackend{Available: func(context.Context) bool { return true }, Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Provider: "local", Model: "fixture", Local: true, ContextTokens: cfg.Models[0].ContextTokens}}}
+	if builtin {
+		backend.Identify = service.NativeHarnessIdentity
+		backend.PlanHarness = service.NativeHarnessCapacity
+		backend.CheckHarness = service.NativeHarnessReadiness
+		backend.Harnesses = []Harness{{ID: task.HarnessID, ModelID: "chat", Kind: "nexus-direct", ModelRevision: task.ExpectedHarnessIdentity.ModelRevision}}
+	}
 	if native {
 		backend.Identify = service.NativeHarnessIdentity
 		backend.PlanHarness = service.NativeHarnessCapacity
@@ -360,6 +397,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	}
 	blocking := task
 	blocking.Prompt = "block-request"
+	blocking.Messages = nil
 	running, e := f.client.DispatchRecorded(ctx, routeStore, "node-a", "request-running-01", blocking)
 	if e != nil {
 		t.Fatal(e)

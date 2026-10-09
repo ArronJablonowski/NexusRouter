@@ -12,6 +12,9 @@ func (s *Service) NativeHarnessIdentity(modelID, registration string, tokens int
 	if s == nil {
 		return harness.Identity{}, ErrAdmission
 	}
+	if registration == harness.DirectRegistration(modelID) {
+		return s.directIdentity(modelID, tokens)
+	}
 	entry, ok := s.nativeHarnesses[registration]
 	if !ok || entry.ModelID != modelID {
 		return harness.Identity{}, ErrHarnessUnsupported

@@ -31,6 +31,9 @@ const (
 func validAvailability(value Availability) bool { return value == Available || value == Unavailable }
 
 type ModelInspection struct {
+	RemoteModelID          string     `json:"remote_model_id,omitempty"`
+	RemoteInstance         string     `json:"remote_instance,omitempty"`
+	Hostname               string     `json:"hostname,omitempty"`
 	ID                     string     `json:"id"`
 	Provider               string     `json:"provider"`
 	Model                  string     `json:"model"`
@@ -60,6 +63,19 @@ type ModelInspection struct {
 }
 
 func (m ModelInspection) Validate() error {
+	if m.RemoteModelID != "" && (m.RemoteInstance == "" || !optionalModelID(m.RemoteModelID)) {
+		return ErrContract
+	}
+	for _, r := range m.Hostname {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-') {
+			return ErrContract
+		}
+	}
+
+	if m.RemoteInstance != "" && (!optionalModelID(m.RemoteInstance) || !boundedPrintable(m.Hostname, 0, 253)) || m.RemoteInstance == "" && m.Hostname != "" {
+		return ErrContract
+	}
+
 	if !optionalModelID(m.ID) || m.ID == "" || !optionalModelID(m.Provider) || m.Provider == "" ||
 		!boundedPrintable(m.Model, 1, 512) || !validInspectionReasoningEffort(m.ReasoningEffort) || (m.Locality != "local" && m.Locality != "cloud") ||
 		m.Capabilities == nil || len(m.Capabilities) > 128 || !boundedPrintable(m.FailureDomain, 0, 128) ||

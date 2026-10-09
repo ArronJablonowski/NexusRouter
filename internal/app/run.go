@@ -27,6 +27,9 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	retryTarget                     *automaticTarget
+	federated                       *FederatedCandidate
+	federation                      FederatedRouting
 	collaboration                   CommanderCollaboration
 	RemoteExecution                 *runtime.RemoteExecution `json:"remote_execution,omitempty"`
 	ExpectedHarnessIdentity         *harness.Identity        `json:"expected_harness_identity,omitempty"`
@@ -151,6 +154,7 @@ type Result struct {
 	RouteEstimatedCost      *float64
 	retryable               bool
 	fallbackModelIDs        []string
+	fallbackTargets         []automaticTarget
 	reservedCost            float64
 	AuditID, AuditStatus    string
 	TaskID, Text            string
@@ -569,6 +573,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 		return nativeResult, nativeErr
 	}
+	r.taskID = result.TaskID
 	providerOpen, providerAdmissionCleanup, err := prepareTaskProvider(s, provider, model, r, messages, privacy, key, providers.PurposeExecution)
 	if err != nil {
 		return result, ErrAdmission

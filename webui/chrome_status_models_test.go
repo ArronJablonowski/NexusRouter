@@ -27,7 +27,7 @@ func TestChromeRemoteModelsAndStatusSeparation(t *testing.T) {
 			w.Write([]byte(`{"version":1,"observed_at":"2026-10-04T18:00:00Z","items":[{"id":"health","description":"Record provider health","enabled":true,"interval":"30s"}]}`))
 		case "/app/api/v1/os-schedules":
 			w.Write([]byte(`{"version":1,"observed_at":"2026-10-04T18:00:00Z","items":[{"id":"timer","name":"Example timer","source":"system timer","schedule":"Every 5m","state":"Configured"}],"limitations":[]}`))
-		case "/app/api/v1/models":
+		case "/app/api/v1/models", "/app/api/v1/routing-grid":
 			w.Write([]byte(chromeModelsPopulatedFixture))
 		case "/app/api/v1/session/csrf":
 			writeChromeJSON(w, map[string]any{"version": 1, "csrf_token": "fixture"})

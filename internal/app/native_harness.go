@@ -110,6 +110,14 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 		}
 		r.ExpectedHarnessIdentity = &expected
 	}
+	if r.HarnessID == harness.DirectRegistration(r.ModelID) {
+		if r.ExpectedHarnessIdentity == nil || r.RemoteExecution == nil || r.RemoteExecution.Mode != "direct" || r.HarnessEvaluation || r.runtimeHostAdmission != nil {
+			return Request{}, ErrHarnessUnsupported
+		}
+		// Intake retains this expected identity. Execution uses the ordinary provider
+		// loop, with the remote direct boundary stripping ambient tool authority.
+		return r, nil
+	}
 	if r.HarnessEvaluation && r.HarnessID != "auto" {
 		return Request{}, ErrHarnessUnsupported
 	}

@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
@@ -29,9 +30,10 @@ var ErrConflict = errors.New("remote request identity conflict")
 var ErrRateLimited = errors.New("remote request rate limited; retry the same request identity later")
 var ErrUnavailable = errors.New("remote operation unavailable; delivery may be uncertain")
 
-// Task deliberately excludes continuation, arbitrary messages, paths and tool
-// authority. The destination's configured runtime retains all admission rules.
+// Task excludes continuation identifiers, paths and tool authority. Optional
+// conversation messages contain text only and require direct execution. The destination's configured runtime retains all admission rules.
 type Task struct {
+	Messages                []providers.Message      `json:"messages,omitempty"`
 	Execution               *runtime.RemoteExecution `json:"execution,omitempty"`
 	ExpectedHarnessIdentity *harness.Identity        `json:"expected_harness_identity,omitempty"`
 	HarnessID               string                   `json:"harness_id,omitempty"`
@@ -48,6 +50,23 @@ type Task struct {
 }
 
 func (t Task) Validate() error {
+	if len(t.Messages) > 0 {
+		if t.Execution == nil || t.Execution.Mode != "direct" || len(t.Messages) > 256 || providers.ValidateMessages(t.Messages) != nil {
+			return ErrInvalid
+		}
+		total := 0
+		for _, m := range t.Messages {
+			if m.Role == "tool" || len(m.ToolCalls) != 0 || m.ToolCallID != "" || m.ToolFailed {
+				return ErrInvalid
+			}
+			total += len(m.Content)
+		}
+		encoded, encodeErr := json.Marshal(t)
+		if encodeErr != nil || len(encoded) > MaxBody || total > MaxBody/2 {
+			return ErrInvalid
+		}
+	}
+
 	if t.Execution != nil {
 		if t.Execution.Validate() != nil || (t.HarnessID != "" && t.Execution.Mode != "direct") {
 			return ErrInvalid
@@ -107,16 +126,17 @@ type Model struct {
 	Local         bool     `json:"local"`
 }
 type Info struct {
-	Controller    *Controller              `json:"controller,omitempty"`
-	Schedules     *webui.SchedulePage      `json:"schedules,omitempty"`
-	HybridVersion int                      `json:"hybrid_version,omitempty"`
-	Routing       *webui.RoutingInspection `json:"routing,omitempty"`
-	Hostname      string                   `json:"hostname,omitempty"`
-	Harnesses     []Harness                `json:"harnesses,omitempty"`
-	Resources     *ResourceObservation     `json:"resources,omitempty"`
-	Version       int                      `json:"version"`
-	Instance      string                   `json:"instance"`
-	Models        []Model                  `json:"models"`
+	ConversationVersion int                      `json:"conversation_version,omitempty"`
+	Controller          *Controller              `json:"controller,omitempty"`
+	Schedules           *webui.SchedulePage      `json:"schedules,omitempty"`
+	HybridVersion       int                      `json:"hybrid_version,omitempty"`
+	Routing             *webui.RoutingInspection `json:"routing,omitempty"`
+	Hostname            string                   `json:"hostname,omitempty"`
+	Harnesses           []Harness                `json:"harnesses,omitempty"`
+	Resources           *ResourceObservation     `json:"resources,omitempty"`
+	Version             int                      `json:"version"`
+	Instance            string                   `json:"instance"`
+	Models              []Model                  `json:"models"`
 	// Availability is advisory; Submit and the destination dispatcher recheck.
 	Available bool `json:"available"`
 }
@@ -161,6 +181,9 @@ func validHostname(s string) bool {
 }
 
 func (i Info) ValidateRouting() error {
+	if i.ConversationVersion < 0 || i.ConversationVersion > 1 {
+		return ErrInvalid
+	}
 	for _, m := range i.Models {
 		if d := m.Inspection; d != nil && (d.Validate() != nil || d.ID != m.ID || d.Provider != m.Provider || d.Model != m.Model || (d.Locality == "local") != m.Local) {
 			return ErrInvalid

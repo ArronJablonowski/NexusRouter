@@ -51,7 +51,7 @@ func TestChromeInspectorUpdatesValuesInPlace(t *testing.T) {
 		case "/app/api/v1/resources":
 			writeChromeJSON(w, map[string]any{"version": 1, "availability": "available", "observed_at": "2026-10-04T12:00:00Z", "cpus": 8})
 			return
-		case "/app/api/v1/models":
+		case "/app/api/v1/models", "/app/api/v1/routing-grid":
 			writeChromeJSON(w, map[string]any{"version": 1, "availability": "unavailable", "models": []any{}})
 			return
 		}

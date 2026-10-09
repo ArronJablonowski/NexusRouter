@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/ArronJablonowski/NexusRouter/internal/gridcollab"
+	"github.com/ArronJablonowski/NexusRouter/internal/gridroute"
 	"io"
 	"log"
 	"net"
@@ -86,6 +87,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	}
 	if err := gridcollab.Install(service, s); err != nil {
 		fmt.Fprintln(stderr, "cannot initialize commander collaboration")
+		return 1
+	}
+	if err := gridroute.Install(service, s); err != nil {
+		fmt.Fprintln(stderr, "cannot initialize unified routing")
 		return 1
 	}
 	registry, err = app.BuildConfiguredSkillValidatorRegistry(service, registry)
@@ -389,6 +394,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return db.ReadCommittedEventPage(ctx, options)
 			},
 		}, Inspections: webuiapp.InspectionServices{
+			Routing: func(ctx context.Context) (webui.ModelInspectionPage, error) {
+				report, _ := healthReport(ctx)
+				return service.BrowserRouting(ctx, report)
+			},
 			Dependencies: service.BrowserDependencies,
 			Logging:      service.BrowserLogging,
 			Schedules:    service.BrowserSchedules,

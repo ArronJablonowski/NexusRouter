@@ -9,6 +9,7 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
+	federation                 FederatedRouting
 	collaboration              CommanderCollaboration
 	nativeHarnesses            map[string]NativeHarness
 	harnessEvidence            *harness.EvidenceStore
@@ -175,7 +177,7 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 			runErr = errors.Join(runErr, r.eventDelivery.Err())
 		}()
 	}
-	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled) && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
+	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled) && r.RemoteExecution == nil && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
 		return Result{}, ErrAdmission
 	}
 	// Process-local handlers have no durable identity yet. Never attach changed
@@ -276,6 +278,15 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 			ctx, cancel = context.WithTimeout(ctx, fallbackTimeout)
 			defer cancel()
 			fallbacks := append([]string(nil), result.fallbackModelIDs...)
+			targets := result.fallbackTargets
+			if targets != nil {
+				maxAttempts = min(maxAttempts, 3)
+				fallbacks = nil
+				for _, target := range targets {
+					fallbacks = append(fallbacks, target.ID)
+				}
+			}
+
 			previous := []string{result.TaskID}
 			remaining := r.MaxCost - result.reservedCost
 			for _, modelID := range fallbacks {
@@ -285,6 +296,14 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 					break
 				}
 				r.onlyModelID = modelID
+				r.retryTarget = nil
+				for i := range targets {
+					if targets[i].ID == modelID {
+						r.retryTarget = &targets[i]
+						break
+					}
+				}
+
 				r.retryOfTaskID = previous[len(previous)-1]
 				r.MaxCost = remaining
 				next, nextErr := s.runWithPressure(ctx, r, s.runAuto)
@@ -618,6 +637,31 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 			evidence[key] = e
 		}
 	}
+	remoteCandidates, remoteErr := s.federatedCandidates(ctx, cfg, r, inference, contextTokens)
+	if remoteErr != nil {
+		return Result{}, remoteErr
+	}
+	routingNow = s.routingNow()
+	remoteByProvider := map[string]FederatedCandidate{}
+	for _, remote := range remoteCandidates {
+		remoteByProvider[remote.Model.Provider] = remote
+		candidates = append(candidates, remote.Candidate)
+		key := routing.Key{Model: remote.Model.Model, Provider: remote.Model.Provider, Domain: r.Domain, Profile: r.Profile}
+		set, e := db.ObservationSet(ctx, key, cfg.Evaluation.Judge)
+		if e != nil {
+			return Result{}, ErrAdmission
+		}
+		set.Fitness = append(set.Fitness, remote.Observations.Fitness...)
+		set.Advisory = append(set.Advisory, remote.Observations.Advisory...)
+		ev, e := routing.AggregateEvidence(key, set, routingNow, p, decayResolver)
+		if e != nil {
+			return Result{}, ErrAdmission
+		}
+		evidence[key] = ev
+	}
+	if len(candidates) > 256 {
+		return Result{}, ErrAdmission
+	}
 	// Serialize profiling and the exploration draw. Each selected local route
 	// then performs fresh, serialized reservation admission; managed lifecycle
 	// HTTP runs outside the global mutex. Capacity failures rerank safely.
@@ -634,7 +678,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 	for {
 		if profileErr != nil {
 			for i := range candidates {
-				if candidates[i].Local {
+				if candidates[i].Local && remoteByProvider[candidates[i].Provider].Instance == "" {
 					candidates[i].CapacityAvailable = false
 				}
 			}
@@ -649,6 +693,16 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 				model = m
 				break
 			}
+		}
+		if remote, ok := remoteByProvider[selected.Primary.Provider]; ok {
+			model = remote.Model
+			cfg.Models = append(slices.Clone(cfg.Models), model)
+			cfg.Providers = append(slices.Clone(cfg.Providers), config.Provider{ID: model.Provider, Kind: "openai_compatible", Endpoint: "http://127.0.0.1:1"})
+			r.ModelID = model.ID
+			r.ContextTokens = max(contextTokens, 8192)
+			r.federated = &remote
+			r.federation = s.federation
+			break
 		}
 		candidateRequest := r
 		candidateRequest.ModelID = model.ID
@@ -733,7 +787,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 	redacted, _ := cfg.RedactedJSON()
 	hash := sha256.Sum256(redacted)
 	r.route = &runtime.Data{ModelID: selected.Primary.Model, ProviderID: selected.Primary.Provider, Route: &selected, Domain: r.Domain, Profile: r.Profile, ConfigID: hex.EncodeToString(hash[:]), RouteCandidates: candidates, RoutePolicy: &p}
-	if profileErr == nil {
+	if profileErr == nil && r.federated == nil {
 		// Persist only the selected device's scalar observation, never the
 		// full hardware inventory or identifiers from unrelated devices.
 		for _, model := range cfg.Models {
@@ -759,6 +813,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		if m.ID == r.ModelID && m.EstimatedCost != nil {
 			result.reservedCost = *m.EstimatedCost
 		}
+	}
+	if len(remoteCandidates) > 0 || r.retryTarget != nil {
+		result.fallbackTargets = topModelTargets(selected, remoteByProvider, cfg.Models)
+		for _, target := range result.fallbackTargets {
+			result.fallbackModelIDs = append(result.fallbackModelIDs, target.ID)
+		}
+		return result, runErr
 	}
 	seenFallbacks := map[string]bool{}
 	for _, fallback := range selected.Fallbacks {

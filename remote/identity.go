@@ -21,7 +21,7 @@ func (q HarnessIdentityRequest) valid() bool {
 	return name(q.ModelID) && name(q.HarnessID) && q.HarnessID != "auto" && q.ContextTokens >= 8192 && q.ContextTokens <= 1<<24
 }
 func (p Peer) permitsIdentity(q HarnessIdentityRequest) bool {
-	return q.valid() && slices.Contains(p.Models, q.ModelID) && slices.Contains(p.Harnesses, q.HarnessID) && q.ContextTokens <= p.MaxContextTokens
+	return q.valid() && slices.Contains(p.Models, q.ModelID) && (slices.Contains(p.Harnesses, q.HarnessID) || q.HarnessID == harness.DirectRegistration(q.ModelID)) && q.ContextTokens <= p.MaxContextTokens
 }
 
 // HarnessIdentity is a configured preview, not verified completion provenance.
