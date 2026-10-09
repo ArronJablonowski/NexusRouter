@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA nine-batch checkpoint
+
+Primary coverage 9/634; Muse batch 9 running. Three new Muse batch 6 claims were rejected/unsupported after reading the omitted caller context: unknown-profile capacity denial is tested policy, configuration appends use cloned local slices, and executionCtx is initialized before selection. No new confirmed bugs; the earlier redaction hypothesis remains unverified. qwen/Laguna batches 7–8 reported no verified defects. [Triage evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved; documentation diff checks only, with no source/configuration/service changes.
+
 ## 2026-10-09 — Spark QA first candidate triage
 
 Primary coverage 4/634, with qwen batch 4 running. Muse batch 3 raised three candidates: fail-closed audit cancellation is documented policy, arbitrary ToolBehavior content is blocked by validated fixed enums, and post-marshal redaction remains an unverified edge-case hypothesis without an admitted reproducer. No confirmed defect or product fix. [Evidence and dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) retain exact pinned source references and cross-review limits. Worker healthy; current GPU 82°C / hottest thermal zone 89.3°C, retained sampled peaks 85°C / 93.3°C. Documentation diff validation only.

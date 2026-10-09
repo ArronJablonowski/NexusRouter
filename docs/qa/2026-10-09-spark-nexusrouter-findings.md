@@ -71,3 +71,13 @@ Pinned source: `7d4b7aac`. Three model candidates; zero confirmed defects. Sourc
 3. **Post-marshal redaction invalidates JSON — unverified hypothesis.** `internal/app/audit_evidence.go:73` redacts serialized JSON and line 74 rejects invalid JSON before output. `internal/app/run.go:889` uses longest-first literal replacements; `internal/app/audit_evidence_test.go:97` exercises quoted/backslash/newline secrets and expects valid redacted JSON. No concrete admitted configuration/event reproducing an unintended rejection has been demonstrated. Crafted secrets overlapping JSON syntax/metadata remain an edge-case hypothesis; no leak is established. Removing the validity/secret defense is not justified by this report.
 
 The original model output remains in the live Markdown report. A second-model cross-review is still planned for this candidate-bearing batch. Related files in this triage were read from the pinned snapshot, not runtime data.
+
+## Muse batch 6 triage — 2026-10-09 18:58 UTC
+
+Three new model claims are not supported by the full pinned caller context (`7d4b7aac`):
+
+- **Unknown-profile local capacity denial:** intentional fail-closed behavior. `internal/app/auto.go:682` disqualifies host-local candidates when profiling fails while retaining separately profiled remote candidates. `internal/app/auto_pressure_test.go:18` explicitly expects the profile-error path to return no route. Treating unknown capacity as available would weaken admission; manual-pin behavior is not established by this automatic-path claim.
+- **Shared configuration pollution:** unsupported. `internal/app/auto.go:435` creates a value-local Settings result; `internal/config/cloud_context.go:16` takes and returns Settings by value. Lines 702–703 clone both slices before appending and reassign only the local cfg fields. The cited code does not append to s.settings or its backing slices.
+- **Nil recursive execution context:** rejected. `internal/app/auto.go:428` initializes executionCtx from the incoming ctx, before candidate selection/reservation. The slice sent to Muse omitted this line. No nil-context trigger is demonstrated.
+
+No tests were run and no product code changed. Claims remain in raw model output for the later second-model cross-review; zero newly verified defects. qwen batch 7 and Laguna batch 8 reported NO_VERIFIED_BUGS with missing implementation/caller gaps. Primary coverage is 9/634; Muse batch 9 is running. Cross-reviews have not started. Worker healthy, no new failures. Spark sample: GPU 81°C; hottest thermal zone 89.3°C. Retained sampled peaks: 85°C GPU / 93.3°C thermal zone.
