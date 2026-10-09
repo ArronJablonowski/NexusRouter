@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA fourth recovery succeeded
+
+48/634 primary batches succeeded; Muse batch 48 running. All four terminal empty-output gaps now have successful same-model recovery reports with original receipts retained. Latest inventory/provenance report adds only hypotheses/style concerns, not actionable defects. [Checkpoint](qa/2026-10-09-spark-nexusrouter-findings.md) records limits; cost-candidate reproduction pending. Worker healthy, no new failure or product change; documentation checks only.
+
 ## 2026-10-09 — Spark collaboration claims checked at store boundary
 
 46/634 primary batches succeeded; qwen recovery of batch 43 running. Negative-cursor/unbounded-read and private-broadcast leak claims are contradicted by store-side option validation, bounded query and private visibility filtering. [Source evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new verified defect/product change or failure; worker healthy. Documentation diff checks only.
