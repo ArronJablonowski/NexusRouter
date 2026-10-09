@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA first completed batch
+
+Muse batch 0 completed with no actionable candidate and explicit missing cross-file caller evidence. NexusRouter status confirms qwen batch 1 running; the sequential worker is alive. Corrected a coverage omission by scheduling two fragments of the minified SPDX schema with original line/character offsets, bringing planned primary batches to 634. The two image assets remain excluded. Sanitized model report saved in [QA findings](qa/2026-10-09-spark-nexusrouter-findings.md). No verified defect or product change is established; 633 primary batches and candidate cross-reviews remain incomplete. Documentation-only diff checks passed; no application tests were rerun.
+
 ## 2026-10-09 — Spark repository QA started
 
 User-authorized private code QA of snapshot `7d4b7aac` is running through NexusRouter on Spark, rotating Muse Glimmer, qwen3.8 27B and Laguna S 2.1 across 632 numbered text batches. A sequential worker and ten-minute monitoring preserve request uncertainty and memory safeguards. Initial context-overflow admission failures were diagnosed; smaller replacement batches are admitted and Muse is running. No model findings are verified yet. Live Markdown/state are kept in the private QA workspace; [review report](qa/2026-10-09-spark-nexusrouter-findings.md) records model identities, distributed coverage, cross-review plan and limits. Product source/configuration/services remain unchanged. This is a campaign start, not completed QA.
