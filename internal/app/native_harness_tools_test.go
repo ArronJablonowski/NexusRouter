@@ -38,6 +38,7 @@ func testNativeToolsSnapshot(t *testing.T, kind string) {
 
 	cfg := config.Defaults()
 	cfg.Tools.Enabled = false
+	cfg.Tools.CollaborationEnabled = true
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://127.0.0.1:11434", RequestTimeout: "15s"}}
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 16384, Capabilities: []string{"chat"}}}
 	cfg.NativeHarnesses = []config.NativeHarness{{ID: "pi-local", NativeTools: true, Kind: kind, HermesSourceDir: "/operator/hermes", RuntimeSHA256: strings.Repeat("b", 64), ModelID: "chat", Executable: "/operator/pi", ExecutableSHA256: strings.Repeat("a", 64), ModelRevision: "v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}

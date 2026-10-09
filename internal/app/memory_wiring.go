@@ -50,6 +50,9 @@ func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string 
 	for _, extension := range extensions {
 		names = append(names, extension.Names()...)
 	}
+	if cfg.Tools.CollaborationEnabled {
+		names = append(names, "collaboration_models", "collaboration_read", "collaboration_send")
+	}
 	if cfg.Tools.Enabled {
 		names = append(names, "read_file")
 	}

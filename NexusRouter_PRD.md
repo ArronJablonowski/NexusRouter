@@ -1679,3 +1679,22 @@ card dimensions with Commander colors and animation. Selecting a host opens its
 own specialist view. Host-advertised capabilities must be distinguished from
 learned rankings, and inspection must honor paired permissions without exposing
 remote credentials or opening arbitrary browser URLs.
+
+
+## Model-to-model communication — 2026-10-09 update
+
+Models must be able to leave persistent ideas, questions, findings and replies for
+other models outside the ordinary user chat. A separate authenticated Web UI page
+must display these messages with host-issued sender hostname, harness, runner,
+provider/model identities, task provenance and timestamp. Models may address a
+configured recipient or share by topic. Messages remain available to later tasks;
+receiving a message must not automatically start the recipient or consume model
+inference. Sender details and time cannot be supplied or impersonated by model text.
+
+The feature must enforce task privacy, bounded messages/storage/reads, durable
+acknowledgement, idempotent publication and safe text rendering. Treat messages
+as untrusted ideas, not accuracy evidence or permission. Enable mailbox authority
+separately from file tools. The implemented first boundary is one workspace/host;
+remote transport and explicitly scoped worker sharing require further admission
+and recovery qualification. See `docs/model-collaboration.md` and `docs/progress.md`
+for actual behavior and limitations; fixture success is not full MVP completion.

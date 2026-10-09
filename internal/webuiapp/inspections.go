@@ -16,24 +16,28 @@ import (
 )
 
 type InspectionServices struct {
-	Routing      func(context.Context) (contract.ModelInspectionPage, error)
-	Dependencies func(context.Context) (contract.DependencyInventory, error)
-	Logging      func(context.Context) (contract.LoggingPage, error)
-	Schedules    func(context.Context) (contract.SchedulePage, error)
-	Skills       func(context.Context) (app.BrowserSkillPage, error)
-	Stats        func(context.Context, *usagestats.Reset) (usagestats.Snapshot, error)
-	Models       func(context.Context) (contract.ModelInspectionPage, error)
-	Route        func(context.Context, string) (contract.RouteInspection, error)
-	Usage        func(context.Context, string) (contract.TaskUsageInspection, error)
-	Tools        func(context.Context, string, string, int) (contract.ToolInspectionPage, error)
-	Audits       func(context.Context, string, string, int) (contract.AuditInspectionPage, error)
-	Health       func(context.Context) (contract.HealthInspection, error)
-	Resources    func(context.Context) (contract.ResourceInspection, error)
-	Settings     func(context.Context) (contract.SettingsInspection, error)
-	Deprecation  func(context.Context, string, string, string, evaluation.DeprecationPolicy) (evaluation.DeprecationReport, error)
+	Collaboration func(context.Context, contract.CollaborationOptions) (contract.CollaborationPage, error)
+	Routing       func(context.Context) (contract.ModelInspectionPage, error)
+	Dependencies  func(context.Context) (contract.DependencyInventory, error)
+	Logging       func(context.Context) (contract.LoggingPage, error)
+	Schedules     func(context.Context) (contract.SchedulePage, error)
+	Skills        func(context.Context) (app.BrowserSkillPage, error)
+	Stats         func(context.Context, *usagestats.Reset) (usagestats.Snapshot, error)
+	Models        func(context.Context) (contract.ModelInspectionPage, error)
+	Route         func(context.Context, string) (contract.RouteInspection, error)
+	Usage         func(context.Context, string) (contract.TaskUsageInspection, error)
+	Tools         func(context.Context, string, string, int) (contract.ToolInspectionPage, error)
+	Audits        func(context.Context, string, string, int) (contract.AuditInspectionPage, error)
+	Health        func(context.Context) (contract.HealthInspection, error)
+	Resources     func(context.Context) (contract.ResourceInspection, error)
+	Settings      func(context.Context) (contract.SettingsInspection, error)
+	Deprecation   func(context.Context, string, string, string, evaluation.DeprecationPolicy) (evaluation.DeprecationReport, error)
 }
 
 func inspectionQueryPath(base, path string) bool {
+	if path == base+"/api/v1/collaboration" {
+		return true
+	}
 	return taskActionID(base, path, "tools") != "" || taskActionID(base, path, "audits") != "" || path == base+"/api/v1/models/deprecation"
 }
 
@@ -69,6 +73,37 @@ func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.R
 		h.serveStats(writer, request)
 	case path == base+"/models/deprecation":
 		h.serveDeprecationInspection(writer, request)
+	case path == base+"/collaboration":
+		serveInspection(h, writer, request, "collaboration_unavailable", func(ctx context.Context) (contract.CollaborationPage, error) {
+			if h.inspections.Collaboration == nil {
+				return contract.CollaborationPage{}, errors.New("unavailable")
+			}
+			values, e := url.ParseQuery(request.URL.RawQuery)
+			if e != nil || len(request.URL.RawQuery) > 512 {
+				return contract.CollaborationPage{}, contract.ErrContract
+			}
+			o := contract.CollaborationOptions{}
+			for key, items := range values {
+				if len(items) != 1 {
+					return contract.CollaborationPage{}, contract.ErrContract
+				}
+				switch key {
+				case "topic":
+					o.Topic = items[0]
+				case "before":
+					o.Before, e = strconv.ParseInt(items[0], 10, 64)
+					if e != nil {
+						return contract.CollaborationPage{}, contract.ErrContract
+					}
+				default:
+					return contract.CollaborationPage{}, contract.ErrContract
+				}
+			}
+			if o.Validate() != nil {
+				return contract.CollaborationPage{}, contract.ErrContract
+			}
+			return h.inspections.Collaboration(ctx, o)
+		})
 	case path == base+"/routing-grid":
 		serveInspection(h, writer, request, "routing_unavailable", func(ctx context.Context) (contract.ModelInspectionPage, error) {
 			if h.inspections.Routing == nil {
@@ -205,7 +240,7 @@ func canonicalToolCursor(value string) bool {
 }
 
 type inspectionResponse interface {
-	contract.DependencyInventory | contract.LoggingPage | scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
+	contract.CollaborationPage | contract.DependencyInventory | contract.LoggingPage | scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
 }
 
 func serveInspection[T inspectionResponse](h *Handler, writer http.ResponseWriter, request *http.Request, code string, read func(context.Context) (T, error), timeouts ...time.Duration) {
@@ -249,6 +284,8 @@ func safeInspection[T inspectionResponse](ctx context.Context, read func(context
 
 func inspectionInvalid[T inspectionResponse](value T) bool {
 	switch typed := any(value).(type) {
+	case contract.CollaborationPage:
+		return typed.Validate() != nil
 	case contract.DependencyInventory:
 		return typed.Validate() != nil
 	case contract.LoggingPage:

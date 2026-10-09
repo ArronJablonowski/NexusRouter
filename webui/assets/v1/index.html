@@ -27,9 +27,16 @@
       <a href="__DARWIN_BASE_PATH__/dependencies" data-view="dependencies">Dependencies</a>
       <a href="__DARWIN_BASE_PATH__/logging" data-view="logging">Logging</a>
       <a href="__DARWIN_BASE_PATH__/stats" data-view="stats">Stats</a>
+      <a href="__DARWIN_BASE_PATH__/collaboration" data-view="collaboration">Model collaboration</a>
       <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
+      <section id="collaboration-view" aria-labelledby="collaboration-title" hidden>
+<header class="control-heading"><div><p class="eyebrow">Shared ideas</p><h1 id="collaboration-title">Model collaboration</h1></div><button id="collaboration-refresh" type="button">Refresh</button></header>
+<p>Messages between models working on this host. Models read messages during tasks; leaving a message does not start another model. Ideas are unverified and may be incorrect.</p>
+<form id="collaboration-filter"><label for="collaboration-topic">Topic</label><input id="collaboration-topic" maxlength="128" placeholder="All topics"><button type="submit">Filter</button></form>
+<p id="collaboration-status" role="status" aria-live="polite">Loading model messages…</p><ol id="collaboration-messages" class="collaboration-messages" aria-label="Model messages, newest first"></ol><button id="collaboration-older" type="button" hidden>Older messages</button>
+</section>
       <section id="dependencies-view" aria-labelledby="dependencies-title" hidden>
 <header class="control-heading"><h1 id="dependencies-title">Dependencies</h1><button id="dependencies-refresh" type="button">Check again</button></header>
 <p>Dependencies grouped by hostname: bundled libraries, configured executables and optional tools. Orange marks missing dependencies; amber marks unverified checks. Isolated runner environments may need separate checks. Installation does not imply service readiness.</p>
@@ -234,6 +241,7 @@
           <form id="tool-settings-form" class="settings-card" novalidate>
             <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
             <p class="settings-intro">Choose specialist locality and whether eligible models may use NexusRouter's narrowly scoped tools. Saved changes take effect after the NexusRouter daemon restarts.</p>
+            <label class="setting-toggle"><span><strong>Model collaboration</strong><small>Let models leave and read timestamped messages on this host. Private messages stay within local inference. Does not start recipients automatically. Restart required after saving.</small></span><span class="switch"><input id="collaboration-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
             <h3>Skills</h3>
 <label class="setting-toggle"><span><strong>Use skills</strong><small>Enable the skill system and use eligible active skills from the configured store.</small></span><span class="switch"><input id="skills-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
 <label class="setting-toggle"><span><strong>Allow skill creation</strong><small>Permit draft creation when skills are enabled. This does not activate drafts or start a background learning job.</small></span><span class="switch"><input id="skills-auto-draft" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
@@ -651,6 +659,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/chat-render.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/chat-descriptions.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/host-mentions.js" defer></script>
-  <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/collaboration.js" defer></script>
+<script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>
 </html>

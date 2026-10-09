@@ -127,6 +127,7 @@ type Workers struct {
 	DelegateMaxTurns  int     `yaml:"delegate_max_turns" json:"delegate_max_turns"`
 }
 type Provider struct {
+	Runner              string `yaml:"runner,omitempty" json:"runner,omitempty"`
 	OllamaThink         *bool  `yaml:"ollama_think,omitempty" json:"ollama_think,omitempty"`
 	DedicatedWarmMemory bool   `yaml:"dedicated_warm_memory,omitempty" json:"dedicated_warm_memory,omitempty"`
 	ManageResidency     bool   `yaml:"manage_residency" json:"manage_residency,omitempty"`
@@ -240,6 +241,7 @@ type Telemetry struct {
 	TraceExport           *TraceExport          `yaml:"trace_export,omitempty" json:"trace_export,omitempty"`
 }
 type Tools struct {
+	CollaborationEnabled  bool   `yaml:"collaboration_enabled" json:"collaboration_enabled,omitempty"`
 	CreateEnabled         bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
 	CreateRoot            string `yaml:"create_root" json:"create_root,omitempty"`
 	ReplaceEnabled        bool   `yaml:"replace_enabled" json:"replace_enabled,omitempty"`
@@ -559,6 +561,9 @@ func (s Settings) Validate() error {
 		return err
 	}
 	for _, p := range s.Providers {
+		if len(p.Runner) > 128 || !utf8.ValidString(p.Runner) || strings.TrimSpace(p.Runner) != p.Runner || strings.ContainsFunc(p.Runner, unicode.IsControl) {
+			return errors.New("invalid provider runner metadata")
+		}
 		if !identifier.MatchString(p.ID) {
 			return errors.New("invalid provider ID")
 		}

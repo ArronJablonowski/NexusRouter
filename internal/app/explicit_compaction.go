@@ -184,6 +184,9 @@ func (s *Service) prepareExplicitInference(ctx context.Context, db *telemetry.St
 
 func initialTaskTools(cfg config.Settings, r Request) []providers.Tool {
 	result := r.toolExtension.Catalog()
+	if cfg.Tools.CollaborationEnabled && r.RemoteExecution == nil && r.delegatedTools == nil && r.delegatedParent == "" && r.runtimeHostAdmission == nil {
+		result = append(result, modelCollaborationSpecs()...)
+	}
 	if cfg.Tools.Enabled {
 		result = append(result, readFileSpec())
 	}

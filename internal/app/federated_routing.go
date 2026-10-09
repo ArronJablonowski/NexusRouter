@@ -37,7 +37,7 @@ type automaticTarget struct {
 func (s *Service) ConfigureFederatedRouting(f FederatedRouting) { s.federation = f }
 
 func (s *Service) federatedCandidates(ctx context.Context, cfg config.Settings, r Request, input providers.Request, tokens int) ([]FederatedCandidate, error) {
-	if s.federation == nil || r.RemoteExecution != nil || r.runtimeHostAdmission != nil || (r.onlyModelID != "" && r.retryTarget == nil) || r.Compaction != nil || r.SummaryAttemptID != "" || r.contextEstimator != nil || len(input.Tools) > 0 || cfg.Tools.Enabled || cfg.Tools.WorkboardReadEnabled || cfg.Tools.WorkboardWriteEnabled || cfg.Workers.DelegateModel != "" || r.delegatedTools != nil {
+	if s.federation == nil || r.RemoteExecution != nil || r.runtimeHostAdmission != nil || (r.onlyModelID != "" && r.retryTarget == nil) || r.Compaction != nil || r.SummaryAttemptID != "" || r.contextEstimator != nil || len(input.Tools) > 0 || cfg.Tools.CollaborationEnabled || cfg.Tools.Enabled || cfg.Tools.WorkboardReadEnabled || cfg.Tools.WorkboardWriteEnabled || cfg.Workers.DelegateModel != "" || r.delegatedTools != nil {
 		return nil, nil
 	}
 	for _, m := range input.Messages {

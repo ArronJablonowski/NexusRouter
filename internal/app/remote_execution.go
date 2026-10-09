@@ -75,6 +75,7 @@ func remoteExecutionSettings(cfg config.Settings, r Request) config.Settings {
 	if r.RemoteExecution == nil {
 		return cfg
 	}
+	cfg.Tools.CollaborationEnabled = false
 	cfg.Tools.Enabled = false
 	cfg.Tools.CreateEnabled = false
 	cfg.Tools.ReplaceEnabled = false

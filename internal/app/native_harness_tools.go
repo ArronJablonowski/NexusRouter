@@ -21,6 +21,9 @@ type nativeToolContract struct {
 
 func nativeToolsFor(s config.Settings, extension *tools.Extension) nativeToolContract {
 	c := nativeToolContract{MaxTurns: min(s.Runtime.MaxTurns, s.Tools.MaxTurns), Rules: extension.Rules()}
+	if s.Tools.CollaborationEnabled {
+		c.Catalog = append(c.Catalog, modelCollaborationSpecs()...)
+	}
 	if s.Tools.Enabled {
 		c.Catalog = append(c.Catalog, readFileSpec())
 	}

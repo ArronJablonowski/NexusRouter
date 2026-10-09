@@ -1,7 +1,10 @@
 package webui
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/ArronJablonowski/NexusRouter/remoteconfig"
+	"io"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -14,6 +17,7 @@ var settingsDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 const MaxSettingsRootBytes = 4096
 
 type ToolAccessSettings struct {
+	CollaborationEnabled  bool                       `json:"collaboration_enabled"`
 	MacMemoryPercent      float64                    `json:"mac_memory_percent"`
 	MacSwapGrowthGB       float64                    `json:"mac_swap_growth_gb"`
 	DNSLogging            string                     `json:"dns_logging"`
@@ -77,9 +81,10 @@ func (s SettingsInspection) Validate() error {
 }
 
 type SettingsUpdateRequest struct {
-	Version        int                `json:"version"`
-	ExpectedDigest string             `json:"expected_digest"`
-	Settings       ToolAccessSettings `json:"settings"`
+	collaborationSpecified bool
+	Version                int                `json:"version"`
+	ExpectedDigest         string             `json:"expected_digest"`
+	Settings               ToolAccessSettings `json:"settings"`
 }
 
 func (r SettingsUpdateRequest) Validate() error {
@@ -87,4 +92,35 @@ func (r SettingsUpdateRequest) Validate() error {
 		return ErrContract
 	}
 	return encodedWithin(r, 16<<10)
+}
+
+// An older browser may omit a newly introduced setting. Presence is tracked on
+// the request, separate from comparable settings projections.
+func (r *SettingsUpdateRequest) UnmarshalJSON(raw []byte) error {
+	type wire SettingsUpdateRequest
+	var value wire
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&value); err != nil {
+		return err
+	}
+	if d.Decode(new(any)) != io.EOF {
+		return ErrContract
+	}
+	var envelope struct {
+		Settings map[string]json.RawMessage `json:"settings"`
+	}
+	if json.Unmarshal(raw, &envelope) != nil {
+		return ErrContract
+	}
+	field, present := envelope.Settings["collaboration_enabled"]
+	if present && string(bytes.TrimSpace(field)) != "true" && string(bytes.TrimSpace(field)) != "false" {
+		return ErrContract
+	}
+	*r = SettingsUpdateRequest(value)
+	r.collaborationSpecified = present
+	return nil
+}
+func (r SettingsUpdateRequest) HasCollaborationSetting() bool {
+	return r.collaborationSpecified || r.Settings.CollaborationEnabled
 }

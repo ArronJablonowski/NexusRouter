@@ -28,6 +28,7 @@ func LockProjectUpdate(path string) (func(), error) { return lockProjectUpdate(p
 // local operator UI. It includes the adjacent specialist-locality policy but
 // is not a general-purpose configuration editor.
 type ToolAccess struct {
+	CollaborationEnabled  bool
 	MacMemoryPercent      float64 `json:"mac_memory_percent"`
 	MacSwapGrowthGB       float64 `json:"mac_swap_growth_gb"`
 	DNSLogging            string  `json:"dns_logging"`
@@ -95,6 +96,7 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	setConfigScalar(root, []string{"remote_advertisement", "interface"}, "!!str", next.RemoteAdvertisement.Interface)
 	setConfigScalar(root, []string{"remote_advertisement", "name"}, "!!str", next.RemoteAdvertisement.Name)
 	setConfigScalar(root, []string{"remote_advertisement", "ssh_port"}, "!!int", strconv.Itoa(next.RemoteAdvertisement.SSHPort))
+	setConfigScalar(root, []string{"tools", "collaboration_enabled"}, "!!bool", boolText(next.CollaborationEnabled))
 	setConfigScalar(root, []string{"tools", "enabled"}, "!!bool", boolText(next.Enabled))
 	setConfigScalar(root, []string{"tools", "read_root"}, "!!str", next.ReadRoot)
 	setConfigScalar(root, []string{"workers", "delegate_read_tools"}, "!!bool", boolText(next.DelegateReadTools))
@@ -182,7 +184,7 @@ func setConfigScalar(node *yaml.Node, path []string, tag, value string) {
 }
 
 func toolAccess(settings Settings) ToolAccess {
-	return ToolAccess{CommanderModel: settings.WebUI.DefaultModel, MacMemoryPercent: settings.Hardware.MacMemoryPercent, MacSwapGrowthGB: settings.Hardware.MacSwapGrowthGB, DNSLogging: settings.Telemetry.DNSLogging, RemoteAdvertisement: settings.RemoteAdvertisement, SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
+	return ToolAccess{CollaborationEnabled: settings.Tools.CollaborationEnabled, CommanderModel: settings.WebUI.DefaultModel, MacMemoryPercent: settings.Hardware.MacMemoryPercent, MacSwapGrowthGB: settings.Hardware.MacSwapGrowthGB, DNSLogging: settings.Telemetry.DNSLogging, RemoteAdvertisement: settings.RemoteAdvertisement, SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
 }
 
 func boolText(value bool) string {

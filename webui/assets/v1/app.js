@@ -968,13 +968,13 @@
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
 	const relativePath = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	const dependenciesRoute = relativePath === "/dependencies"; const loggingRoute = relativePath === "/logging"; const cronRoute = window.NexusRoutes.cron(relativePath); const statusRoute = window.NexusRoutes.status(relativePath); const jobsRoute = window.NexusRoutes.jobs(relativePath);
+	const collaborationRoute = relativePath === "/collaboration"; const dependenciesRoute = relativePath === "/dependencies"; const loggingRoute = relativePath === "/logging"; const cronRoute = window.NexusRoutes.cron(relativePath); const statusRoute = window.NexusRoutes.status(relativePath); const jobsRoute = window.NexusRoutes.jobs(relativePath);
 	const skillsRoute = window.NexusRoutes.skills(relativePath), statsRoute = window.NexusRoutes.stats(relativePath);
 	const workboardRoute = window.NexusRoutes.workboards(relativePath), settingsRoute = window.NexusRoutes.settings(relativePath), modelsRoute = window.NexusRoutes.models(relativePath), routingRoute = window.NexusRoutes.routing(relativePath), eliminationRoute = window.NexusRoutes.elimination(relativePath);	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
 	if (routeMatch) {
 		try { selectChat(decodeURIComponent(routeMatch[1])); } catch (_) { showNotice(transcriptState, "The chat address is invalid.", true); }
 	}
-	if (!dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
+	if (!collaborationRoute && !dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
 	document.querySelector("#chat-view").hidden = false;
 	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
  window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage&&!window.NexusChatDescriptions.busy(),busy:value=>{loadingPage=value;if(!value&&reloadChats){reloadChats=false;loadChats("",true);}},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{window.NexusChatDescriptions.order(list);chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
@@ -991,7 +991,7 @@
 		if (!selectedChat) connection.textContent = "Connected";
 	}).catch(() => { connection.textContent = "Session needs attention"; }); }
 	for (const link of document.querySelectorAll("[data-view]")) {
-		const selected = link.dataset.view === "dependencies" ? dependenciesRoute : link.dataset.view === "logging" ? loggingRoute : link.dataset.view === "cron" ? cronRoute : link.dataset.view === "status" ? statusRoute : link.dataset.view === "jobs" ? jobsRoute : link.dataset.view === "skills" ? skillsRoute : link.dataset.view === "stats" ? statsRoute : link.dataset.view === "workboards" ? workboardRoute : link.dataset.view === "settings" ? settingsRoute : link.dataset.view === "models" ? modelsRoute : link.dataset.view === "routing" ? routingRoute : link.dataset.view === "elimination" ? eliminationRoute : window.NexusRoutes.chats(relativePath);
+		const selected = link.dataset.view === "collaboration" ? collaborationRoute : link.dataset.view === "dependencies" ? dependenciesRoute : link.dataset.view === "logging" ? loggingRoute : link.dataset.view === "cron" ? cronRoute : link.dataset.view === "status" ? statusRoute : link.dataset.view === "jobs" ? jobsRoute : link.dataset.view === "skills" ? skillsRoute : link.dataset.view === "stats" ? statsRoute : link.dataset.view === "workboards" ? workboardRoute : link.dataset.view === "settings" ? settingsRoute : link.dataset.view === "models" ? modelsRoute : link.dataset.view === "routing" ? routingRoute : link.dataset.view === "elimination" ? eliminationRoute : window.NexusRoutes.chats(relativePath);
 		if (selected) link.setAttribute("aria-current", "page");
 		else link.removeAttribute("aria-current");
 	}

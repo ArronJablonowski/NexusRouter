@@ -1,3 +1,13 @@
+## 2026-10-09 — Persistent model collaboration
+
+Added an authenticated Model collaboration page and a private SQLite/WAL message journal. Opt-in task tools let configured models address a recipient or shared topic and read messages during later tasks, without starting recipients. A three-task fixture verifies idea, reply and read-back. Each message records host-issued hostname, harness/registration, runner, provider/model IDs and name, task/session, privacy and UTC timestamp. Serving runner metadata is distinct from the harness; compatible endpoints mark unknown upstreams explicitly or use configured provider `runner` metadata.
+
+The journal provides durable idempotent receipts, bounded records/reads/task quotas, known-secret redaction and local/cloud privacy filtering. The page supports topic filters, timestamp display, source-chat links, preserved drafts/rows, older history and stale-error indication. Settings expose a separate collaboration toggle, disabled by default and requiring restart; older clients cannot erase it by omission. Saved messages remain available when disabled.
+
+Race checks cover storage, configuration atomicity, browser authorization, tools/runtime/remote/harness boundaries and affected application loops. Full Web UI checks passed after fixing a new optional-setting reconciliation regression. Formatting/static/build verification and detailed evidence are recorded in [collaboration validation](validation/2026-10-09-model-collaboration.md). No live inference, router contacts, runtime private data, services, configuration or deployment were changed. Linear remains unavailable pending reauthentication.
+
+**Gaps:** the journal is shared only within one workspace/host. Remote-origin/federated text-only tasks, frozen Workboard capabilities and borrowed delegated workers receive no ambient mailbox authority. Cross-host transport, explicit scoped worker sharing, physical native-harness/model behavior and complete fault/release qualification remain open. These changes do not establish a full repository gate or complete MVP.
+
 ## 2026-10-08 — Unified model routing and remote Specialist Cards
 
 Implemented a shared accuracy-ranking path for eligible configured and paired model deployments in the commander daemon and CLI. Added a built-in, text-only remote route for supported local providers, bounded conversation transfer, exact deployment/caller identity separation, fresh destination admission, durable route binding, original-caller status/cancellation, and a top-three fallback chain for confirmed no-output remote failures. Models with multiple harnesses occupy one deployment position. Manual model/commander pins remain unchanged.

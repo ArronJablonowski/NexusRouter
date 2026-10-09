@@ -85,6 +85,8 @@ The Command grid shows the top three eligible specialist model deployments. A pr
 
 Use the three-dot menu beside a chat title to **Rename**, **Pin**, or **Unpin** it. Pinned chats stay above unpinned chats, with newest-first ordering within each group. Preferences are shared by authenticated browsers on the same daemon. Include `<telemetry.database>.chat-preferences.json` alongside the task database in backups; see [chat preferences](docs/workboard-operator-guide.md#rename-and-pin-chats).
 
+The **Model collaboration** page logs timestamped messages between models, separately from user chats, including hostname, harness, runner and model attribution. Enable it in Settings and restart the daemon. Messages remain available for later tasks and do not start recipients. The current journal is workspace-local on one host; see [model collaboration](docs/model-collaboration.md).
+
 The stock daemon listens on loopback. For remote execution, configure the separate trusted remote-routing service using the [secure remote routing guide](docs/secure-remote-routing.md).
 
 ## Documentation

@@ -1,6 +1,9 @@
 package webui
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestSettingsContract(t *testing.T) {
 	digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -23,6 +26,24 @@ func TestSettingsContract(t *testing.T) {
 	} {
 		if err := value.Validate(); err == nil {
 			t.Fatal("invalid settings accepted")
+		}
+	}
+}
+
+func TestCollaborationSettingPresenceAndStrictDecode(t *testing.T) {
+	for _, item := range []struct {
+		raw              string
+		present, enabled bool
+	}{{`{"settings":{}}`, false, false}, {`{"settings":{"collaboration_enabled":false}}`, true, false}, {`{"settings":{"collaboration_enabled":true}}`, true, true}} {
+		var r SettingsUpdateRequest
+		if json.Unmarshal([]byte(item.raw), &r) != nil || r.HasCollaborationSetting() != item.present || r.Settings.CollaborationEnabled != item.enabled {
+			t.Fatal(item, r)
+		}
+	}
+	for _, raw := range []string{`{"settings":{"collaboration_enabled":null}}`, `{"unknown":true,"settings":{}}`, `{"settings":{"unknown":true}}`} {
+		var r SettingsUpdateRequest
+		if json.Unmarshal([]byte(raw), &r) == nil {
+			t.Fatal("invalid settings accepted", raw)
 		}
 	}
 }

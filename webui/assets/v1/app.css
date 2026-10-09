@@ -581,3 +581,10 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .remote-specialist-model .route-rank,.remote-specialist-model strong,.remote-specialist-host { color:#ffe56a; }
 .remote-specialist-host { display:block; overflow-wrap:anywhere; }
 .remote-specialist-model .route-model-facts { grid-template-columns:repeat(auto-fit,minmax(min(8rem,100%),1fr)); }
+.collaboration-messages { list-style:none; padding:0; display:grid; gap:1rem; }
+.collaboration-message { padding:1rem; background:#062028; border-left:3px solid #51dce3; min-width:0; }
+.collaboration-message h2 { font-size:1rem; overflow-wrap:anywhere; }
+.collaboration-provenance { color:#94bdc5; font-size:.8rem; overflow-wrap:anywhere; }
+.collaboration-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+.collaboration-message a { overflow-wrap:anywhere; }
+#collaboration-filter { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }

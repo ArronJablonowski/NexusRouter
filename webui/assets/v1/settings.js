@@ -4,7 +4,8 @@
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
 	if (!window.NexusRoutes || !window.NexusRoutes.settings(relative)) return;
 	const view = document.querySelector("#settings-view"), chat = document.querySelector("#chat-view"), workboards = document.querySelector("#workboard-view"), models = document.querySelector("#models-view");
-	const form = document.querySelector("#tool-settings-form"), tools = document.querySelector("#tools-enabled"), delegated = document.querySelector("#delegate-read-tools"), specialistsAllowCloud = document.querySelector("#specialists-allow-cloud");
+	const collaboration=document.querySelector("#collaboration-enabled");
+ const form = document.querySelector("#tool-settings-form"), tools = document.querySelector("#tools-enabled"), delegated = document.querySelector("#delegate-read-tools"), specialistsAllowCloud = document.querySelector("#specialists-allow-cloud");
 	const root = document.querySelector("#tools-read-root"), validation = document.querySelector("#settings-validation"), status = document.querySelector("#settings-status");
 	const save = document.querySelector("#save-settings"), reset = document.querySelector("#reset-settings"), refresh = document.querySelector("#refresh-settings");
 	const badge = document.querySelector("#settings-restart-badge"), activeSummary = document.querySelector("#active-settings");
@@ -18,7 +19,7 @@
 	let csrf = "", projection = null, loading = false;
 	chat.hidden = true; workboards.hidden = true; models.hidden = true; view.hidden = false;
 	function validAccess(value) {
-		return value && (value.mac_memory_percent===undefined || Number.isFinite(value.mac_memory_percent)&&value.mac_memory_percent>=0&&value.mac_memory_percent<=100) && (value.mac_swap_growth_gb===undefined || Number.isFinite(value.mac_swap_growth_gb)&&value.mac_swap_growth_gb>=0&&value.mac_swap_growth_gb<=1024) && [undefined,"","managed","full"].includes(value.dns_logging) && validAdvertisement(value.remote_advertisement) && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
+		return value && (value.collaboration_enabled===undefined || typeof value.collaboration_enabled==="boolean") && (value.mac_memory_percent===undefined || Number.isFinite(value.mac_memory_percent)&&value.mac_memory_percent>=0&&value.mac_memory_percent<=100) && (value.mac_swap_growth_gb===undefined || Number.isFinite(value.mac_swap_growth_gb)&&value.mac_swap_growth_gb>=0&&value.mac_swap_growth_gb<=1024) && [undefined,"","managed","full"].includes(value.dns_logging) && validAdvertisement(value.remote_advertisement) && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
 	}
 	function validProjection(value) {
 		return value && value.version === 1 && digestPattern.test(value.digest) && validAccess(value.active) && validAccess(value.saved) && typeof value.restart_required === "boolean" && value.restart_required === (JSON.stringify(value.active) !== JSON.stringify(value.saved));
@@ -41,10 +42,10 @@
  dnsStatus.textContent=value.active.dns_logging==="full"?"Managed logging enabled. Full capture: administrator setup required; not verified active.":value.active.dns_logging==="managed"?"Managed logging enabled. Daily DNS JSONL files are stored beside the runtime database; see Logging for coverage.":"DNS logging is off.";
  advertiseEnabled.checked=value.saved.remote_advertisement.enabled;advertiseInterface.value=value.saved.remote_advertisement.interface;advertiseName.value=value.saved.remote_advertisement.name;advertiseSSH.value=value.saved.remote_advertisement.ssh_port||"";
  skillsEnabled.checked=value.saved.skills_enabled;skillsDraft.checked=value.saved.skills_auto_draft;skillsRoot.value=value.saved.skills_root;skillsScope.value=value.saved.skills_scope;
-		tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
+		collaboration.checked = value.saved.collaboration_enabled===true; tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
 		badge.hidden = !value.restart_required; activeSummary.replaceChildren();
 		addSummary("Skill usage",value.active.skills_enabled?"Enabled":"Disabled");addSummary("Skill creation",value.active.skills_enabled&&value.active.skills_auto_draft?"Allowed":"Disabled");
- addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
+ addSummary("Model collaboration",value.active.collaboration_enabled ? "Enabled" : "Disabled"); addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
 		addSummary("Delegated reads", value.active.delegate_read_tools ? "Enabled" : "Disabled");
 		addSummary("Specialist models", value.active.specialists_allow_cloud ? "Local and cloud" : "Local only");
 		addSummary("Remote advertisement in loaded config",value.active.remote_advertisement.enabled?"Enabled (remote host status not checked)":"Disabled");
@@ -53,7 +54,7 @@
 		syncDependency(); validation.hidden = true;
 		setStatus(value.restart_required ? "Settings are saved. Restart the owning service to activate them; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
 	}
-	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]));}
+	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="collaboration_enabled"?(projection.saved[key]===true):key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]));}
  function load() {
   if(dirty()){setStatus("Your unsaved edits are preserved. Use Reset changes before refreshing saved settings.",false);return Promise.resolve();}
 		setBusy(true); setStatus("Loading settings…", false);
@@ -64,7 +65,7 @@
 			setStatus("Settings could not be loaded. Previously loaded values and edits are preserved.", true);
 		}).finally(() => setBusy(false));
 	}
-	function formValue() { return {...(projection?.saved.commander_model!==undefined?{commander_model:projection.saved.commander_model}:{}),mac_memory_percent:Number(macMemory.value),mac_swap_growth_gb:Number(macSwap.value),dns_logging:dnsLogging.value,remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
+	function formValue() { return {...(projection?.saved.commander_model!==undefined?{commander_model:projection.saved.commander_model}:{}),mac_memory_percent:Number(macMemory.value),mac_swap_growth_gb:Number(macSwap.value),dns_logging:dnsLogging.value,remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),collaboration_enabled:collaboration.checked, tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
 	function validate(value) {
 		let message = "";
 		if (!validAdvertisement(value.remote_advertisement)) message = "Use a valid interface, lowercase TLS name, and optional SSH port from 1 to 65535. Interface and TLS name are required when discovery is enabled.";
@@ -97,7 +98,7 @@
    const value=await response.json();if(!validProjection(value))throw Error();
    if(value.digest===projection.digest&&JSON.stringify(value.active)===JSON.stringify(projection.active))return;
    // Keep the original digest while a draft is dirty, so save still detects conflicts.
-   if(Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]))){setStatus("Settings changed elsewhere. Your unsaved edits are preserved; use Reset or Refresh to load current settings.",false);return;}
+   if(Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="collaboration_enabled"?(projection.saved[key]===true):key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]))){setStatus("Settings changed elsewhere. Your unsaved edits are preserved; use Reset or Refresh to load current settings.",false);return;}
    render(value);
   }catch{setStatus("Live settings check unavailable. Your edits are preserved; reconnecting automatically.",true);return false;}
   finally{liveSettingsBusy=false;}

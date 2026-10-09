@@ -15,7 +15,7 @@ func TestProjectToolAccessAtomicUpdate(t *testing.T) {
 	if err != nil || before.Enabled || before.DelegateReadTools || before.ReadRoot != Defaults().Tools.ReadRoot || before.SpecialistsAllowCloud || len(digest) != 64 {
 		t.Fatal(before, digest, err)
 	}
-	next := ToolAccess{Enabled: true, DelegateReadTools: true, ReadRoot: root, SpecialistsAllowCloud: true}
+	next := ToolAccess{CollaborationEnabled: true, Enabled: true, DelegateReadTools: true, ReadRoot: root, SpecialistsAllowCloud: true}
 	saved, nextDigest, err := UpdateProjectToolAccess(path, digest, next)
 	if err != nil || saved != next || nextDigest == digest {
 		t.Fatal(saved, nextDigest, err)
@@ -25,7 +25,7 @@ func TestProjectToolAccessAtomicUpdate(t *testing.T) {
 		t.Fatal(loaded.Tools, loaded.Workers, err)
 	}
 	body, _ := os.ReadFile(path)
-	if !strings.Contains(string(body), "read_root: "+root) || !strings.Contains(string(body), "delegate_read_tools: true") || !strings.Contains(string(body), "specialists_allow_cloud: true") {
+	if !strings.Contains(string(body), "collaboration_enabled: true") || !strings.Contains(string(body), "read_root: "+root) || !strings.Contains(string(body), "delegate_read_tools: true") || !strings.Contains(string(body), "specialists_allow_cloud: true") {
 		t.Fatal(string(body))
 	}
 	if _, _, err := UpdateProjectToolAccess(path, digest, ToolAccess{}); !errors.Is(err, ErrConfigConflict) {

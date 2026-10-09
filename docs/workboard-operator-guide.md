@@ -364,3 +364,15 @@ backup automatically.
 For detailed daemon behavior, see [CLI-managed daemon lifecycle](daemon-control.md).
 For release-grade migration evidence, see
 [Installation, migration and rollback rehearsal](install-migration-rehearsal.md).
+
+
+## Model collaboration
+
+Open **Model collaboration** in the sidebar to read timestamped model messages,
+filter by topic, and browse older history. Enable its separate switch in Settings,
+save, and restart the owning daemon to make the tools available to eligible tasks.
+Messages do not start models automatically. Every row identifies the execution
+hostname, harness, model runner, provider, model and source task. Private messages
+remain within local inference; messages are ideas rather than verified evidence.
+See [model collaboration](model-collaboration.md) for tools, backups and host/worker
+boundaries. Disabling the switch retains the journal for operator review.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/contextengine"
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/internal/agentchat"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/memory"
@@ -195,6 +196,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		r.memoryPrepared, r.skillPrepared = true, true
 		s.Tools.Enabled, s.Tools.CreateEnabled, s.Tools.ReplaceEnabled = false, false, false
 		s.Tools.WorkboardReadEnabled, s.Tools.WorkboardWriteEnabled = false, false
+		s.Tools.CollaborationEnabled = false
 		s.Memory.Enabled, s.Skills.Enabled = false, false
 		s.Workers.DelegateModel = ""
 		s.Workers.DelegateReadTools = false
@@ -533,6 +535,33 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
+
+	var chatStore *agentchat.Store
+	if s.Tools.CollaborationEnabled && r.RemoteExecution == nil && r.runtimeHostAdmission == nil && r.delegatedTools == nil && r.delegatedParent == "" && r.federated == nil {
+		if model.ContextTokens < 1 {
+			return result, ErrAdmission
+		}
+		chatStore, err = agentchat.Open(ctx, s.Telemetry.Database+".collaboration")
+		if err != nil {
+			return result, ErrAdmission
+		}
+		defer chatStore.Close()
+		if registry == nil {
+			registry = &tools.Registry{}
+		}
+		for _, spec := range modelCollaborationSpecs() {
+			if registry.Register(tools.Definition{Tool: spec, Scope: "collaboration", ReadOnly: spec.Name != "collaboration_send", Behavior: func() runtime.ToolBehavior {
+				if spec.Name == "collaboration_send" {
+					return runtime.BehaviorIdempotentWrite
+				}
+				return runtime.BehaviorReadOnly
+			}(), Handler: func(context.Context, json.RawMessage) (runtime.ToolResult, error) {
+				return runtime.ToolResult{Effect: runtime.NoEffect}, tools.ErrDenied
+			}}) != nil {
+				return result, ErrAdmission
+			}
+		}
+	}
 	var toolExecutor runtime.ToolExecutor
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
@@ -541,9 +570,17 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			executor.Authority = newToolAuthority(db, r.toolReviewer, r.toolPresenter, secrets)
 		}
 		toolExecutor = executor
-		if s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0 {
+		if s.Tools.CollaborationEnabled || s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0 {
 			maxTurns = min(maxTurns, s.Tools.MaxTurns)
 		}
+	}
+	if chatStore != nil {
+		sender, e := collaborationSender(model, provider, r, result.TaskID, privacy == "local_only")
+		if e != nil {
+			return result, e
+		}
+		sender.SessionID = sessionID
+		toolExecutor = &modelCollaborationExecutor{inner: toolExecutor, store: chatStore, sender: sender, models: s.Models, secrets: secrets, taskID: result.TaskID, sessionID: sessionID}
 	}
 	if r.HarnessID != "" {
 		nativeResult, nativeErr := runNativeAdmitted(ctx, s, r, provider, model, key, messages, j, result, sessionID, secrets, registry, toolExecutor)
