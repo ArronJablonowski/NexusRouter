@@ -50,6 +50,7 @@ func BenchmarkSelectConstrainedFallback(b *testing.B) {
 
 func BenchmarkSelectExploration(b *testing.B) {
 	r, p, candidates, evidence, now := routerBenchmarkFixture(8)
+	r.AllowExploration = true
 	// Half the models have no measured history. Bounded exploration still
 	// ranks all eligible candidates and builds the complete fallback list.
 	for i := 4; i < len(candidates); i++ {

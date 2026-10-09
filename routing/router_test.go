@@ -70,6 +70,7 @@ func TestRankingDecayAndDomainIsolation(t *testing.T) {
 
 func TestExplorationAndStableOrdering(t *testing.T) {
 	r, c, now := fixture()
+	r.AllowExploration = true
 	p := Defaults()
 	a, err := Select(r, p, c, nil, now, .9)
 	if err != nil {
@@ -92,6 +93,7 @@ func TestExplorationAndStableOrdering(t *testing.T) {
 
 func TestExplorationAlwaysSelectsAnEligibleAlternative(t *testing.T) {
 	r, candidates, now := fixture()
+	r.AllowExploration = true
 	third := candidates[0]
 	third.Model = "new-local"
 	candidates = append(candidates, third)

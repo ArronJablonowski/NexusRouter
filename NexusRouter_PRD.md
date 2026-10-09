@@ -15,7 +15,7 @@ NexusRouter is a Go-based, local-first agent runtime whose defining capability i
 
 The product combines a compact event-driven runtime, persistent sessions and memory, progressively loaded procedural skills, bounded worker delegation, hardware-aware scheduling, auditable policy enforcement, and restart-safe telemetry. It runs as a persistent daemon controlled through a CLI, a versioned Go SDK, an OpenAI-compatible HTTP surface, NexusRouter-native task-management APIs, and an authenticated Web UI for chat and durable work planning.
 
-NexusRouter supports fully local, fully cloud, and hybrid operation. Fully local mode is an enforced privacy boundary: unauthorized outbound transports must be denied, not merely left unconfigured. Hybrid mode favors local execution when it satisfies task, privacy, quality, and resource constraints, then uses cloud capacity where policy permits.
+NexusRouter supports fully local, fully cloud, and hybrid operation. Fully local mode is an enforced privacy boundary: unauthorized outbound transports must be denied, not merely left unconfigured. Automatic requests select the most accurate eligible model for the task regardless of execution location, including explicitly paired remote systems. Cost and latency remain admission constraints and cannot compensate for lower accuracy. Explicit operator model selections remain pinned; privacy, authorization, capabilities, context and resource limits remain mandatory.
 
 ## 2. Product Vision and Success Criteria
 
@@ -831,9 +831,9 @@ requirement from in-process reservations.
 
 ### 8.3 Fitness Ranking
 
-Eligible models are ranked within their task domain and execution profile using normalized values for quality, schema compliance, reliability, latency, cost, recency, and uncertainty. Metrics are comparable only after normalization to documented units and ranges.
+Eligible models are ranked within their task domain and execution profile by evidence-supported accuracy. Default model routing uses direct task quality, confidence/recency shrinkage, independent objective-invalidity penalties and bounded advisory evidence; speed, cost and execution location cannot increase its score. Schema compliance, reliability, latency and cost remain measured execution facts, while hard admission constraints still apply. Remote model–harness ranking keeps correctness ahead of quality. Explicit operator model selections remain pinned.
 
-Fitness is maintained by model, provider, domain, and relevant execution profile. Recency decay limits stale evidence. Minimum-sample and uncertainty terms prevent overconfidence. Bounded exploration gives new or rarely used candidates a controlled opportunity without violating hard constraints.
+Fitness is maintained by model, provider, domain, and relevant execution profile. Recency decay limits stale evidence. Minimum-sample and uncertainty terms prevent overconfidence. Ordinary requests never explore a weaker candidate. Bounded exploration is available only when a trusted caller explicitly requests an evaluation. Unknown candidates retain a neutral prior and stable ordering; model size, naming and a self-reported successful review do not establish accuracy. Legacy stored weighted-scoring policies remain readable under their original policy representation.
 
 ### 8.4 Fallbacks
 
@@ -1609,9 +1609,12 @@ able to rotate credentials and revoke access. Operational audit retention must
 archive and verify removed history while retaining durable request identities;
 cleanup must never enable duplicate dispatch. SSH must be an explicitly selectable
 remote transport with strict host verification and key authentication, retaining
-the same task permissions, audit and retry identity as direct HTTPS. Remote selection must eventually
-consume the accuracy-first model–harness evidence in DAR-132; idle capacity alone
-must not determine the winner. Separate tasks use separate systems; GPU pooling
+the same task permissions, audit and retry identity as direct HTTPS. Automatic unpinned requests must compare all eligible local and explicitly
+paired remote candidates using accuracy-first model–harness evidence; execution
+location, idle capacity, price and latency alone must not determine the winner.
+Ordinary configured-model and paired-remote automatic requests currently retain
+separate candidate pools; unified discovery and execution remain an implementation
+gap documented in `docs/accuracy-first-routing.md`. Separate tasks use separate systems; GPU pooling
 is outside scope. Protocol and current qualification boundaries are documented in
 `docs/secure-remote-routing.md`.
 

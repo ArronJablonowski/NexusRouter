@@ -65,6 +65,8 @@ func autoFixture(t *testing.T) (*Service, config.Settings) {
 func TestAutomaticUsesDurableDomainFitnessAndAuditsBeforeTurn(t *testing.T) {
 	ctx := context.Background()
 	svc, cfg := autoFixture(t)
+	svc.settings.Routing.Exploration = .25
+	svc.draw = func() float64 { return 0 }
 	prior, err := RunExplicit(ctx, cfg, Request{ModelID: "z", Prompt: "seed"}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +97,10 @@ func TestAutomaticUsesDurableDomainFitnessAndAuditsBeforeTurn(t *testing.T) {
 	if err != nil || out.Text != "z" {
 		t.Fatalf("%+v %v", out, err)
 	}
+	manual, err := svc.Run(ctx, Request{ModelID: "a", Prompt: "manual selection", Domain: "code"})
+	if err != nil || manual.Text != "a" {
+		t.Fatalf("explicit model selection was overridden: %+v %v", manual, err)
+	}
 	events, err = db.Read(ctx, out.TaskID, 0, 100)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +111,7 @@ func TestAutomaticUsesDurableDomainFitnessAndAuditsBeforeTurn(t *testing.T) {
 	route := events[1]
 	raw, _ := route.Encode()
 	primary := route.Data.Route.Primary
-	if strings.Contains(string(raw), "private payload") || strings.Contains(string(raw), cfg.Providers[0].Endpoint) || primary.Samples != 1 || primary.EffectiveSamples != .5 || primary.DecayContribution != .5 || !primary.WindowStart.Equal(routingNow.Add(-time.Hour)) || !primary.WindowEnd.Equal(routingNow.Add(-time.Hour)) || route.Data.ConfigID == "" {
+	if strings.Contains(string(raw), "private payload") || strings.Contains(string(raw), cfg.Providers[0].Endpoint) || primary.Samples != 1 || primary.EffectiveSamples != .5 || primary.DecayContribution != .5 || !primary.WindowStart.Equal(routingNow.Add(-time.Hour)) || !primary.WindowEnd.Equal(routingNow.Add(-time.Hour)) || route.Data.ConfigID == "" || (route.Data.RoutePolicy == nil || !route.Data.RoutePolicy.AccuracyFirst) {
 		t.Fatalf("invalid audit %s", raw)
 	}
 	explanation, err := db.RouteExplanation(ctx, out.TaskID)

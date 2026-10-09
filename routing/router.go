@@ -62,18 +62,23 @@ type Candidate struct {
 type Request struct {
 	Mode, Domain, Profile string
 	LocalRequired         bool
-	Capabilities          []string
-	ContextTokens         int
-	MaxCost               float64
+	// AllowExploration is reserved for explicitly requested evaluations.
+	AllowExploration bool
+	Capabilities     []string
+	ContextTokens    int
+	MaxCost          float64
 }
 type Weights struct{ Quality, Compliance, Reliability, Latency, Cost, Recency, Uncertainty float64 }
 type Policy struct {
-	Weights      Weights
-	MinSamples   int
-	HalfLife     time.Duration
-	LatencyScale time.Duration
-	CostScale    float64
-	Exploration  float64
+	// AccuracyFirst leaves cost and latency as admission constraints. The zero
+	// value preserves weighted scoring when replaying historical policies.
+	AccuracyFirst bool `json:",omitempty"`
+	Weights       Weights
+	MinSamples    int
+	HalfLife      time.Duration
+	LatencyScale  time.Duration
+	CostScale     float64
+	Exploration   float64
 }
 type Ranked struct {
 	SourceDomain, SourceProfile       string `json:",omitempty"`
@@ -120,7 +125,7 @@ var ErrInvalid = errors.New("invalid routing inputs")
 var ErrNoRoute = errors.New("no eligible model route")
 
 func Defaults() Policy {
-	return Policy{Weights: Weights{.35, .15, .20, .10, .10, .05, .05}, MinSamples: 20, HalfLife: 30 * 24 * time.Hour, LatencyScale: 10 * time.Second, CostScale: .01, Exploration: .05}
+	return Policy{AccuracyFirst: true, Weights: Weights{.35, .15, .20, .10, .10, .05, .05}, MinSamples: 20, HalfLife: 30 * 24 * time.Hour, LatencyScale: 10 * time.Second, CostScale: .01, Exploration: .05}
 }
 
 // Select is deterministic for its inputs, including the injected random draw.
@@ -289,6 +294,12 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		latency := 1 / (1 + float64(e.Latency)/float64(p.LatencyScale))
 		cost := 1 / (1 + e.Cost/p.CostScale)
 		score := w.Quality*quality + w.Compliance*shrink(e.Compliance) + w.Reliability*shrink(e.Reliability) + w.Latency*shrink(latency) + w.Cost*shrink(cost) + w.Recency*fresh + w.Uncertainty*confidence
+		if p.AccuracyFirst {
+			// Confidence, decay, objective invalidity and bounded advisory evidence
+			// are already applied to quality. Speed, price and execution location
+			// cannot compensate for a less accurate result.
+			score = quality
+		}
 		out.Ranked = append(out.Ranked, Ranked{SourceDomain: e.SourceDomain, SourceProfile: e.SourceProfile, Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Recency: fresh, Uncertainty: 1 - confidence, Samples: e.Samples, EffectiveSamples: e.EffectiveSamples, DecayContribution: e.DecayContribution, WindowStart: e.WindowStart, WindowEnd: e.WindowEnd, DecayApplied: e.DecayApplied, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, AdvisoryEffectiveSamples: a.EffectiveSamples, AdvisoryDecayContribution: a.DecayContribution, AdvisoryWindowStart: a.WindowStart, AdvisoryWindowEnd: a.WindowEnd, AdvisoryDecayApplied: a.DecayApplied, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty, ValidityEffectiveSamples: v.EffectiveSamples, ValidityEffectiveFailures: v.EffectiveFailures, ValidityDecayContribution: v.DecayContribution, ValidityWindowStart: v.WindowStart, ValidityWindowEnd: v.WindowEnd, ValidityDecayApplied: v.DecayApplied})
 	}
 	sort.Slice(out.Excluded, func(i, j int) bool {
@@ -312,7 +323,7 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		return out, ErrNoRoute
 	}
 	selected := 0
-	if p.Exploration > 0 && draw < p.Exploration && len(out.Ranked) > 1 {
+	if (!p.AccuracyFirst || r.AllowExploration) && p.Exploration > 0 && draw < p.Exploration && len(out.Ranked) > 1 {
 		// Explore uniformly among eligible non-primary routes. Excluding the
 		// normal winner ensures an exploration decision actually evaluates an
 		// alternative while every cold-start candidate retains nonzero

@@ -33,7 +33,7 @@ func TestValidityDiscountIsSeparateFromSubjectiveQuality(t *testing.T) {
 	}
 	e.Validity.Failures = 100
 	failed := selectRank(e)
-	if math.Abs(base.Score-failed.Score-p.Weights.Quality) > 1e-9 || failed.ValidityPenalty != 1 || failed.Confidence != base.Confidence {
+	if math.Abs(failed.Score) > 1e-9 || failed.ValidityPenalty != 1 || failed.Confidence != base.Confidence {
 		t.Fatalf("%+v %+v", base, failed)
 	}
 	e.Validity.Updated = now.Add(-p.HalfLife)

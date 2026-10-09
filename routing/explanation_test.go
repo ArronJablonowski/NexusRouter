@@ -75,7 +75,7 @@ func TestValidateExplanationRejectsReorderedFallbacks(t *testing.T) {
 func TestValidateExploredExplanation(t *testing.T) {
 	candidates, policy, _ := explanationFixture(t)
 	policy.Exploration = .25
-	selection, err := Select(Request{Mode: "hybrid", Domain: "code", Profile: "default", Capabilities: []string{"chat"}, ContextTokens: 10, MaxCost: 1}, policy, candidates, nil, time.Unix(1000, 0), .1)
+	selection, err := Select(Request{AllowExploration: true, Mode: "hybrid", Domain: "code", Profile: "default", Capabilities: []string{"chat"}, ContextTokens: 10, MaxCost: 1}, policy, candidates, nil, time.Unix(1000, 0), .1)
 	if err != nil || !selection.Explored || ValidateExplanation(candidates, &policy, &selection) != nil {
 		t.Fatal(selection, err)
 	}

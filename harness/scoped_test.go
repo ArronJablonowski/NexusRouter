@@ -30,6 +30,26 @@ func TestScopedRankingSeparatesIdenticalConfigurations(t *testing.T) {
 		t.Fatal("duplicate scope identity", err)
 	}
 }
+
+func TestScopedAccuracySelectsStrongerRemoteBeforeCheaperLocal(t *testing.T) {
+	localID, remoteID := identity("small-local", "native"), identity("strong-remote", "native")
+	localExecution, localReview := observation("local-failed", localID, testClass, false)
+	remoteExecution, remoteReview := observation("remote-passed", remoteID, testClass, true)
+	local := ScopedCandidate{Scope: "local-machine", Candidate: candidate(localID), Evidence: snapshot(t, []Execution{localExecution}, []Review{localReview})}
+	remote := ScopedCandidate{Scope: "paired-spark", Candidate: candidate(remoteID), Evidence: snapshot(t, []Execution{remoteExecution}, []Review{remoteReview})}
+	local.Candidate.EstimatedCost, remote.Candidate.EstimatedCost = 0, 9
+	policy := DefaultPolicy()
+	policy.Exploration = .25
+	selection, err := SelectScoped(request(), policy, []ScopedCandidate{local, remote}, testNow, 0)
+	if err != nil || selection.Explored || selection.Primary.Scope != "paired-spark" {
+		t.Fatalf("accuracy lost to location, price or exploration: %+v %v", selection, err)
+	}
+	remote.Candidate.Authorized = false
+	selection, err = SelectScoped(request(), policy, []ScopedCandidate{local, remote}, testNow, 0)
+	if err != nil || selection.Primary.Scope != "local-machine" {
+		t.Fatalf("remote accuracy bypassed authorization: %+v %v", selection, err)
+	}
+}
 func TestScopedRankingPreservesOrdinaryScoresAndExploration(t *testing.T) {
 	id := identity("one", "pi")
 	e, r := observation("pass", id, testClass, true)
