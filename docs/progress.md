@@ -1,3 +1,7 @@
+## 2026-10-09 — Paired Spark deployment
+
+Deployed source `52cfe465` (same application code as local `cef3150a`) to paired DGX Spark instance `dgx-spark`, hostname `spark-9c8a`. Linux ARM64 build/config validation, idle checks and consistent private database backups passed. Paired info and the commander's authenticated browser inspection report available=true and targeting_version=1. Exact remote model-name assignment is now supported by this peer. Ollama retained its process; configuration/trust and local services are unchanged. No inference task was run. See [remote deployment receipt](validation/2026-10-09-spark-deployment.md) for verification and remaining limits.
+
 ## 2026-10-09 — Exact targeting deployed locally
 
 Deployed application source `cef3150a` to the existing local commander with a fresh consistent private backup and idle-boundary checks. Configuration was preserved. The new process reports ready; authenticated chat page, configured target catalogue and reviewed script bytes passed verification without inference. Collaboration remains enabled, central logging retained its process and the stopped local remote service remains stopped. Remote hosts were not deployed and need targeting-version-1 updates for exact remote model-name assignment. See [deployment receipt](validation/2026-10-09-exact-target-deployment.md). Reload existing browser tabs and renew approval if prompted. This is a local deployment with scoped validation, not full release/MVP qualification.
