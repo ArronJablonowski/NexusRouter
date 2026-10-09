@@ -822,8 +822,8 @@
 		if (selectedChat) loadHistory(selectedChat, "", true, false);
 	}
 	function submitComposer() {
-		const text = window.NexusHostMentions ? window.NexusHostMentions.prepare(composerText.value, selectedChat, csrfToken) : composerText.value;
-		if (text === null) return;
+		const assignment = window.NexusHostMentions ? window.NexusHostMentions.prepare(composerText.value, selectedChat, csrfToken) : composerText.value; if (assignment === null) return;
+ const text=typeof assignment==="string"?assignment:assignment.text,assignedModel=typeof assignment==="object"?assignment.modelID:"";
 		composerError.hidden = true;
 		if (!text.trim()) {
 			showNotice(composerError, "Enter a message first.", true);
@@ -835,7 +835,7 @@
 			return;
 		}
 		let path = "/api/v1/chats";
-		let payload = {version: 1, action: "submit", text};
+		let payload = {version: 1, action: "submit", text,...(assignedModel?{model_id:assignedModel}:{})};
 		if (selectedChat) {
 			const controls = selectedControls;
 			if (!controls || !controls.canResume) return;

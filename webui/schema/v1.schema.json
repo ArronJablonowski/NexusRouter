@@ -3,6 +3,7 @@
   "$id": "https://nexusrouter.local/schema/webui/v1",
   "title": "NexusRouter Web UI Contract v1",
   "oneOf": [
+    {"$ref":"#/$defs/model_targets"},
     {
       "$ref": "#/$defs/chat_request"
     },
@@ -74,6 +75,18 @@
     }
   ],
   "$defs": {
+    "model_targets": {
+      "type":"object", "additionalProperties":false,
+      "required":["version","hostname","models"],
+      "properties":{
+        "version":{"const":1},
+        "hostname":{"type":"string","minLength":1,"maxLength":253},
+        "models":{"type":"array","maxItems":256,"items":{
+          "type":"object","additionalProperties":false,"required":["id","model","local"],
+          "properties":{"id":{"$ref":"#/$defs/model_id","not":{"const":"auto"}},"model":{"type":"string","minLength":1,"maxLength":512},"local":{"type":"boolean"}}
+        }}
+      }
+    },
     "id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",

@@ -530,7 +530,7 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .host-options { border: 1px solid var(--accent, #00dce5); background: #06212c; max-height: 15rem; overflow-y: auto; }
 .host-options button { display: block; width: 100%; text-align: left; overflow-wrap: anywhere; }
 .host-options [aria-selected="true"] { background: #12505d; outline: 2px solid #00dce5; outline-offset: -2px; }
-#host-routing { border-left: 3px solid #00dce5; padding: .5rem; }
+#host-routing { border-left: 3px solid #00dce5; padding: .5rem; overflow-wrap:anywhere; }
 #host-routing select { max-width: 100%; }
 #host-receipt { overflow-wrap: anywhere; }
 #host-receipt pre { white-space: pre-wrap; }

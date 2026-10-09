@@ -61,7 +61,7 @@ func (b *BrowserMutations) Chat(ctx context.Context, subject string, request con
 			model = "auto"
 		}
 	}
-	input := Request{ModelID: model, Prompt: request.Text}
+	input := Request{ModelID: model, Prompt: request.Text, DisableFallback: request.ModelID != "" && request.ModelID != "auto"}
 	var status submissions.Status
 	if request.Action == contract.ChatSubmit {
 		status, err = b.service.Submit(ctx, record.OperationID, input)

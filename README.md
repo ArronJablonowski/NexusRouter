@@ -89,6 +89,31 @@ The **Model collaboration** page logs timestamped messages between models, separ
 
 The stock daemon listens on loopback. For remote execution, configure the separate trusted remote-routing service using the [secure remote routing guide](docs/secure-remote-routing.md).
 
+### Assign a task to a specific host and model
+
+In a **new Web UI chat**, start the prompt with `@hostname/model-ID`:
+
+```text
+@dgx-spark/laguna-s Review the code below for concurrency bugs.
+@local/qwen-coder Explain this failing test.
+```
+
+Replace these illustrative names with the choices from autocomplete. Type `@` to
+choose a paired host or this host, then select its configured model. Tab/Enter
+accepts a suggestion without submitting. The composer shows the resolved host
+and model before sending. Paired-host IDs also work; `local` identifies this host.
+A unique model name is accepted too; encode spaces when entering one manually,
+for example `@dgx-spark/Laguna%20S`.
+
+Exact assignments stay pinned: an unavailable host or failed model does not
+silently activate another destination. Remote peers need the updated exact-model
+capability. The remote composer currently supports permitted **private, zero-cost
+local models**; include the task's code/context because existing chat history and
+files are not transferred. Uncertain delivery retains recovery controls and is
+not automatically resent. `@host/auto`, `@auto/model` and multiple assignments
+are future work. See [host/model assignments](docs/host-model-assignments.md) for
+identity resolution, privacy, context and compatibility limits.
+
 ## Documentation
 
 | Start here | Guide |

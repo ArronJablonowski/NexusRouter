@@ -401,6 +401,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return db.ReadCommittedEventPage(ctx, options)
 			},
 		}, Inspections: webuiapp.InspectionServices{
+			ModelTargets:  service.BrowserModelTargets,
 			Collaboration: service.BrowserCollaboration,
 			Routing: func(ctx context.Context) (webui.ModelInspectionPage, error) {
 				report, _ := healthReport(ctx)

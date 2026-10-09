@@ -12,6 +12,7 @@ import (
 	"math"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
@@ -33,6 +34,7 @@ var ErrUnavailable = errors.New("remote operation unavailable; delivery may be u
 // Task excludes continuation identifiers, paths and tool authority. Optional
 // conversation messages contain text only and require direct execution. The destination's configured runtime retains all admission rules.
 type Task struct {
+	ExpectedModel           string                   `json:"expected_model,omitempty"`
 	Messages                []providers.Message      `json:"messages,omitempty"`
 	Execution               *runtime.RemoteExecution `json:"execution,omitempty"`
 	ExpectedHarnessIdentity *harness.Identity        `json:"expected_harness_identity,omitempty"`
@@ -50,6 +52,9 @@ type Task struct {
 }
 
 func (t Task) Validate() error {
+	if len(t.ExpectedModel) > 512 || !utf8.ValidString(t.ExpectedModel) || strings.TrimSpace(t.ExpectedModel) != t.ExpectedModel || strings.ContainsFunc(t.ExpectedModel, unicode.IsControl) {
+		return ErrInvalid
+	}
 	if len(t.Messages) > 0 {
 		if t.Execution == nil || t.Execution.Mode != "direct" || len(t.Messages) > 256 || providers.ValidateMessages(t.Messages) != nil {
 			return ErrInvalid
@@ -126,6 +131,7 @@ type Model struct {
 	Local         bool     `json:"local"`
 }
 type Info struct {
+	TargetingVersion    int                      `json:"targeting_version,omitempty"`
 	ConversationVersion int                      `json:"conversation_version,omitempty"`
 	Controller          *Controller              `json:"controller,omitempty"`
 	Schedules           *webui.SchedulePage      `json:"schedules,omitempty"`
@@ -181,6 +187,9 @@ func validHostname(s string) bool {
 }
 
 func (i Info) ValidateRouting() error {
+	if i.TargetingVersion < 0 || i.TargetingVersion > 1 {
+		return ErrInvalid
+	}
 	if i.ConversationVersion < 0 || i.ConversationVersion > 1 {
 		return ErrInvalid
 	}

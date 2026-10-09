@@ -77,7 +77,7 @@ func (b *SDKBackend) info(ctx context.Context, configured []Model) (Info, error)
 		return Info{}, ErrUnavailable
 	}
 	models := cloneModels(configured)
-	out := Info{ConversationVersion: 1, HybridVersion: 2, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
+	out := Info{TargetingVersion: 1, ConversationVersion: 1, HybridVersion: 2, Version: Version, Models: models, Available: b.Available != nil && b.Available(ctx)}
 	if b.Schedules != nil {
 		page, err := b.Schedules(ctx)
 		if err != nil || page.Validate() != nil {
@@ -176,7 +176,7 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	}
 	eligible := false
 	for _, m := range b.Models {
-		if m.ID == t.ModelID && (!t.Private || m.Local) && m.ContextTokens >= t.ContextTokens && m.EstimatedCost != nil && !math.IsNaN(*m.EstimatedCost) && !math.IsInf(*m.EstimatedCost, 0) && *m.EstimatedCost >= 0 && *m.EstimatedCost <= t.MaxCost {
+		if m.ID == t.ModelID && (t.ExpectedModel == "" || t.ExpectedModel == m.Model) && (!t.Private || m.Local) && m.ContextTokens >= t.ContextTokens && m.EstimatedCost != nil && !math.IsNaN(*m.EstimatedCost) && !math.IsInf(*m.EstimatedCost, 0) && *m.EstimatedCost >= 0 && *m.EstimatedCost <= t.MaxCost {
 			eligible = true
 		}
 	}

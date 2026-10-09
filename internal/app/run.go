@@ -28,6 +28,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	DisableFallback                 bool `json:"disable_fallback,omitempty"`
 	retryTarget                     *automaticTarget
 	federated                       *FederatedCandidate
 	federation                      FederatedRouting

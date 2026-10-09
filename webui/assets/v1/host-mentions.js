@@ -1,77 +1,61 @@
 "use strict";
 window.NexusHostMentions = (() => {
  const input=document.querySelector('#composer-text'),base=document.body.dataset.basePath||'',panel=document.querySelector('#host-routing'),popup=document.querySelector('#host-options'),notice=document.querySelector('#host-notice'),models=document.querySelector('#host-model'),receipt=document.querySelector('#host-receipt');
- let hosts=[{id:'local',name:'local',local:true}],matches=[],active=0,loading=false,loadedAt=0,selected='',busy=false,sent=false,csrf='';
- const id=/^[A-Za-z0-9_-]{1,64}$/, hostname=/^[A-Za-z0-9._-]{1,253}$/;
- const token=text=>/^@([A-Za-z0-9._-]*)(\s|$)/.exec(text);
+ const newTask=document.querySelector('#host-new-task');newTask.hidden=true;
+ let hosts=[{id:'local',name:'local',local:true,info:{models:[]}}],matches=[],active=0,loading=false,loadedAt=0,selected='',busy=false,sent=false,csrf='';
+ const id=/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/,peerID=/^[A-Za-z0-9_-]{1,64}$/,hostname=/^[A-Za-z0-9._-]{1,253}$/;
+ // Only a leading mention routes. Encode spaces in manual model names; the
+ // autocomplete always inserts stable paired/configured IDs.
+ function token(text){const t=/^@([A-Za-z0-9._-]*)(?:\/([^\s]*))?(\s|$)/.exec(text);if(!t)return null;try{return {host:t[1],model:t[2]===undefined?null:decodeURIComponent(t[2]),length:t[0].length,reference:t[0].trim()};}catch{return null;}}
  function message(text){notice.textContent=text;panel.hidden=false;}
  async function json(path,body){const response=await fetch(base+'/api/v1/'+path,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000),headers:{Accept:'application/json',...(body?{'Content-Type':'application/json','X-Darwin-CSRF':csrf}:{})},...(body?{body:JSON.stringify(body)}:{})});if(!response.ok)throw Error();return response.json();}
  async function session(){if(!csrf){const p=await json('session/csrf',{version:1});if(p.version!==1||typeof p.csrf_token!=='string'||!p.csrf_token)throw Error();csrf=p.csrf_token;}return csrf;}
  function hide(){popup.hidden=true;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');}
+ function resolve(name){const exact=hosts.filter(h=>h.id===name);if(exact.length===1)return exact[0];const found=hosts.filter(h=>h.name.toLowerCase()===name.toLowerCase()||h.id.toLowerCase()===name.toLowerCase());return found.length===1?found[0]:null;}
+ function eligible(host){return (host.info?.models||[]).filter(m=>m&&typeof m.id==='string'&&id.test(m.id)&&m.id!=='auto'&&typeof m.model==='string'&&m.model.length<=512&&(host.local||m.local&&host.peer.models.includes(m.id)&&m.estimated_cost===0));}
+ function modelFor(host,name){const items=eligible(host),exact=items.filter(m=>m.id===name);if(exact.length===1)return exact[0];const found=items.filter(m=>m.id.toLowerCase()===name.toLowerCase()||m.model.toLowerCase()===name.toLowerCase());return found.length===1?found[0]:null;}
  function draw(){
-  const t=token(input.value),caret=input.selectionStart;
-  if(!t||caret>t[1].length+1||caret<1){hide();return;}
-  const query=t[1].toLowerCase();matches=hosts.filter(h=>h.name.toLowerCase().includes(query)||h.id.toLowerCase().includes(query));active=Math.min(active,Math.max(0,matches.length-1));popup.replaceChildren();
-  matches.forEach((h,i)=>{const option=document.createElement('button');option.type='button';option.id='host-option-'+i;option.setAttribute('role','option');option.setAttribute('aria-selected',String(i===active));option.textContent='@'+h.name+(h.local?' · This host':' · '+h.id+(h.info?.available?'':' · unavailable'));option.addEventListener('mousedown',e=>e.preventDefault());option.addEventListener('click',()=>choose(h));popup.append(option);});
-  popup.hidden=!matches.length;input.setAttribute('aria-expanded',String(matches.length>0));if(matches.length)input.setAttribute('aria-activedescendant','host-option-'+active);
+  const t=token(input.value),caret=input.selectionStart;if(!t||caret<1||caret>t.reference.length){hide();return;}
+  const host=resolve(t.host);matches=t.model!==null&&host?eligible(host).filter(m=>m.id.toLowerCase().includes(t.model.toLowerCase())||m.model.toLowerCase().includes(t.model.toLowerCase())).map(model=>({host,model})):t.model===null?hosts.filter(h=>h.name.toLowerCase().includes(t.host.toLowerCase())||h.id.toLowerCase().includes(t.host.toLowerCase())).map(host=>({host})):[];
+  active=Math.min(active,Math.max(0,matches.length-1));popup.replaceChildren();matches.forEach((item,i)=>{const option=document.createElement('button');option.type='button';option.id='host-option-'+i;option.setAttribute('role','option');option.setAttribute('aria-selected',String(i===active));option.textContent=item.model?item.model.model+' · '+item.model.id:'@'+item.host.name+(item.host.local?' · This host':' · '+item.host.id+(item.host.info?.available?'':' · unavailable'));option.addEventListener('mousedown',e=>e.preventDefault());option.addEventListener('click',()=>choose(item));popup.append(option);});popup.hidden=!matches.length;input.setAttribute('aria-expanded',String(matches.length>0));if(matches.length)input.setAttribute('aria-activedescendant','host-option-'+active);else input.removeAttribute('aria-activedescendant');
  }
- function resolve(name){const exact=hosts.filter(h=>h.name.toLowerCase()===name.toLowerCase()||h.id.toLowerCase()===name.toLowerCase());return exact.length===1?exact[0]:null;}
  function sync(){
-  const t=token(input.value),host=t&&resolve(t[1]);panel.hidden=!t&&!sent;models.hidden=!host||host.local;
-  if(!host){selected='';models.replaceChildren();if(t)message('Choose a host from the list. Unknown or ambiguous mentions will not be sent.');return;}
-  if(selected===host.id)return;selected=host.id;models.replaceChildren();
-  if(host.local){message('Destination: this host.');return;}
-  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Choose a local model on '+host.name;models.append(placeholder);
-  for(const m of host.info?.models||[]){if(!m.local||!host.peer.models.includes(m.id)||m.estimated_cost!==0)continue;const option=document.createElement('option');option.value=m.id;option.textContent=m.model||m.id;models.append(option);}
-  message('Destination: '+host.name+' · this host only · private, zero-cost model · no fallback.');
+  if(sent||busy)return;
+  const t=token(input.value),host=t&&resolve(t.host);panel.hidden=!t&&!sent;models.hidden=!host||host.local&&t.model===null;
+  if(!host){selected='';models.replaceChildren();if(t)message('Choose a verified host. Unknown or ambiguous mentions will not be sent.');return;}
+  if(selected!==host.id){const previous=selected===host.id?models.value:'';selected=host.id;models.replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Choose a configured model on '+host.name;models.append(placeholder);for(const m of eligible(host)){const option=document.createElement('option');option.value=m.id;option.textContent=m.model+' · '+m.id;models.append(option);}if([...models.options].some(o=>o.value===previous))models.value=previous;}
+  const model=t.model!==null?modelFor(host,t.model):models.value?modelFor(host,models.value):null;
+  if(t.model!==null)models.value=model?.id||'';
+  message('Host: '+host.name+' ['+host.id+']'+(model?' · Model: '+model.model+' ['+model.id+'] · Exact assignment; no fallback.':t.model!==null?' · Choose an unambiguous model ID or name.':' · '+(host.local?'This host.':'Choose a permitted zero-cost local model; no fallback.')));
  }
- function choose(host){const t=token(input.value);if(!t)return;input.value='@'+host.name+' '+input.value.slice(t[0].length);input.setSelectionRange(host.name.length+2,host.name.length+2);hide();sync();input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}
+ function refreshed(){const prior=selected,value=models.value;selected='';sync();if(selected===prior&&token(input.value)?.model===null&&[...models.options].some(o=>o.value===value))models.value=value;draw();}
+ function choose(item){const t=token(input.value);if(!t)return;const prefix='@'+item.host.id+(item.model?'/'+item.model.id+' ':'/');input.value=prefix+input.value.slice(t.length);input.setSelectionRange(prefix.length,prefix.length);hide();selected='';sync();input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}
+ models.addEventListener('change',()=>{const t=token(input.value),host=t&&resolve(t.host),m=host&&modelFor(host,models.value);if(host&&m){if(t.model===null)sync();else choose({host,model:m});}});
  async function load(){
   if(loading||Date.now()-loadedAt<15000)return;loading=true;
-  try{await session();const page=await json('remote-membership');if(page.version!==1||!page.enabled||!page.dispatch_enabled||!Array.isArray(page.registry?.peers))throw Error();
-   const next=[hosts[0]];for(const peer of page.registry.peers.slice(0,128)){
-    if(!id.test(peer.id)||peer.id==='local'||!Array.isArray(peer.models)||!['info','dispatch','inspect'].every(op=>peer.operations?.includes(op)))continue;
-    const host={id:peer.id,name:peer.id,peer,info:null};next.push(host);
-    try{const p=await json('remote-inspection',{version:1,instance:peer.id,view:'info'});if(p.version===1&&p.info?.instance===peer.id&&Array.isArray(p.info.models)){host.info=p.info;if(hostname.test(p.info.hostname)&&p.info.hostname!=='local')host.name=p.info.hostname;}}catch{}
-   }
-   const previousHost=selected,previousModel=models.value;
-   hosts=next;loadedAt=Date.now();selected='';sync();
-   if(selected===previousHost&&Array.from(models.options).some(option=>option.value===previousModel))models.value=previousModel;
-   draw();
-  }catch{message('Host lookup unavailable. Remote mentions cannot be sent until hosts are verified.');}finally{loading=false;}
- }
- input.addEventListener('input',()=>{sync();draw();if(input.value.startsWith('@'))load();});input.addEventListener('click',draw);
- input.addEventListener('keydown',event=>{
-  if(event.isComposing||popup.hidden)return;
-  if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();active=(active+(event.key==='ArrowDown'?1:-1)+matches.length)%matches.length;draw();}
-  else if(['Tab','Enter'].includes(event.key)&&!event.shiftKey){event.preventDefault();event.stopImmediatePropagation();choose(matches[active]);}
-  else if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();hide();}
- },true);
- input.addEventListener('blur',hide);
- function recover(peer,key){receipt.replaceChildren();receipt.hidden=false;receipt.open=true;const summary=document.createElement('summary');summary.textContent='Remote job on '+peer;receipt.append(summary);window.NexusRemoteTaskControls.attach(receipt,{id:peer},{request_id:key},base,csrf);}
- async function send(host,prompt,model){
-  if(busy||sent)return;busy=true;models.disabled=true;
   try{
-   await session();const key=crypto.randomUUID(),url=new URL(window.location.href);url.hash=new URLSearchParams({chat_host:host.id,chat_request:key}).toString();window.history.replaceState(null,'',url);sent=true;
-   message('Sending to '+host.name+' · '+model.model+'…');
-   try{const p=await json('remote-dispatch',{version:1,instance:host.id,request_id:key,task:{version:1,model_id:model.id,prompt,domain:'general',profile:'default',context_tokens:Math.min(4096,host.peer.max_context_tokens,model.context_tokens),max_cost:0,private:true}});
-    if(p.version!==1||p.instance!==host.id||p.request_id!==key||!p.submission_id)throw Error();message('Sent to '+host.name+' · '+model.model+'. Status and result below.');
-   }catch{message('Delivery could not be confirmed. Inspect the saved request below; do not resend it. No fallback or retry was sent.');}
-   recover(host.id,key);
-  }catch{message('Could not preserve request recovery information. No task was sent.');}finally{busy=false;models.disabled=sent;}
+   try{const local=await json('model-targets');if(local.version!==1||!hostname.test(local.hostname)||!Array.isArray(local.models)||local.models.length>256||local.models.some(m=>!id.test(m.id)||typeof m.model!=='string'||typeof m.local!=='boolean'))throw Error();
+   const oldHost=selected,oldModel=models.value;hosts[0]={id:'local',name:local.hostname,local:true,info:{models:local.models}};selected='';sync();if(selected===oldHost&&token(input.value)?.model===null&&[...models.options].some(o=>o.value===oldModel))models.value=oldModel;draw();}catch{hosts[0]={id:'local',name:'local',local:true,info:{models:[]}};}
+   try{await session();const page=await json('remote-membership');if(page.version!==1||typeof page.enabled!=='boolean')throw Error();const peers=page.enabled&&page.dispatch_enabled?page.registry?.peers:[];if(!Array.isArray(peers)||peers.length>128)throw Error();const next=[hosts[0]];
+    for(const peer of peers){if(typeof peer.id!=='string'||!peerID.test(peer.id)||peer.id==='local'||!Array.isArray(peer.models)||!['info','dispatch','inspect'].every(op=>peer.operations?.includes(op)))continue;next.push({id:peer.id,name:peer.id,peer,info:null});}
+    hosts=next;let index=1;async function worker(){while(index<next.length){const h=next[index++];try{const p=await json('remote-inspection',{version:1,instance:h.id,view:'info'});if(p.version===1&&p.info?.instance===h.id&&Array.isArray(p.info.models)&&p.info.models.length<=256){h.info={available:p.info.available,targeting_version:p.info.targeting_version,models:p.info.models.map(m=>({id:m.id,model:m.model,local:m.local,estimated_cost:m.estimated_cost,context_tokens:m.context_tokens}))};if(typeof p.info.hostname==='string'&&hostname.test(p.info.hostname)&&p.info.hostname!=='local')h.name=p.info.hostname;refreshed();}}catch{}}}
+    await Promise.all(Array.from({length:Math.min(4,next.length-1)},worker));
+   }catch{hosts=[hosts[0]];}
+   const previousHost=selected,previousModel=models.value;loadedAt=Date.now();selected='';sync();if(selected===previousHost&&token(input.value)?.model===null&&[...models.options].some(o=>o.value===previousModel))models.value=previousModel;draw();
+  }catch{hosts=[{id:'local',name:'local',local:true,info:{models:[]}}];selected='';sync();message('Host/model lookup unavailable. Explicit assignments will not be sent until verified.');}finally{loading=false;}
  }
- function prepare(text,chat,sessionToken){
-  const t=token(text);if(busy||sent){message('Inspect the previous remote job first. Choose “New remote task” below to send independent work.');return null;}
-  if(!t){if(text.startsWith('@')){message('Invalid host mention. Choose a host from the popup; nothing was sent.');return null;}return text;}
-  csrf=sessionToken||csrf;const host=resolve(t[1]);if(!host){message('Unknown or ambiguous host. Select a host from the popup; nothing was sent.');return null;}
-  if(host.local)return text.slice(t[0].length);
-  if(chat){message('Start a new chat to route an independent remote task. Existing local chat history is not transferred.');return null;}
-  const prompt=text.slice(t[0].length).trim(),model=host.info?.models.find(m=>m.id===models.value);
-  if(loading||!host.info?.available||!host.peer.allow_private||!model?.local||model.estimated_cost!==0||!host.peer.models.includes(model.id)||!Number.isSafeInteger(model.context_tokens)||model.context_tokens<1||!Number.isSafeInteger(host.peer.max_context_tokens)||host.peer.max_context_tokens<1||!prompt){message('Choose an available host, a permitted zero-cost local model, and enter a task. Nothing was sent.');return null;}
-  if(new TextEncoder().encode(prompt).length>1048576){message('Task is too large. Nothing was sent.');return null;}
-  send(host,prompt,model);return null;
+ input.addEventListener('input',()=>{sync();draw();if(input.value.startsWith('@'))load();});input.addEventListener('click',draw);input.addEventListener('keydown',event=>{if(event.isComposing||popup.hidden)return;if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();active=(active+(event.key==='ArrowDown'?1:-1)+matches.length)%matches.length;draw();}else if(['Tab','Enter'].includes(event.key)&&!event.shiftKey){event.preventDefault();event.stopImmediatePropagation();choose(matches[active]);}else if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();hide();}},true);input.addEventListener('blur',hide);
+ function recover(peer,key){receipt.replaceChildren();receipt.hidden=false;receipt.open=true;const summary=document.createElement('summary');summary.textContent='Remote job on '+peer;receipt.append(summary);window.NexusRemoteTaskControls.attach(receipt,{id:peer},{request_id:key},base,csrf);}
+ async function send(host,prompt,model,exact){if(busy||sent)return;busy=true;models.disabled=true;try{await session();const key=crypto.randomUUID(),url=new URL(window.location.href);url.hash=new URLSearchParams({chat_host:host.id,chat_request:key}).toString();window.history.replaceState(null,'',url);sent=true;newTask.hidden=false;message('Sending to '+host.name+' · '+model.model+'…');try{const p=await json('remote-dispatch',{version:1,instance:host.id,request_id:key,task:{version:1,...(exact?{expected_model:model.model}:{}),model_id:model.id,prompt,domain:'general',profile:'default',context_tokens:Math.min(4096,host.peer.max_context_tokens,model.context_tokens),max_cost:0,private:true}});if(p.version!==1||p.instance!==host.id||p.request_id!==key||!p.submission_id)throw Error();message('Sent to '+host.name+' · '+model.model+'. Status and result below.');}catch{message('Delivery could not be confirmed. Inspect the saved request below; do not resend it. No fallback or retry was sent.');}recover(host.id,key);}catch{message('Could not preserve request recovery information. No task was sent.');}finally{busy=false;models.disabled=sent;}}
+ function prepare(text,chat,sessionToken){const t=token(text);if(busy||sent){message('Inspect the previous remote job first. Choose “New remote task” below to send independent work.');return null;}if(!t){if(text.startsWith('@')){message('Invalid assignment. Use @hostname/model-ID task; nothing was sent.');return null;}return text;}
+  csrf=sessionToken||csrf;const host=resolve(t.host);if(!host){message('Unknown or ambiguous host. Select a verified host; nothing was sent.');return null;}const prompt=text.slice(t.length).trim();
+  if(t.model!==null&&(/^@[^\s]+\//.test(prompt)||chat)){message('Use one exact assignment in a new chat. Existing history is not transferred; nothing was sent.');return null;}
+  if(host.local&&t.model===null)return prompt;
+  const model=t.model!==null?modelFor(host,t.model):modelFor(host,models.value);
+  if(t.model==='auto'||host.id==='auto'||!model||!prompt||new TextEncoder().encode(prompt).length>1048576){message('Choose an unambiguous configured model ID or name and enter a task. Nothing was sent.');return null;}
+  if(host.local){if(!host.info?.models.length){message('Local model catalogue unavailable; nothing was sent.');return null;}return {text:prompt,modelID:model.id};}
+  if(chat||!host.info?.available||!host.peer.allow_private||!model.local||model.estimated_cost!==0||!host.peer.models.includes(model.id)||!Number.isSafeInteger(model.context_tokens)||model.context_tokens<1||!Number.isSafeInteger(host.peer.max_context_tokens)||host.peer.max_context_tokens<1){message('Choose an available, permitted zero-cost local model in a new chat. Nothing was sent.');return null;}
+  if(t.model!==null&&host.info.targeting_version!==1){message('This host must be updated to support exact model-name assignments. Nothing was sent.');return null;}send(host,prompt,model,t.model!==null);return null;
  }
- document.querySelector('#host-new-task').addEventListener('click',()=>{if(busy)return;sent=false;models.disabled=false;const u=new URL(window.location.href);u.hash='';window.history.replaceState(null,'',u);message('New independent task. The previous job is not retried or canceled.');});
- const saved=new URLSearchParams(window.location.hash.slice(1)),peer=saved.get('chat_host'),key=saved.get('chat_request');if(id.test(peer||'')&&/^[A-Za-z0-9_-]{16,64}$/.test(key||'')){sent=true;session().then(()=>{recover(peer,key);message('Recovered remote job. No work was resent.');}).catch(()=>message('Sign in to inspect the saved remote job. No work was resent.'));}
- return {prepare};
+ document.querySelector('#host-new-task').addEventListener('click',()=>{if(busy)return;sent=false;newTask.hidden=true;models.disabled=false;const u=new URL(window.location.href);u.hash='';window.history.replaceState(null,'',u);message('New independent task. The previous job is not retried or canceled.');});const saved=new URLSearchParams(window.location.hash.slice(1)),peer=saved.get('chat_host'),key=saved.get('chat_request');if(peerID.test(peer||'')&&/^[A-Za-z0-9_-]{16,64}$/.test(key||'')){sent=true;newTask.hidden=false;session().then(()=>{recover(peer,key);message('Recovered remote job. No work was resent.');}).catch(()=>message('Sign in to inspect the saved remote job. No work was resent.'));}return {prepare};
 })();

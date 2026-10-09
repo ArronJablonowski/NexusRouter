@@ -395,3 +395,29 @@ func TestBrowserFeedbackPendingReceiptSurvivesLaterRevision(t *testing.T) {
 		t.Fatal(history, err)
 	}
 }
+
+func TestBrowserExplicitModelPersistsStrictPin(t *testing.T) {
+	svc, cfg := autoFixture(t)
+	svc.settings.WebUI.DefaultModel = "z"
+	ctx := context.Background()
+	store, err := browserops.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	mutations, err := NewBrowserMutations(svc, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := contract.ChatRequest{Version: 1, Action: contract.ChatSubmit, IdempotencyKey: "browser-exact-model-01", ModelID: "a", Text: "explicit task"}
+	receipt, err := mutations.Chat(ctx, browserMutationTestSubject, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.ResumeSubmission(ctx, receipt.OperationID, Request{ModelID: "a", Prompt: "explicit task", DisableFallback: true}); err != nil {
+		t.Fatal("strict pin not durably bound", err)
+	}
+	if _, err = svc.ResumeSubmission(ctx, receipt.OperationID, Request{ModelID: "a", Prompt: "explicit task"}); err == nil {
+		t.Fatal("fallback permission changed under same submission")
+	}
+}

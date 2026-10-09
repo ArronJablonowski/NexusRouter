@@ -243,6 +243,9 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 	if maxAttempts == 0 {
 		maxAttempts = 3
 	}
+	if r.DisableFallback {
+		maxAttempts = 1
+	}
 	fallbackTimeout := 10 * time.Minute
 	if s.settings.Runtime.FallbackTimeout != "" {
 		fallbackTimeout, _ = config.Duration(s.settings.Runtime.FallbackTimeout)
@@ -250,7 +253,7 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 	if r.ModelID != "" && r.ModelID != "auto" {
 		result, err = s.runWithPressure(ctx, r, s.runExplicit)
 		fallback := s.settings.WebUI.CommanderFallbackModel
-		if maxAttempts > 1 && err != nil && result.retryable && result.TaskID != "" && fallback != "" && r.ModelID == s.settings.WebUI.DefaultModel && r.runtimeHostAdmission == nil && r.delegatedParent == "" && ctx.Err() == nil {
+		if maxAttempts > 1 && r.RemoteExecution == nil && err != nil && result.retryable && result.TaskID != "" && fallback != "" && r.ModelID == s.settings.WebUI.DefaultModel && r.runtimeHostAdmission == nil && r.delegatedParent == "" && ctx.Err() == nil {
 			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(ctx, fallbackTimeout)
 			defer cancel()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -54,12 +55,12 @@ func TestRemoteSDKNativeHarnessSSH(t *testing.T) {
 }
 
 func TestRemoteSDKTextConversationPreservesPriorTurns(t *testing.T) {
-	remoteSDKLifecycleConversation(t, false, false, true, true)
+	remoteSDKLifecycleConversation(t, false, false, true, true, false)
 }
 func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations ...config.NativeHarness) {
-	remoteSDKLifecycleConversation(t, interruptedSSH, native, false, false, registrations...)
+	remoteSDKLifecycleConversation(t, interruptedSSH, native, false, false, false, registrations...)
 }
-func remoteSDKLifecycleConversation(t *testing.T, interruptedSSH, native, conversation, builtin bool, registrations ...config.NativeHarness) {
+func remoteSDKLifecycleConversation(t *testing.T, interruptedSSH, native, conversation, builtin, exact bool, registrations ...config.NativeHarness) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	var calls atomic.Int32
@@ -235,6 +236,18 @@ func remoteSDKLifecycleConversation(t *testing.T, interruptedSSH, native, conver
 	routeStore, e := OpenRouteStore(routeDirectory)
 	if e != nil {
 		t.Fatal(e)
+	}
+	if exact {
+		info, e := f.client.Info(ctx, "node-a")
+		if e != nil || info.TargetingVersion != 1 {
+			t.Fatal("exact targeting not advertised", info.TargetingVersion, e)
+		}
+		task.ExpectedModel = "fixture"
+		bad := task
+		bad.ExpectedModel = "renamed-model"
+		if _, e = f.client.DispatchRecorded(ctx, routeStore, "node-a", "sdk-wrong-model-01", bad); !errors.Is(e, ErrDenied) || calls.Load() != 0 {
+			t.Fatal("changed alias was dispatched", e, calls.Load())
+		}
 	}
 	request := "request-sdk-00001"
 	var automatic AutomaticRequest
@@ -431,4 +444,8 @@ func remoteSDKLifecycleConversation(t *testing.T, interruptedSSH, native, conver
 	if calls.Load() != 2 {
 		t.Fatalf("duplicate or canceled inference: %d", calls.Load())
 	}
+}
+
+func TestRemoteSDKExactModelRejectsChangedAlias(t *testing.T) {
+	remoteSDKLifecycleConversation(t, false, false, false, false, true)
 }

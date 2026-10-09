@@ -1698,3 +1698,18 @@ separately from file tools. The implemented first boundary is one workspace/host
 remote transport and explicitly scoped worker sharing require further admission
 and recovery qualification. See `docs/model-collaboration.md` and `docs/progress.md`
 for actual behavior and limitations; fixture success is not full MVP completion.
+
+
+## Exact host/model prompt assignment — 2026-10-09 update
+
+The Web UI composer must accept one leading `@hostname/model-ID` assignment for
+an independent task, with host/model autocomplete and visible resolved identities
+before dispatch. Friendly names resolve to stable paired/configured IDs; ambiguous
+names fail closed. Local assignments use the durable submission journal; remote
+assignments use the original caller/destination recorded binding. Exact selections
+remain pinned, including a commander's configured default model, and cannot silently
+activate fallback. Remote destinations must check the expected model name before
+admission, with an advertised capability for coordinated peer upgrades. Preserve
+privacy, trust, capability, context, resource and recovery boundaries. Initial
+implementation scope and deferred automatic/multiple-assignment forms are recorded
+in `docs/host-model-assignments.md`; this does not establish complete MVP coverage.

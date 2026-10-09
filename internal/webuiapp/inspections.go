@@ -16,6 +16,7 @@ import (
 )
 
 type InspectionServices struct {
+	ModelTargets  func(context.Context) (contract.ModelTargets, error)
 	Collaboration func(context.Context, contract.CollaborationOptions) (contract.CollaborationPage, error)
 	Routing       func(context.Context) (contract.ModelInspectionPage, error)
 	Dependencies  func(context.Context) (contract.DependencyInventory, error)
@@ -73,6 +74,13 @@ func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.R
 		h.serveStats(writer, request)
 	case path == base+"/models/deprecation":
 		h.serveDeprecationInspection(writer, request)
+	case path == base+"/model-targets":
+		serveInspection(h, writer, request, "model_targets_unavailable", func(ctx context.Context) (contract.ModelTargets, error) {
+			if h.inspections.ModelTargets == nil {
+				return contract.ModelTargets{}, errors.New("unavailable")
+			}
+			return h.inspections.ModelTargets(ctx)
+		})
 	case path == base+"/collaboration":
 		serveInspection(h, writer, request, "collaboration_unavailable", func(ctx context.Context) (contract.CollaborationPage, error) {
 			if h.inspections.Collaboration == nil {
@@ -240,7 +248,7 @@ func canonicalToolCursor(value string) bool {
 }
 
 type inspectionResponse interface {
-	contract.CollaborationPage | contract.DependencyInventory | contract.LoggingPage | scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
+	contract.ModelTargets | contract.CollaborationPage | contract.DependencyInventory | contract.LoggingPage | scheduleview.Page | contract.SchedulePage | contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
 }
 
 func serveInspection[T inspectionResponse](h *Handler, writer http.ResponseWriter, request *http.Request, code string, read func(context.Context) (T, error), timeouts ...time.Duration) {
@@ -284,6 +292,8 @@ func safeInspection[T inspectionResponse](ctx context.Context, read func(context
 
 func inspectionInvalid[T inspectionResponse](value T) bool {
 	switch typed := any(value).(type) {
+	case contract.ModelTargets:
+		return typed.Validate() != nil
 	case contract.CollaborationPage:
 		return typed.Validate() != nil
 	case contract.DependencyInventory:
