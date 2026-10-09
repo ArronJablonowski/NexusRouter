@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark repository QA started
+
+User-authorized private code QA of snapshot `7d4b7aac` is running through NexusRouter on Spark, rotating Muse Glimmer, qwen3.8 27B and Laguna S 2.1 across 632 numbered text batches. A sequential worker and ten-minute monitoring preserve request uncertainty and memory safeguards. Initial context-overflow admission failures were diagnosed; smaller replacement batches are admitted and Muse is running. No model findings are verified yet. Live Markdown/state are kept in the private QA workspace; [review report](qa/2026-10-09-spark-nexusrouter-findings.md) records model identities, distributed coverage, cross-review plan and limits. Product source/configuration/services remain unchanged. This is a campaign start, not completed QA.
+
 ## 2026-10-09 — Paired Spark deployment
 
 Deployed source `52cfe465` (same application code as local `cef3150a`) to paired DGX Spark instance `dgx-spark`, hostname `spark-9c8a`. Linux ARM64 build/config validation, idle checks and consistent private database backups passed. Paired info and the commander's authenticated browser inspection report available=true and targeting_version=1. Exact remote model-name assignment is now supported by this peer. Ollama retained its process; configuration/trust and local services are unchanged. No inference task was run. See [remote deployment receipt](validation/2026-10-09-spark-deployment.md) for verification and remaining limits.
