@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark feedback candidates checked against replay
+
+37/634 primary batches succeeded; qwen batch 37 running. Completed-plus-pending feedback trigger is rejected by replay invariants; empty-domain route feedback remains an unverified custom-producer edge because the real application emitter supplies domain/profile. [Caller evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. Worker healthy; no new failures or reproduced defects, cost-candidate reproduction pending. Documentation diff checks only.
+
 ## 2026-10-09 — Spark QA cross-review classification corrected
 
 30/634 primary batches succeeded. Delegation lifetime-budget and recoverable-success claims are unsupported by task-scoped registration and outcome invariants. Corrected the campaign's cross-review classifier to retain explicit candidate reports even when they also include NO_VERIFIED_BUGS; tested mixed/noncandidate reports and helper syntax. Active task preserved during worker restart. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records cost-candidate reproduction gap. No new verified defect or product change; documentation checks passed.

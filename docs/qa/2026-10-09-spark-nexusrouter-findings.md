@@ -147,3 +147,12 @@ Muse batch 27's lifetime-budget claim is contradicted by the caller: `internal/a
 Fixed a campaign classification gap: reports containing both explicit numbered Candidate headings and a NO_VERIFIED_BUGS marker now remain eligible for second-model cross-review. Batch 25 has that mixed shape; ignoring its marker alone would skip the cost candidate. Syntax and positive/negative classification checks passed on existing reports, and worker safely restarted without canceling the active remote task. No product or provider settings changed. Cross-reviews still run after primary batches.
 
 30/634 unique primary batches succeeded; Muse batch 30 active, worker healthy, no new failures. qwen/Laguna batches 28–29 reported no verified defects. The source-supported recovery-cost candidate remains pending isolated reproduction. GPU 82°C / hottest thermal zone 89.4°C; retained sampled peaks 85°C / 93.3°C. Documentation diff checks only.
+
+## Muse batch 36 feedback triage — 2026-10-09 21:38 UTC
+
+Two model claims remain unverified/rejected against pinned caller evidence:
+
+- Completed task with pending tool calls: rejected claimed trigger. `sessions/replay.go:209` rejects TaskCompleted while pending calls or uncertain effects remain, so FeedbackHistoryStore cannot receive the alleged completed-plus-pending snapshot through successful replay.
+- Empty RouteSelected domain/profile overwrites feedback key: unverified contract-edge hypothesis. `runtime/event.go:254` does not independently require these fields, but the application's actual route emitter `internal/app/auto.go:792` fills both from the request, matching TaskStarted. No normal application caller producing the alleged empty route event has been found; direct/custom event-producer behavior needs further tracing and a reproducer before a defect claim.
+
+37/634 successful primary batches, qwen batch 37 running. Cross-reviews pending. Worker healthy; no new failures. No new reproduced defect; recovery-cost candidate still pending isolated reproduction. GPU 78°C / hottest thermal zone 86.2°C, retained sampled peaks 85°C / 93.3°C. Source read only; documentation diff checks, no tests or product changes.
