@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark QA bounded recovery failed, gap preserved
+
+86/634 successful primary batches; Muse batch 87 active. Batch 82's one same-model recovery also returned empty final text despite token accounting. Both failed receipts retained; no automatic further repeat, and this source batch remains a coverage gap. Worker continues normally. [Failure evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records incomplete coverage; no new reproduced defect or product/provider/service change. Documentation checks only.
+
 ## 2026-10-09 — Spark fifth bounded response recovery
 
 83/634 primary batches succeeded; Muse batch 84 active. Nil-provider allegation omits the existing early nil guard. qwen batch 82 has confirmed terminal empty_output; one same-model recovery queued, retaining receipt and active task. All four prior recoveries succeeded. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved; no new verified defect, cost reproduction pending. Documentation checks only; no product/model/service change.
