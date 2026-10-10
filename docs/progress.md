@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark outcome-supervision hypotheses recorded
+
+70/634 primary batches succeeded; qwen batch 70 active. Outcome-supervision claims omit identical copied MinSamples and file-store ownership restrictions; guard growth and event-reconciliation claims remain unverified without legitimate traces. [Dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new source-supported/reproduced defect or failure, cost reproduction pending. Worker healthy; documentation checks only.
+
 ## 2026-10-09 — Spark skill-generation claims traced
 
 68/634 primary batches succeeded; Laguna batch 68 active. Skill-selection helper preserves/extends base secrets, cleanup is once-guarded, and credential-drift rejection is deliberate; new claims are unsupported without a privacy-safe reproducer. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new source-supported/reproduced defect or failure; cost reproduction pending. Worker healthy; documentation checks only.
