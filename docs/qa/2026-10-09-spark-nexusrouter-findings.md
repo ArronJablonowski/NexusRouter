@@ -301,3 +301,11 @@ Safe standalone Go fixture using repository modernc.org/sqlite dependency and an
 Report149 steeringCounts inversion allegation rejected: valid pending/null or applied/sequence>1 rows contribute zero bad count; suggested inversion would reject valid rows. Legacy NextSteering nil/no-error behavior is explicitly asserted by steering_test.go:232, which the report misquotes. No new verified defect; cost-budget reproduction and other caller hypotheses still pending.
 
 149/634 primary successes; Muse index150 (user ordinal151) running, worker healthy, no new failures/recoveries. Cross-reviews not started; total undetermined. Primary82 gap remains. GPU82°C/hottest zone90.2°C; sampled peaks85°C/93.3°C including initial manual peak. Documentation diff checks plus isolated driver fixture only, not full suite.
+
+## Store identity trace and bounded recovery — 2026-10-10 08:50 UTC
+
+Report150 relative-path identity hypothesis rejected: Open normalizes filepath.Abs at open.go:29 and stores path:abs at58 before ValidateIdentity. No new verified bugs in latest reports. Earlier cost-budget reproduction remains pending.
+
+qwen primary151 (user ordinal152) failed terminally: complete own events show stop, usage13243 input/14609 output, deterministic.nonempty_text.v1 rejected, task.failed empty_output. One same-model recovery queued after active Muse, receipt preserved. Eight prior recoveries succeeded; primary82 remains unresolved after failed recovery. No uncertain resend/model/service/config changes.
+
+151/634 primary successes; Muse index153 (user ordinal154) running, worker healthy. Cross-reviews not started, total undetermined. GPU82°C current/85°C sampled peak; hottest zone90.5°C current/93.3°C retained sampled peak including initial manual reading. Documentation diff checks and source inspection only; no application tests.
