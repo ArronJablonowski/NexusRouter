@@ -355,3 +355,11 @@ qwen primary241 (user ordinal242) terminal empty_output confirmed via full own e
 Latest successful batches237–240 primarily reviewed PRD/README and accounting tests;242 reviewed approvals/classification. Documentation invariants align on accuracy-first, preserved manual pins, original top-three remote fallback and exact-host/model assignments. This is requirements coverage, not executable verification. No new verified bug. Earlier SyncUsage omission allegation rejected by Tasks calling recordUsagePage; TLSrevocation claim omits per-request registry.authenticate. Priorworkboard/costhypotheses pending.
 
 241/634 primary successes; Muse index243 (user ordinal244) running, worker healthy. Cross-reviews not started, total undetermined. GPU71°C/hottest zone78.3°C; retained sampled peaks85°C/93.3°C including initial manual thermal reading. Documentation diff checks, source/events reads only, no application tests.
+
+## Second unresolved coverage gap — 2026-10-10 18:30 UTC
+
+Primary241 single same-model recovery648 failed terminally: full own events show stop, usage14786 input/10075 output, deterministic.nonempty_text.v1 rejected, task.failed empty_output. No accepted final report. Both receipts retained; no further automatic repeat. Unresolved primary coverage gaps now82 and241 (user ordinals83/242). Thirteen other recoveries succeeded. Sequential worker advances later work; no uncertain replay or model/service/config changes.
+
+Report243 nil-estimator inversion allegation rejected: providers/context_engine.go:34 selects EstimateContext when estimator is nil, maintaining default token preflight. Typed-nil rejection and untyped-nil default are distinct intentional cases. No new verified defect; earlier workboard/cost-budget hypotheses pending.
+
+243/634 primary successes; Laguna index245 (user ordinal246) running, worker healthy. Cross-reviews not started, total undetermined. GPU71°C/hottest zone84.7°C current; retained sampled peaks85°C/93.3°C including initial manual thermal reading. Documentation-only diff checks, source/events inspection, no application tests.
