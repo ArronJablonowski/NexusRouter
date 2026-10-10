@@ -331,3 +331,11 @@ qwen primary220 (user ordinal221) failed terminally: complete own events show st
 Report221 empty-hostname controller rejection allegation is contradicted by validHostname (contract.go:177), which permits empty strings (no lower-length guard, empty rune loop). Context floor and certificate exact-expiry hypotheses require admitted callers/policy evidence; remaining strict-hint/interface/cancellation observations do not demonstrate wrong outcomes. No new verified bugs; earlier workboard/cost candidates still pending.
 
 220/634 primary successes; Muse index222 (user ordinal223) running ~16min within deadline, worker healthy. Cross-reviews not started, total undetermined. GPU83°C/hottest zone91.6°C current; sampled peaks85°C/93.3°C including initial manual reading. Documentation-only diff checks and source inspection, no tests this checkpoint.
+
+## Remote queue hypotheses and bounded recovery — 2026-10-10 16:50 UTC
+
+qwen primary229 (user ordinal230) terminal empty_output confirmed through full own events: stop, usage11738 input/6175 output, deterministic.nonempty_text.v1 rejected, task.failed empty_output. One same-model recovery queued after active Laguna; original receipt retained. Eleven prior recoveries succeeded; primary82 remains unresolved after failed recovery. No uncertain resend/model/service/config changes.
+
+Reports227/228 raise unverified rotation/peer-binding and review-queue intent hypotheses. Existing deadline replay acceptance differs from admission of new expired work; report itself cites process expiry guard, so past-deadline inference is not demonstrated. Permanent attention on intent mismatch may be intentional no-automatic-retry boundary; full caller/spec trace required. No new verified bug; workboard/cost-budget candidates pending.
+
+228/634 primary successes; Laguna index230 (user ordinal231) running, worker healthy. Cross-reviews not started, total undetermined. GPU72°C/hottest zone78.6°C current; retained sampled peaks85°C/93.3°C including initial manual thermal sample. Documentation-only diff checks and source/events inspection; no application tests.
