@@ -287,3 +287,9 @@ Muse batch132 alleges sync.WaitGroup.Go is undefined. Installed go doc sync.Wait
 qwen primary133 (user ordinal134) failed terminally: complete own event page shows stop, 14241 input/12611 output tokens, deterministic.nonempty_text.v1 rejection, task.failed empty_output. One same-model recovery queued after active Laguna; receipt retained, no uncertain resend/model/config/service changes. Six prior recoveries succeeded; primary82 remains unresolved after one failed recovery.
 
 132/634 unique successful primary batches; Laguna index134 (user ordinal135) running. Worker healthy; cross-reviews not started, total undetermined. No new verified bugs. GPU71°C current/85°C sampled peak; hottest zone75.6°C current/93.3°C retained sampled peak including initial manual reading. Intermittent samples only. Documentation diff checks, source/API inspection; no product changes.
+
+## Bounded recovery update — 2026-10-10 07:10 UTC
+
+Primary133 recovery succeeded. Primary136 (qwen, user ordinal137) failed terminally; complete campaign events confirm stop, 11793 input/11428 output, deterministic.nonempty_text.v1 rejection, task.failed empty_output. One same-model recovery queued after active Muse. Seven prior recoveries succeeded; primary82 remains unresolved after its failed recovery. Original receipts retained, no uncertain replay, no model/service/config changes. Latest reports135/137 have no actionable findings; no new verified defects.
+
+136/634 unique primary successes; Muse index138 (user ordinal139) running. Worker healthy. Cross-reviews not started, total undetermined. GPU81°C current/85°C sampled peak; hottest zone89.6°C current/93.3°C retained sampled peak including initial manual reading. Earlier hypotheses await isolated validation. Documentation-only diff checks; no application tests or product changes this checkpoint.
