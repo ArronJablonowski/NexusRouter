@@ -347,3 +347,11 @@ qwen primary232 (user ordinal233) terminal empty_output confirmed via complete o
 Delivered reports231/233 cover server authorization paths and opt-in two-host fixture tests; no new verified bug. Native/live tests were read, not run. Earlier report230 Observe inversion rejected by actual sdk.go:90 err!=nil; harness authorization enforced by server peer.permitsTask before backend Submit. Other remote/workboard/cost hypotheses still pending.
 
 232/634 primary successes; Muse index234 (user ordinal235) running, worker healthy. Cross-reviews not started, total undetermined. GPU83°C/hottest zone90.9°C; retained sampled peaks85°C/93.3°C including initial manual reading. Documentation diff checks and campaign/source inspection only; no application tests.
+
+## Requirements coverage and bounded recovery — 2026-10-10 18:10 UTC
+
+qwen primary241 (user ordinal242) terminal empty_output confirmed via full own events: stop, usage14748 input/13387 output, deterministic.nonempty_text.v1 rejected, task.failed empty_output. One same-model recovery queued after active Muse; original retained. Thirteen prior recoveries succeeded; primary82 remains unresolved after failed recovery. No uncertain replay/model/service/config changes.
+
+Latest successful batches237–240 primarily reviewed PRD/README and accounting tests;242 reviewed approvals/classification. Documentation invariants align on accuracy-first, preserved manual pins, original top-three remote fallback and exact-host/model assignments. This is requirements coverage, not executable verification. No new verified bug. Earlier SyncUsage omission allegation rejected by Tasks calling recordUsagePage; TLSrevocation claim omits per-request registry.authenticate. Priorworkboard/costhypotheses pending.
+
+241/634 primary successes; Muse index243 (user ordinal244) running, worker healthy. Cross-reviews not started, total undetermined. GPU71°C/hottest zone78.3°C; retained sampled peaks85°C/93.3°C including initial manual thermal reading. Documentation diff checks, source/events reads only, no application tests.
