@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark skill-generation claims traced
+
+68/634 primary batches succeeded; Laguna batch 68 active. Skill-selection helper preserves/extends base secrets, cleanup is once-guarded, and credential-drift rejection is deliberate; new claims are unsupported without a privacy-safe reproducer. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new source-supported/reproduced defect or failure; cost reproduction pending. Worker healthy; documentation checks only.
+
 ## 2026-10-09 — Spark policy/run-path candidates traced
 
 63/634 primary batches succeeded, Muse batch 63 active. Malformed-duration and nil-policy/race claims omit validation, nil-safe policy handling and locked/local state; remaining commit-acknowledgment claim is unverified without observable corruption or replay. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records dispositions. No new source-supported/reproduced defect or failure, cost reproduction pending. Worker healthy; documentation checks only.
