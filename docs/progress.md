@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark reviewer-token claim rejected upstream
+
+90/634 primary batches succeeded; qwen batch 91 running. Claimed output-cap bypass is blocked by evaluation.Reviewer's upstream usage check, configured cap propagation and an existing overrun test. [Caller evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. One unresolved empty-output source gap retained; no new failure/reproduced defect, cost reproduction pending. Worker healthy; documentation checks only.
+
 ## 2026-10-09 — Spark QA bounded recovery failed, gap preserved
 
 86/634 successful primary batches; Muse batch 87 active. Batch 82's one same-model recovery also returned empty final text despite token accounting. Both failed receipts retained; no automatic further repeat, and this source batch remains a coverage gap. Worker continues normally. [Failure evidence](qa/2026-10-09-spark-nexusrouter-findings.md) records incomplete coverage; no new reproduced defect or product/provider/service change. Documentation checks only.
