@@ -323,3 +323,11 @@ New reports172/173 raise unverified workboard hypotheses: latest per-card attent
 Report207 claims SQLite json_type returns boolean and DDL implicitly commits. Standalone Go fixture with repository modernc.org/sqlite and in-memory DB returned json_type(true)=true, json_type(false)=false, table_restored=true after DROP TABLE within transaction followed by rollback. Both allegations rejected by targeted execution; source unchanged and no private runtime data accessed. Convergence NULL-check hypothesis still requires showing the preceding validated UPDATE can leave phase absent; no admitted failing migration demonstrated. Latest208/209 reports no verified defects.
 
 209/634 primary successes; Muse index210 (user ordinal211) running, worker healthy, no new failures/recoveries. Cross-reviews not started, total undetermined; primary82 remains unresolved. GPU82°C/hottest zone90.4°C current; sampled peaks85°C/93.3°C including initial manual thermal reading. Prior workboard/cost-budget hypotheses pending. Documentation diff checks and isolated driver fixture only; not application/full-suite validation.
+
+## Remote contract hypotheses and bounded recovery — 2026-10-10 15:50 UTC
+
+qwen primary220 (user ordinal221) failed terminally: complete own events show stop, usage11729 input/8605 output, rejected deterministic.nonempty_text.v1, task.failed empty_output. One same-model recovery queued after active Muse. Ten previous recoveries succeeded; primary82 remains unresolved after its failed recovery. Original receipt retained, no uncertain resend/model/service/config changes.
+
+Report221 empty-hostname controller rejection allegation is contradicted by validHostname (contract.go:177), which permits empty strings (no lower-length guard, empty rune loop). Context floor and certificate exact-expiry hypotheses require admitted callers/policy evidence; remaining strict-hint/interface/cancellation observations do not demonstrate wrong outcomes. No new verified bugs; earlier workboard/cost candidates still pending.
+
+220/634 primary successes; Muse index222 (user ordinal223) running ~16min within deadline, worker healthy. Cross-reviews not started, total undetermined. GPU83°C/hottest zone91.6°C current; sampled peaks85°C/93.3°C including initial manual reading. Documentation-only diff checks and source inspection, no tests this checkpoint.
