@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark summary-validator claims traced
+
+81/634 primary batches succeeded; Muse batch 81 active. Validator resolution occurs before replay branch; source bindings, transactional review CAS and nil-draft guards contradict new claims. [Triage](qa/2026-10-09-spark-nexusrouter-findings.md) saved; no new source-supported/reproduced defect or failure, cost reproduction pending. Worker healthy; documentation checks only.
+
 ## 2026-10-09 — Spark summary claims checked across storage/parser boundaries
 
 78/634 primary batches succeeded; Muse batch 78 active. Summary ID uniqueness, timestamp persistence and JSON depth claims omit store/parser guards; unauthorized inspection and config-drift allegations remain unverified without caller traces. [Dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new reproduced defect or failure; cost reproduction pending, worker healthy. Documentation checks only.
