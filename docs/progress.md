@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark summary claims checked across storage/parser boundaries
+
+78/634 primary batches succeeded; Muse batch 78 active. Summary ID uniqueness, timestamp persistence and JSON depth claims omit store/parser guards; unauthorized inspection and config-drift allegations remain unverified without caller traces. [Dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new reproduced defect or failure; cost reproduction pending, worker healthy. Documentation checks only.
+
 ## 2026-10-09 — Spark monitor policy and join claims checked
 
 73/634 primary batches succeeded, qwen batch 73 active. Sticky regression error is explicitly documented; secret-refresh and Close-join claims omit existing guards/assertions. Remaining evidence/catalog concerns are unverified. [Dispositions](qa/2026-10-09-spark-nexusrouter-findings.md) recorded. No new verified defect/failure/product change, cost reproduction pending. Worker healthy; documentation checks only.
