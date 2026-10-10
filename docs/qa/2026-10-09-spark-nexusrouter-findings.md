@@ -309,3 +309,11 @@ Report150 relative-path identity hypothesis rejected: Open normalizes filepath.A
 qwen primary151 (user ordinal152) failed terminally: complete own events show stop, usage13243 input/14609 output, deterministic.nonempty_text.v1 rejected, task.failed empty_output. One same-model recovery queued after active Muse, receipt preserved. Eight prior recoveries succeeded; primary82 remains unresolved after failed recovery. No uncertain resend/model/service/config changes.
 
 151/634 primary successes; Muse index153 (user ordinal154) running, worker healthy. Cross-reviews not started, total undetermined. GPU82°C current/85°C sampled peak; hottest zone90.5°C current/93.3°C retained sampled peak including initial manual reading. Documentation diff checks and source inspection only; no application tests.
+
+## Workboard hypotheses and bounded recovery — 2026-10-10 11:10 UTC
+
+qwen primary175 (user ordinal176) failed terminally. Complete own event page: stop, usage12973 input/9740 output, deterministic.nonempty_text.v1 rejection, task.failed empty_output. One same-model recovery queued after active Muse; original receipt retained. Nine prior recoveries succeeded; primary82 gap remains after failed recovery. No uncertain resend or product/model/service/config changes.
+
+New reports172/173 raise unverified workboard hypotheses: latest per-card attention event attribution if multiple attention claims can coexist; auxiliary-review charge/admission trigger validation. Neither is confirmed against lifecycle/callers. Charge equal to reserved limit does not by itself prove conservative mode: actual measured usage can equal reservation. Unsettled admission reservation is expected while a review runs, not proof of corruption. Other hypotheses require full boundary trace. No new verified defect; cost-budget reproduction pending.
+
+175/634 primary successes; Muse index177 (user ordinal178) queued, worker healthy. Cross-reviews not started, total undetermined. GPU60°C/hottest zone62.8°C; sampled peaks85°C/93.3°C including initial manual reading. Documentation-only diff checks, no application tests.
