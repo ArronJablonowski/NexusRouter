@@ -339,3 +339,11 @@ qwen primary229 (user ordinal230) terminal empty_output confirmed through full o
 Reports227/228 raise unverified rotation/peer-binding and review-queue intent hypotheses. Existing deadline replay acceptance differs from admission of new expired work; report itself cites process expiry guard, so past-deadline inference is not demonstrated. Permanent attention on intent mismatch may be intentional no-automatic-retry boundary; full caller/spec trace required. No new verified bug; workboard/cost-budget candidates pending.
 
 228/634 primary successes; Laguna index230 (user ordinal231) running, worker healthy. Cross-reviews not started, total undetermined. GPU72°C/hottest zone78.6°C current; retained sampled peaks85°C/93.3°C including initial manual thermal sample. Documentation-only diff checks and source/events inspection; no application tests.
+
+## Server review and bounded recovery — 2026-10-10 17:30 UTC
+
+qwen primary232 (user ordinal233) terminal empty_output confirmed via complete own events: stop, usage14373 input/14916 output, deterministic.nonempty_text.v1 rejected, task.failed empty_output. One same-model recovery queued after active Muse; receipt retained. Twelve prior recoveries succeeded; primary82 remains unresolved after failed recovery. No uncertain replay/model/service/config changes.
+
+Delivered reports231/233 cover server authorization paths and opt-in two-host fixture tests; no new verified bug. Native/live tests were read, not run. Earlier report230 Observe inversion rejected by actual sdk.go:90 err!=nil; harness authorization enforced by server peer.permitsTask before backend Submit. Other remote/workboard/cost hypotheses still pending.
+
+232/634 primary successes; Muse index234 (user ordinal235) running, worker healthy. Cross-reviews not started, total undetermined. GPU83°C/hottest zone90.9°C; retained sampled peaks85°C/93.3°C including initial manual reading. Documentation diff checks and campaign/source inspection only; no application tests.
