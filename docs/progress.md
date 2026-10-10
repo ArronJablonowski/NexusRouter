@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark workboard schema allegations checked
+
+93/634 primary batches succeeded; qwen batch 94 active. Invalid-field test cases do not show key-validation failure, and oneOf rejects both reorder neighbors. [Triage](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new reproduced defect/failure; one empty-output source gap and cost reproduction remain pending. Worker healthy; documentation checks only.
+
 ## 2026-10-09 — Spark reviewer-token claim rejected upstream
 
 90/634 primary batches succeeded; qwen batch 91 running. Claimed output-cap bypass is blocked by evaluation.Reviewer's upstream usage check, configured cap propagation and an existing overrun test. [Caller evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved. One unresolved empty-output source gap retained; no new failure/reproduced defect, cost reproduction pending. Worker healthy; documentation checks only.

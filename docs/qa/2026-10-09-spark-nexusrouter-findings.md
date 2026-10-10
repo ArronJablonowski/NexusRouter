@@ -243,3 +243,11 @@ qwen's single recovery for primary batch 82 also failed terminally with empty_ou
 qwen batch 88 labels output-token overrun a verified candidate, but the real reviewer boundary contradicts it. `internal/app/workboard_candidate_reviewer.go:51` passes configured MaxOutputTokens to evaluation.Reviewer. `evaluation/reviewer.go:133` rejects reported OutputTokens beyond that cap before a successful Review result. `evaluation/reviewer_test.go:121` explicitly tests requested cap 7 / reported output 8 and expects an error. The adapter's later input-only check is not the whole admission path. Claim rejected after source tracing; tests were read, not rerun. No new reproduced defect/product change.
 
 90/634 unique primary batches succeeded; qwen batch 91 running. One unresolved source-batch coverage gap (batch 82, original plus bounded recovery both empty output), with receipts retained; four earlier recoveries succeeded. Worker healthy and advancing; no new failures. Cross-reviews not started. Source-supported cost-budget candidate still awaiting reproduction. GPU 72°C / hottest zone 76.5°C; sampled peaks 85°C / 93.3°C. Documentation diff checks only.
+
+## Workboard argument/schema claims — 2026-10-10 02:50 UTC
+
+Laguna batch 92's alleged missing idempotency-key bug is unsupported: the cited tests intentionally reject extra actor/reason fields, missing revise fields, oversized labels and missing parent graph revision; the example key names are not proof of malformed-key acceptance. Mutation schemas use workboardKeySchema, and tools/registry.go compiles/enforces JSON schemas before authority. No failing malformed-key execution was demonstrated.
+
+Muse batch 93's both-neighbors hypothesis misunderstands oneOf: when both before_card_id and after_card_id are present, both required branches match, so oneOf rejects the object (exactly one branch is required). No schema ambiguity as alleged. No product fix/test execution.
+
+93/634 successful primary batches; qwen batch 94 running. Worker healthy, no new failures. Four earlier recoveries succeeded; source batch 82 remains an unresolved empty-output coverage gap. Cross-reviews pending. No new reproduced defects; cost-budget reproduction pending. GPU 80°C / hottest thermal zone 88°C; sampled peaks 85°C / 93.3°C. Documentation checks only.
