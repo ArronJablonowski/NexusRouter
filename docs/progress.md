@@ -1,3 +1,7 @@
+## 2026-10-09 — Spark fifth bounded response recovery
+
+83/634 primary batches succeeded; Muse batch 84 active. Nil-provider allegation omits the existing early nil guard. qwen batch 82 has confirmed terminal empty_output; one same-model recovery queued, retaining receipt and active task. All four prior recoveries succeeded. [Evidence](qa/2026-10-09-spark-nexusrouter-findings.md) saved; no new verified defect, cost reproduction pending. Documentation checks only; no product/model/service change.
+
 ## 2026-10-09 — Spark summary-validator claims traced
 
 81/634 primary batches succeeded; Muse batch 81 active. Validator resolution occurs before replay branch; source bindings, transactional review CAS and nil-draft guards contradict new claims. [Triage](qa/2026-10-09-spark-nexusrouter-findings.md) saved; no new source-supported/reproduced defect or failure, cost reproduction pending. Worker healthy; documentation checks only.
