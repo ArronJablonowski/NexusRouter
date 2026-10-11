@@ -161,3 +161,7 @@ See [implementation evidence](docs/progress.md) for specific completed work and 
 ## License
 
 [MIT](LICENSE). Release artifacts also carry dependency notices; see [release packaging](docs/release-packaging.md) for how those notices are assembled and reviewed.
+
+### Recover an uncertain remote dispatch
+
+Use `nexus remote recover-status --instance HOST --request ORIGINAL_ID` with the original task JSON on stdin and the same trust/certificate options. This read-only admission reconciliation does not run a model. It restores a lost submission binding when the exact request was admitted, or reports that the reserved request was not admitted. Keep the original payload and request identity; unavailable or conflicting recovery is not permission to send a different request. Existing `remote status` remains the normal inspection command.

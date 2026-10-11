@@ -21,6 +21,8 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
+	SubmitTask       func(context.Context, string, Task) (submissions.Status, error)
+	RecoverTask      func(context.Context, string, Task) (submissions.Status, error)
 	ReadDependencies func(context.Context) (webui.DependencyInventory, error)
 	Schedules        func(context.Context) (webui.SchedulePage, error)
 	JobHistory       func(context.Context, string, webui.HistoryOptions) (webui.HistoryPage, error)
@@ -160,7 +162,7 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 			return submissions.Status{}, ErrUnavailable
 		}
 	}
-	if b == nil || b.Client == nil || t.Validate() != nil {
+	if b == nil || (b.Client == nil && b.SubmitTask == nil) || t.Validate() != nil {
 		return submissions.Status{}, ErrInvalid
 	}
 	if t.HarnessID != "" {
@@ -183,6 +185,26 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	if !eligible {
 		return submissions.Status{}, ErrDenied
 	}
+	if b.SubmitTask != nil {
+		return b.SubmitTask(ctx, key, t)
+	}
+	return b.Client.Submit(ctx, key, submissionRequest(t))
+}
+
+// RecoverSubmission only observes an already admitted exact request.
+func (b *SDKBackend) RecoverSubmission(ctx context.Context, key string, t Task) (submissions.Status, error) {
+	if b == nil || t.Validate() != nil {
+		return submissions.Status{}, ErrInvalid
+	}
+	if b.RecoverTask != nil {
+		return b.RecoverTask(ctx, key, t)
+	}
+	if b.Client == nil {
+		return submissions.Status{}, ErrUnavailable
+	}
+	return b.Client.InspectSubmissionRequest(ctx, key, submissionRequest(t))
+}
+func submissionRequest(t Task) sdk.Request {
 	execution := t.Execution
 	if execution == nil {
 		execution = &runtime.RemoteExecution{Mode: "direct", Depth: 1}
@@ -191,7 +213,7 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	if len(t.Messages) > 0 {
 		prompt = ""
 	}
-	return b.Client.Submit(ctx, key, sdk.Request{Messages: t.Messages, RemoteExecution: execution, Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
+	return sdk.Request{Messages: t.Messages, RemoteExecution: execution, Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private}
 }
 func (b *SDKBackend) Status(ctx context.Context, id string) (submissions.Status, error) {
 	if b.ReadStatus != nil {

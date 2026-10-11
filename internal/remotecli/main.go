@@ -22,7 +22,9 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"github.com/ArronJablonowski/NexusRouter/webui"
 )
 
@@ -271,6 +273,16 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 			return e
 		}
 		result, err = client.InspectRecorded(ctx, store, *request)
+	case "recover-status":
+		data, e := io.ReadAll(io.LimitReader(input, remote.MaxBody+1))
+		if e != nil || len(data) > remote.MaxBody {
+			return remote.ErrInvalid
+		}
+		var task remote.Task
+		if json.Unmarshal(data, &task) != nil || task.Validate() != nil {
+			return remote.ErrInvalid
+		}
+		result, err = client.RecoverStatus(ctx, *instance, *request, task)
 	case "status":
 		result, err = client.Status(ctx, *instance, *request)
 	case "cancel":
@@ -402,7 +414,24 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{ReadDependencies: service.BrowserDependencies, Schedules: func(context.Context) (webui.SchedulePage, error) {
+	// Submit and reconcile through the dispatcher-owned Service. A second SDK
+	// Service would reopen and revalidate the growing task database per request.
+	requestFor := func(t remote.Task) app.Request {
+		execution := t.Execution
+		if execution == nil {
+			execution = &runtime.RemoteExecution{Mode: "direct", Depth: 1}
+		}
+		prompt := t.Prompt
+		if len(t.Messages) > 0 {
+			prompt = ""
+		}
+		return app.Request{Messages: t.Messages, RemoteExecution: execution, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private}
+	}
+	backend := &remote.SDKBackend{SubmitTask: func(ctx context.Context, key string, t remote.Task) (submissions.Status, error) {
+		return service.Submit(ctx, key, requestFor(t))
+	}, RecoverTask: func(ctx context.Context, key string, t remote.Task) (submissions.Status, error) {
+		return service.ResumeSubmission(ctx, key, requestFor(t))
+	}, ReadDependencies: service.BrowserDependencies, Schedules: func(context.Context) (webui.SchedulePage, error) {
 		return webui.SchedulePage{Version: 1, ObservedAt: time.Now().UTC(), Items: []webui.Schedule{}}, nil
 	}, JobHistory: service.ChatHistory, RunnerModelID: cfg.VLLM.ModelID, ControlRunner: vllmController(cfg, service), Routing: service.RemoteRoutingInspection, ReadStatus: service.SubmissionStatus, Client: client, LogEvents: service.RemoteCommittedLogs, Usage: service.RemoteTaskUsage, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {

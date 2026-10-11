@@ -22,6 +22,18 @@ func (c *Client) Submit(ctx context.Context, key string, request Request) (submi
 	return c.service.Submit(ctx, key, request.internal())
 }
 
+// InspectSubmissionRequest reconciles an exact idempotent request without creating
+// storage or dispatching work. Missing and conflicting requests remain errors.
+func (c *Client) InspectSubmissionRequest(ctx context.Context, key string, request Request) (submissions.Status, error) {
+	if !c.valid(ctx) || request.Version != 1 {
+		return submissions.Status{}, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return submissions.Status{}, err
+	}
+	return c.service.ResumeSubmission(ctx, key, request.internal())
+}
+
 // SubmissionStatus reads durable work, including sensitive completed output.
 // It does not create storage, migrate it, or start an execution worker.
 func (c *Client) SubmissionStatus(ctx context.Context, id string) (submissions.Status, error) {

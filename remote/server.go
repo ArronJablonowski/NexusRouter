@@ -23,13 +23,14 @@ import (
 )
 
 type Server struct {
-	runnerMu sync.RWMutex
-	instance string
-	trust    TrustFile
-	journal  *Journal
-	backend  Backend
-	slots    chan struct{}
-	limits   requestLimiter
+	runnerMu        sync.RWMutex
+	submissionSlots chan struct{}
+	instance        string
+	trust           TrustFile
+	journal         *Journal
+	backend         Backend
+	slots           chan struct{}
+	limits          requestLimiter
 }
 
 func NewServer(instance string, trust TrustFile, journal *Journal, backend Backend) (*Server, error) {
@@ -39,7 +40,7 @@ func NewServer(instance string, trust TrustFile, journal *Journal, backend Backe
 	if _, err := trust.Read(); err != nil {
 		return nil, err
 	}
-	return &Server{instance: instance, trust: trust, journal: journal, backend: backend, slots: make(chan struct{}, 32)}, nil
+	return &Server{instance: instance, trust: trust, journal: journal, backend: backend, slots: make(chan struct{}, 32), submissionSlots: make(chan struct{}, 1)}, nil
 }
 
 // HTTPServer uses TLS 1.3 mutual authentication and bounded HTTP/1.1 requests.
@@ -121,6 +122,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				} else if r.Method == "GET" {
 					op = "inspect"
 				}
+			}
+			if len(parts) == 2 && parts[1] == "recover" && r.Method == "POST" {
+				op = "inspect"
 			}
 			if len(parts) == 2 && parts[1] == "cancel" && r.Method == "POST" {
 				op = "cancel"
@@ -247,7 +251,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			info.Harnesses = filterHarnesses(info.Harnesses, filtered, peer.Harnesses, false)
 			result = info
 		}
-	} else if op == "dispatch" {
+	} else if op == "dispatch" || strings.HasSuffix(r.URL.Path, "/recover") {
+		select {
+		case s.submissionSlots <- struct{}{}:
+			defer func() { <-s.submissionSlots }()
+		case <-ctx.Done():
+			s.finish(w, ctx, peer.ID, op, key, nil, ErrUnavailable)
+			return
+		}
 		var task Task
 		if r.Header.Get("Content-Type") != "application/json" {
 			s.finish(w, ctx, peer.ID, op, key, nil, ErrInvalid)
@@ -263,6 +274,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if !peer.permitsTask(task) || task.Private && !private {
 			s.finish(w, ctx, peer.ID, op, key, nil, ErrDenied)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/recover") {
+			result, err = s.recoverSubmission(ctx, peer.ID, key, task)
+			s.finish(w, ctx, peer.ID, op, key, result, err)
 			return
 		}
 		var submission string
@@ -313,6 +329,9 @@ func (s *Server) finish(w http.ResponseWriter, ctx context.Context, caller, op, 
 		code = 503
 		outcome = "uncertain"
 		switch {
+		case errors.Is(err, ErrNotAdmitted):
+			code = 404
+			outcome = "not_admitted"
 		case errors.Is(err, ErrInvalid):
 			code = 400
 			outcome = "invalid"
@@ -333,6 +352,9 @@ func (s *Server) finish(w http.ResponseWriter, ctx context.Context, caller, op, 
 		return
 	}
 	if err != nil {
+		if errors.Is(err, ErrNotAdmitted) {
+			w.Header().Set("X-Nexus-Recovery", "not-admitted")
+		}
 		s.fail(w, code)
 		return
 	}

@@ -27,10 +27,11 @@ func TestSDKSubmissionGuardsNoStorageCreation(t *testing.T) {
 	ctx := context.Background()
 	for _, client := range []*sdk.Client{nil, {}} {
 		_, a := client.Submit(ctx, "0123456789abcdef", sdk.Request{Version: 1})
+		_, recovery := client.InspectSubmissionRequest(ctx, "0123456789abcdef", sdk.Request{Version: 1})
 		_, b := client.SubmissionStatus(ctx, "id")
 		_, c := client.CancelSubmission(ctx, "id")
 		_, d := client.ListSubmissions(ctx, submissions.ListOptions{Limit: 25})
-		for _, err := range []error{a, b, c, d} {
+		for _, err := range []error{a, b, c, d, recovery} {
 			if !errors.Is(err, sdk.ErrAdmission) {
 				t.Fatal(err)
 			}

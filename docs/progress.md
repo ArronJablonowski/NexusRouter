@@ -2789,3 +2789,11 @@ Remote model inventory now transports the permission-scoped local ModelInspectio
 Cloud catalog discovery uses authenticated configured Codex/API providers with bounded concurrency and timeouts. Discovered models remain unconfigured/access-unverified; no prompts or auto-enablement. Scoped remote projections and local-only mode do not broaden discovery. Partial discovery is labeled.
 
 Models page provides Set as commander for configured enabled chat models, active commander badge, and explicit restart-required save feedback. Uses existing digest-checked settings writer and whole-config validation; other settings saves preserve commander selection.
+
+## 2026-10-11 — Remote admission recovery
+
+Remote serve now queues and reconciles through the dispatcher-owned application service rather than a second SDK service that reopens/revalidates task storage per submission. An authenticated `remote recover-status` operation checks the exact original payload, caller, destination and key without creating work; it repairs an acknowledgement-lost ownership binding or reports not admitted. Unknown lookup/storage failures remain uncertain. Recovery does not select a different model or authorize a new request identity.
+
+Campaign recovery: the unbound request had no exact-key submission; a fresh authorized same-model recovery is progressing. Earlier monitoring incorrectly treated absent port 7788 as remote service failure; the remote router listens on 9443 and was running. Admission audit spanned the fixed 20-second handler timeout. The precise historical database wait/validation timing cannot be reconstructed without additional instrumentation; source establishes the separate-service reopen path.
+
+Validation results and deployment details are recorded in docs/validation/2026-10-11-remote-admission-recovery.md. Linear requirements remain unavailable pending connector reauthentication. This is not a full MVP or exhaustive QA completion.

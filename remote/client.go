@@ -157,6 +157,11 @@ func (c *Client) callPinned(ctx context.Context, destination, op, method, path s
 	case http.StatusTooManyRequests:
 		return ErrRateLimited
 	case 200:
+	case 404:
+		if strings.HasSuffix(path, "/recover") && response.Header.Get("X-Nexus-Recovery") == "not-admitted" {
+			return ErrNotAdmitted
+		}
+		return ErrUnavailable
 	case 400:
 		return ErrInvalid
 	case 403:
