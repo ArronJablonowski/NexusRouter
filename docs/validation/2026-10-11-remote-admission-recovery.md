@@ -22,6 +22,8 @@ Final scoped checks: `go test -race ./remote ./internal/remotecli` passed after 
 
 Private campaign worker recovery logic was exercised with isolated temporary state and mocked CLI results for repaired binding, unavailable/uncertain, and confirmed-not-admitted. All passed; no dispatch or live inference performed in those tests. Full-suite validation not run.
 
-Deployment pending the campaign model's idle boundary. No model service changes, credentials, trust alterations or product inference tests.
+Deployment completed at an idle boundary after the Muse recovery finished and an aggregate check showed zero queued/running submissions. No model service changes, credentials, trust alterations or product inference tests.
 
 Expired-request reconciliation: exact-request historical lookup now preserves the original deadline in its digest while allowing an expired deadline only for read-only inspection. New submission still rejects expired execution. Regression covers existing/missing/changed expired requests. `go test -race ./internal/app ./remote ./internal/remotecli ./sdk/v1 -run 'TestResumeSubmission|TestRecoverStatus|TestSDKSubmissionGuardsNoStorageCreation'`, static checks, and both command builds passed after this change.
+
+Deployed source `acce2efc` to Spark remote router and local remote CLI; original executables retained for rollback. Restarted only nexusrouter-remote.service, dedicated nexusrouter-ollama.service remained active. Read-only live recovery of the original expired request returned the explicit not-admitted result after startup settled. Router info available and fresh campaign request running confirmed. Resumed watch worker with exact-envelope recovery logic; original request never resent while uncertain. Campaign advanced to 429/634 delivered reports, next Qwen batch434 running. No full-suite claim; unrelated SDK fixture failures remain recorded above.

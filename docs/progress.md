@@ -2797,3 +2797,5 @@ Remote serve now queues and reconciles through the dispatcher-owned application 
 Campaign recovery: the unbound request had no exact-key submission; a fresh authorized same-model recovery is progressing. Earlier monitoring incorrectly treated absent port 7788 as remote service failure; the remote router listens on 9443 and was running. Admission audit spanned the fixed 20-second handler timeout. The precise historical database wait/validation timing cannot be reconstructed without additional instrumentation; source establishes the separate-service reopen path.
 
 Validation results and deployment details are recorded in docs/validation/2026-10-11-remote-admission-recovery.md. Linear requirements remain unavailable pending connector reauthentication. This is not a full MVP or exhaustive QA completion.
+
+Remote recovery deployment verified on Spark at an idle boundary (source acce2efc): original expired request now explicitly reports not admitted, router info available, and campaign Qwen batch434 running. Worker resumed with bounded exact-envelope reconciliation; no model/trust changes. Previous executables retained for rollback.
