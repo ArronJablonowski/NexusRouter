@@ -23,3 +23,5 @@ Final scoped checks: `go test -race ./remote ./internal/remotecli` passed after 
 Private campaign worker recovery logic was exercised with isolated temporary state and mocked CLI results for repaired binding, unavailable/uncertain, and confirmed-not-admitted. All passed; no dispatch or live inference performed in those tests. Full-suite validation not run.
 
 Deployment pending the campaign model's idle boundary. No model service changes, credentials, trust alterations or product inference tests.
+
+Expired-request reconciliation: exact-request historical lookup now preserves the original deadline in its digest while allowing an expired deadline only for read-only inspection. New submission still rejects expired execution. Regression covers existing/missing/changed expired requests. `go test -race ./internal/app ./remote ./internal/remotecli ./sdk/v1 -run 'TestResumeSubmission|TestRecoverStatus|TestSDKSubmissionGuardsNoStorageCreation'`, static checks, and both command builds passed after this change.

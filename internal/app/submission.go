@@ -65,7 +65,19 @@ func (s *Service) submissionPayload(key string, r Request) (string, string, []by
 }
 
 func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvelope) (string, string, []byte, error) {
-	if err := s.checkRemoteExecution(envelope.Request); err != nil {
+	return s.submissionEnvelopePayloadMode(key, envelope, false)
+}
+
+func (s *Service) submissionEnvelopePayloadMode(key string, envelope submissionEnvelope, inspection bool) (string, string, []byte, error) {
+	policyRequest := envelope.Request
+	// Historical exact-key inspection cannot execute work. Keep the original
+	// deadline in the hashed envelope, but allow reading after it expires.
+	if inspection && policyRequest.RemoteExecution != nil && !policyRequest.RemoteExecution.Deadline.IsZero() && !time.Now().Before(policyRequest.RemoteExecution.Deadline) {
+		copyExecution := *policyRequest.RemoteExecution
+		copyExecution.Deadline = time.Now().Add(time.Minute)
+		policyRequest.RemoteExecution = &copyExecution
+	}
+	if err := s.checkRemoteExecution(policyRequest); err != nil {
 		return "", "", nil, err
 	}
 	bound, bindErr := s.bindNativeHarness(envelope.Request)
@@ -218,7 +230,7 @@ func (s *Service) Submit(ctx context.Context, key string, r Request) (submission
 // ResumeSubmission authorizes a reconnect against an existing exact
 // idempotent request. Unlike Submit, it can never create or dispatch work.
 func (s *Service) ResumeSubmission(ctx context.Context, key string, r Request) (submissions.Status, error) {
-	keyDigest, requestDigest, _, err := s.submissionPayload(key, r)
+	keyDigest, requestDigest, _, err := s.submissionEnvelopePayloadMode(key, submissionEnvelope{Version: submissionContractVersion, Request: r}, true)
 	if err != nil {
 		return submissions.Status{}, err
 	}

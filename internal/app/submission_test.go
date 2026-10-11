@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
@@ -100,5 +102,31 @@ func TestSubmissionPrivateEnvelopeRejectsDuplicateAndUnknown(t *testing.T) {
 		if _, err := decodeSubmission([]byte(body)); !errors.Is(err, ErrAdmission) {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestResumeSubmissionExpiredDeadlineIsObservationOnly(t *testing.T) {
+	s := submissionService(t)
+	ctx := context.Background()
+	request := Request{ModelID: "fixture", Prompt: "original", RemoteExecution: &runtime.RemoteExecution{Mode: "direct", Depth: 1, Deadline: time.Now().Add(time.Second)}}
+	created, err := s.Submit(ctx, "expired-recovery-key", request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Until(request.RemoteExecution.Deadline) + time.Millisecond)
+	got, err := s.ResumeSubmission(ctx, "expired-recovery-key", request)
+	if err != nil || got.ID != created.ID {
+		t.Fatal(got, err)
+	}
+	if _, err = s.Submit(ctx, "expired-new-request-key", request); !errors.Is(err, ErrAdmission) {
+		t.Fatal("expired request admitted", err)
+	}
+	changed := request
+	changed.Prompt = "changed"
+	if _, err = s.ResumeSubmission(ctx, "expired-recovery-key", changed); !errors.Is(err, submissions.ErrConflict) {
+		t.Fatal(err)
+	}
+	if _, err = s.ResumeSubmission(ctx, "missing-expired-request-key", request); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatal(err)
 	}
 }
