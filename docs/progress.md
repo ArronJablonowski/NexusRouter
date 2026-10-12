@@ -2801,3 +2801,5 @@ Validation results and deployment details are recorded in docs/validation/2026-1
 Remote recovery deployment verified on Spark at an idle boundary (source acce2efc): original expired request now explicitly reports not admitted, router info available, and campaign Qwen batch434 running. Worker resumed with bounded exact-envelope reconciliation; no model/trust changes. Previous executables retained for rollback.
 
 QA checkpoint 2026-10-12 10:02 UTC: primary pass terminal, 629/634 reports delivered with five missing reports and two truncated-report quality gaps. Cross-review 1/140 delivered, second running. Additional schema candidates await reproduction; no exhaustive verification claim. See docs/qa/2026-10-09-spark-nexusrouter-findings.md.
+
+QA campaign terminal2026-10-12 22:42UTC: primary629/634 and cross139/140 reports delivered. Five primary missing, one cross canceled, known truncated-report gaps retained; candidate reproduction remains incomplete. Operational admission recovery fix verified/deployed earlier; no exhaustive MVP validation claim. See docs/qa/2026-10-09-spark-nexusrouter-findings.md.

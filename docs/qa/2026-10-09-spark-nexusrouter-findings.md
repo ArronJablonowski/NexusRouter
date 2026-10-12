@@ -381,3 +381,15 @@ Cross-review now has 140 scheduled batches: 1 delivered, Qwen3.8 27B reviewing p
 Current sampled GPU80°C/hottest ACPI thermal zone88.6°C; retained sampled peaks GPU86°C/zone93.8°C at 2026-10-10 23:50:10 UTC. Tracking began 2026-10-09 18:26:09 UTC. Intermittent samples cannot establish continuous maxima or retroactive coverage.
 
 Documentation-only validation: reviewed sanitized diff and git diff --check; no application suite run. Campaign remains active until cross-reviews are terminal.
+
+## Campaign terminal — 2026-10-12 22:42 UTC
+
+Pinned source unchanged: 7d4b7aac4203e6f8bdfa95a44763b58ef3eef540. Primary reports delivered629/634; five missing primary reports (83,242,360,419,470), two known truncated primary reports (389,509). Cross-review reports delivered139/140; one canceled review for primary185, cause unresolved, no resend. Cross-review report776 is a known truncated/source-echo quality gap. Review counts measure delivered reports, not exhaustive validation; native opt-in tests, batch boundaries, split SPDX fixture fragments and unseen callers limit actual coverage. Models reviewed distributed source batches, not three independent full audits.
+
+Worker52507 exited normally after recording complete:true and historical receipt totals succeeded768/failed29/canceled2. No active model/batch, no new failure or recovery during this check. Retained terminal gaps are not successes. No uncertain requests were resent.
+
+One confirmed operational admission/ownership-observation defect was fixed and deployed earlier (see remote-admission recovery validation evidence). A test-only shell-marker diagnostic bounds flaw was statically confirmed. No additional independently reproduced production defects were established by this campaign. Strong candidates remain for schema contradictions (block/unblock fields and unavailable model refresh interval), monitor recovered-health reporting, reviewer output-token enforcement, Unicode instruction splitting, and config/path privacy contracts; these require isolated reproduction and producer/caller validation. Raw model confirmed labels are not verification. Final nil-result replay allegation rejected: submissions.Status.Result is a pointer, so nil marshals consistently as null.
+
+Final temperature sample22:42:51UTC: GPU51°C, hottest ACPI thermal zone56.4°C. Highest retained samples GPU86°C and thermal-zone93.8°C, both2026-10-10 23:50:10UTC. Tracking began2026-10-09 18:26:09UTC. All reported sensors available in final sample; ACPI zones are not identified CPU-die sensors. Intermittent samples do not establish continuous instantaneous maxima or retroactively cover earlier monitoring.
+
+Documentation-only checkpoint: reviewed sanitized diff and git diff --check; no application suite run. Monitoring automation paused after terminal coverage report; unresolved hypotheses and quality gaps remain recorded.
