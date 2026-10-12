@@ -371,3 +371,13 @@ Observed 2026-10-11: a remote dispatch reserved its request, reached the 20-seco
 Fix: submit and recover through the dispatcher-owned service; exact-request authenticated recovery can inspect an existing submission and repair its binding without inference. A dedicated not-admitted response is distinct from older-router 404s and unknown storage/network failures. Controller recovery remains bounded and preserves original receipts. Details and check limitations: docs/validation/2026-10-11-remote-admission-recovery.md.
 
 Campaign checkpoint: 428/634 primary reports delivered before the outage, four missing reports (83, 242, 360, 419), incomplete delivered report 389, cross-reviews not started. Fresh same-model recovery for the failed dispatch is running; campaign source pin remains unchanged. Sampled peaks: GPU86°C and ACPI thermal zone93.8°C; intermittent samples only. Earlier model findings remain hypotheses or source-rejected candidates unless explicitly verified.
+
+## Primary pass terminal; cross-review underway — 2026-10-12 10:02 UTC
+
+Pinned source remains 7d4b7aac4203e6f8bdfa95a44763b58ef3eef540. 629/634 unique primary batches delivered reports (+3 since the preceding check); five missing primary reports remain (user ordinals 83, 242, 360, 419, 470). Delivered reports 389 and 509 are truncated quality gaps; final two batches contain only split SPDX schema fragments. This distributed review is not three independent full audits and does not establish test execution or complete MVP coverage.
+
+Cross-review now has 140 scheduled batches: 1 delivered, Qwen3.8 27B reviewing primary batch 7 (cross-review 2). Worker PID 52507 alive; remote status running with an unexpired lease; lock-respecting worker tick confirms progress. No new failures/recoveries. First cross-review disputes earlier audit hypotheses; its conclusions still require independent validation. No additional independently verified production bugs this checkpoint. Schema contradictions remain strong candidates awaiting validator/producer reproduction. A separate test-only shell diagnostic bounds flaw is statically confirmed, not reproduced or fixed. The confirmed operational admission/reconciliation defect and deployed fix are documented above.
+
+Current sampled GPU80°C/hottest ACPI thermal zone88.6°C; retained sampled peaks GPU86°C/zone93.8°C at 2026-10-10 23:50:10 UTC. Tracking began 2026-10-09 18:26:09 UTC. Intermittent samples cannot establish continuous maxima or retroactive coverage.
+
+Documentation-only validation: reviewed sanitized diff and git diff --check; no application suite run. Campaign remains active until cross-reviews are terminal.

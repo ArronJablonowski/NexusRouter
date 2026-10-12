@@ -2799,3 +2799,5 @@ Campaign recovery: the unbound request had no exact-key submission; a fresh auth
 Validation results and deployment details are recorded in docs/validation/2026-10-11-remote-admission-recovery.md. Linear requirements remain unavailable pending connector reauthentication. This is not a full MVP or exhaustive QA completion.
 
 Remote recovery deployment verified on Spark at an idle boundary (source acce2efc): original expired request now explicitly reports not admitted, router info available, and campaign Qwen batch434 running. Worker resumed with bounded exact-envelope reconciliation; no model/trust changes. Previous executables retained for rollback.
+
+QA checkpoint 2026-10-12 10:02 UTC: primary pass terminal, 629/634 reports delivered with five missing reports and two truncated-report quality gaps. Cross-review 1/140 delivered, second running. Additional schema candidates await reproduction; no exhaustive verification claim. See docs/qa/2026-10-09-spark-nexusrouter-findings.md.
