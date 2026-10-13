@@ -50,6 +50,9 @@ func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string 
 	for _, extension := range extensions {
 		names = append(names, extension.Names()...)
 	}
+	if cfg.ComfyUI.Enabled {
+		names = append(names, "comfy_inspect", "comfy_status", "comfy_submit", "comfy_cancel_pending")
+	}
 	if cfg.Tools.CollaborationEnabled {
 		names = append(names, "collaboration_models", "collaboration_read", "collaboration_send")
 	}
@@ -87,7 +90,7 @@ func (s *Service) bindToolExtension(r Request) Request {
 		r.toolExtension = s.toolExtension
 		r.toolReviewer = s.toolReviewer
 		r.toolPresenter = s.toolPresenter
-		if len(r.toolExtension.Names()) > 0 {
+		if s.settings.ComfyUI.Enabled || len(r.toolExtension.Names()) > 0 {
 			r.LocalRequired = true
 		}
 	}

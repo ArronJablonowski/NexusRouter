@@ -588,3 +588,8 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 .collaboration-text { white-space:pre-wrap; overflow-wrap:anywhere; }
 .collaboration-message a { overflow-wrap:anywhere; }
 #collaboration-filter { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+
+#comfy-view form { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+#comfy-view input { max-width: 100%; }
+.comfy-images { display: grid; gap: 1rem; margin-top: 1rem; }
+.comfy-images img { max-width: 100%; max-height: 32rem; object-fit: contain; }

@@ -550,6 +550,9 @@ type candidateDecisionApprovalArguments struct {
 }
 
 func (b *BrowserMutations) approvalProposal(ctx context.Context, record approvals.Record) (*contract.ApprovalProposal, error) {
+	if record.Request.ToolName == "comfy_submit" || record.Request.ToolName == "comfy_cancel_pending" {
+		return b.comfyApprovalProposal(ctx, record)
+	}
 	if record.Request.ToolName != "workboard_propose_criteria" && record.Request.ToolName != "workboard_request_candidate_decision" {
 		return nil, nil
 	}

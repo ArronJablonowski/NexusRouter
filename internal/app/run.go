@@ -171,6 +171,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	result := Result{}
 	s = remoteExecutionSettings(s, r)
 	if r.RemoteExecution != nil {
+		s.ComfyUI.Enabled = false
 		r.toolExtension = nil
 		r.toolReviewer = nil
 		r.toolPresenter = nil
@@ -185,6 +186,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	if r.runtimeHostAdmission != nil {
+		s.ComfyUI.Enabled = false
 		// A host-bound Workboard execution is an effect-free child capability.
 		// It receives only the explicit frozen card context: no recursive
 		// delegation, ambient memory or skills, or process-wide tool registry.
@@ -217,12 +219,13 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		// Children receive only explicit context and, optionally, a borrowed
 		// read-only capability. Never grant memory, skills or recursion.
 		s.Tools.Enabled, s.Tools.WorkboardReadEnabled, s.Tools.WorkboardWriteEnabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false, false, false
+		s.ComfyUI.Enabled = false
 		s.Tools.CreateEnabled = false
 		s.Tools.ReplaceEnabled = false
 		s.Workers.DelegateModel = ""
 		s.Workers.DelegateReadTools = false
 	}
-	if (s.Tools.CreateEnabled || s.Tools.ReplaceEnabled || s.Tools.WorkboardWriteEnabled) && r.toolReviewer == nil && r.toolPresenter == nil {
+	if (s.Tools.CreateEnabled || s.Tools.ReplaceEnabled || s.Tools.WorkboardWriteEnabled || s.ComfyUI.Enabled) && r.toolReviewer == nil && r.toolPresenter == nil {
 		return result, ErrAdmission
 	}
 	var model config.Model
@@ -261,6 +264,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
+	if s.ComfyUI.Enabled && (model.Locality != "local" || model.ContextTokens < 1) {
+		return result, ErrAdmission
+	}
 	// Direct file tools are local-only. A cloud coordinator may hold only the
 	// delegate tool while an independently scoped local worker borrows read_file.
 	// Allowing read tools is optional capability, not a requirement to use them.
@@ -272,7 +278,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 		s.Tools.Enabled = false
 	}
-	toolingEnabled := s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
+	toolingEnabled := s.ComfyUI.Enabled || s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
 	if toolingEnabled && (model.ContextTokens == 0 || model.Locality != "local" && !cloudDelegatedReads(s, r, model)) {
 		return result, ErrAdmission
 	}
@@ -305,6 +311,19 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 				delegatedReadCapability = &delegateTools{Registry: readRegistry, Policy: toolPolicy}
 			}
 		}
+	}
+	if s.ComfyUI.Enabled {
+		if registry == nil {
+			registry = &tools.Registry{}
+		}
+		if registerComfyTools(registry, s.ComfyUI) != nil {
+			return result, ErrAdmission
+		}
+		comfyWriteDecision := tools.Ask
+		if s.Security.ToolPolicy == "deny" {
+			comfyWriteDecision = tools.Deny
+		}
+		toolPolicy.Rules = append(toolPolicy.Rules, tools.Rule{Tool: "comfy_inspect", Scope: "comfyui", Decision: tools.Allow}, tools.Rule{Tool: "comfy_status", Scope: "comfyui", Decision: tools.Allow}, tools.Rule{Tool: "comfy_submit", Scope: "comfyui", Decision: comfyWriteDecision}, tools.Rule{Tool: "comfy_cancel_pending", Scope: "comfyui", Decision: comfyWriteDecision})
 	}
 	if s.Tools.CreateEnabled {
 		closeCreate, scope, err := registerCreateTool(registry, s.Tools.CreateRoot)
@@ -571,7 +590,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			executor.Authority = newToolAuthority(db, r.toolReviewer, r.toolPresenter, secrets)
 		}
 		toolExecutor = executor
-		if s.Tools.CollaborationEnabled || s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0 {
+		if s.ComfyUI.Enabled || s.Tools.CollaborationEnabled || s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0 {
 			maxTurns = min(maxTurns, s.Tools.MaxTurns)
 		}
 	}

@@ -607,6 +607,85 @@
       }
     },
     "approval_proposal": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/workboard_approval_proposal"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "kind",
+            "arguments"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "kind": {
+              "enum": [
+                "comfy_workflow",
+                "comfy_cancel"
+              ]
+            },
+            "arguments": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "key"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                },
+                "workflow": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 256,
+            "propertyNames": {"minLength": 1},
+            "additionalProperties": {"type": "object", "required": ["class_type", "inputs"], "properties": {"class_type": {"type": "string", "minLength": 1}, "inputs": {"type": "object"}}}
+                }
+              }
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "comfy_workflow"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "arguments": {
+                    "required": [
+                      "workflow"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "arguments": {
+                    "not": {
+                      "required": [
+                        "workflow"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "x-maxBytes": 131072
+        }
+      ]
+    },
+    "workboard_approval_proposal": {
       "type": "object", "additionalProperties": false, "x-maxBytes": 131072,
       "required": ["version", "kind", "board_id", "card_id", "expected_board_revision", "expected_card_revision"],
       "properties": {
@@ -647,7 +726,7 @@
         {"if": {"properties": {"state": {"const": "denied"}}}, "then": {"properties": {"revision": {"const": 2}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
         {"if": {"properties": {"state": {"enum": ["revoked", "consumed"]}}}, "then": {"properties": {"revision": {"const": 3}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
         {"if": {"properties": {"state": {"const": "expired"}}}, "then": {"properties": {"revision": {"enum": [1, 2]}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
-        {"if": {"properties": {"tool_name": {"enum": ["workboard_propose_criteria", "workboard_request_candidate_decision"]}, "state": {"enum": ["pending", "approved"]}}, "required": ["tool_name", "state"]}, "then": {"required": ["proposal"]}, "else": {"not": {"required": ["proposal"]}}}
+        {"if": {"properties": {"tool_name": {"enum": ["comfy_submit", "comfy_cancel_pending", "workboard_propose_criteria", "workboard_request_candidate_decision"]}, "state": {"enum": ["pending", "approved"]}}, "required": ["tool_name", "state"]}, "then": {"required": ["proposal"]}, "else": {"not": {"required": ["proposal"]}}}
       ]
     },
     "approval_page": {

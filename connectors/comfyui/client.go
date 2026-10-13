@@ -223,3 +223,16 @@ func (c *Client) Image(ctx context.Context, i Image) ([]byte, error) {
 	}
 	return c.request(ctx, "GET", "/view", url.Values{"filename": {i.Filename}, "subfolder": {i.Subfolder}, "type": {i.Type}}, nil, MaxImage)
 }
+
+// NodeInfo discovers one installed node schema without exporting the entire
+// catalogue into a model context.
+func (c *Client) NodeInfo(ctx context.Context, name string) (json.RawMessage, error) {
+	if !validID(name) {
+		return nil, errors.New("invalid node class")
+	}
+	b, e := c.request(ctx, "GET", "/object_info/"+name, nil, nil, MaxJSON)
+	if e == nil && !json.Valid(b) {
+		e = errors.New("invalid node JSON")
+	}
+	return b, e
+}

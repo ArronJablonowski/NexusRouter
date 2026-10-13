@@ -83,6 +83,9 @@ func newChatReviewer(settings config.Settings, secret func(string) string, reque
 }
 
 func chatApprovalPreview(settings config.Settings, secret func(string) string, p tools.ApprovalPrompt) (string, error) {
+	if p.Request.ToolName == "comfy_submit" || p.Request.ToolName == "comfy_cancel_pending" {
+		return chatComfyApprovalPreview(settings, secret, p)
+	}
 	if p.Request.ToolName == "replace_file" {
 		return chatReplaceApprovalPreview(settings, secret, p)
 	}

@@ -168,4 +168,4 @@ Use `nexus remote recover-status --instance HOST --request ORIGINAL_ID` with the
 
 ### ComfyUI on Spark
 
-Use `nexus comfy help` to inspect ComfyUI, submit API-format workflows with private durable receipts, observe jobs and download images. See [the connector guide](docs/comfyui.md) and [Spark test evidence](docs/validation/2026-10-13-comfyui.md).
+Use `nexus comfy help` to inspect ComfyUI, submit API-format workflows with private durable receipts, observe jobs and download images. Opt-in configuration also adds approved local chat tools and an authenticated ComfyUI web page. See [the connector guide](docs/comfyui.md) and [Spark test evidence](docs/validation/2026-10-13-comfyui.md).
