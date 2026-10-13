@@ -214,8 +214,19 @@ func (c *Client) DeletePending(ctx context.Context, id string) error {
 	if !validID(id) {
 		return errors.New("invalid prompt ID")
 	}
-	_, e := c.request(ctx, "POST", "/queue", nil, map[string]any{"delete": []string{id}}, MaxJSON)
-	return e
+	b, e := c.request(ctx, "POST", "/queue", nil, map[string]any{"delete": []string{id}}, MaxJSON)
+	if e != nil {
+		return e
+	}
+	// ComfyUI server.py returns an empty HTTP 200; some adapters return {}.
+	if len(bytes.TrimSpace(b)) == 0 {
+		return nil
+	}
+	var acknowledgement map[string]json.RawMessage
+	if json.Unmarshal(b, &acknowledgement) != nil || acknowledgement == nil {
+		return ErrUncertain
+	}
+	return nil
 }
 func (c *Client) Image(ctx context.Context, i Image) ([]byte, error) {
 	if i.Filename == "" || strings.ContainsAny(i.Filename, "/\\") || i.Filename == "." || i.Filename == ".." || strings.Contains(i.Subfolder, "\\") || strings.HasPrefix(i.Subfolder, "/") || (i.Subfolder != "" && (path.Clean(i.Subfolder) != i.Subfolder || i.Subfolder == ".." || strings.HasPrefix(i.Subfolder, "../"))) || i.Type != "output" {

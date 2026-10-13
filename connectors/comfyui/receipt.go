@@ -1,12 +1,14 @@
 package comfyui
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -24,15 +26,48 @@ type Receipt struct {
 
 func LoadReceipt(file string) (Receipt, error) {
 	var r Receipt
-	b, e := os.ReadFile(file)
+	info, e := os.Lstat(file)
+	if e != nil {
+		return r, e
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+		return r, errors.New("receipt must be a private regular file")
+	}
+	f, e := os.Open(file)
+	if e != nil {
+		return r, e
+	}
+	defer f.Close()
+	b, e := io.ReadAll(io.LimitReader(f, MaxJSON+1))
 	if e != nil {
 		return r, e
 	}
 	if len(b) > MaxJSON {
 		return r, errors.New("receipt exceeds limit")
 	}
-	if json.Unmarshal(b, &r) != nil || r.Version != 1 || r.Endpoint == "" || r.ClientID == "" {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&r) != nil || decoder.Decode(new(any)) != io.EOF || r.Version != 1 || !validID(r.ClientID) {
 		return r, errors.New("invalid receipt")
+	}
+	if _, e := New(r.Endpoint); e != nil {
+		return Receipt{}, errors.New("invalid receipt origin")
+	}
+	digest, e := hex.DecodeString(r.WorkflowSHA256)
+	if e != nil || len(digest) != sha256.Size {
+		return Receipt{}, errors.New("invalid receipt digest")
+	}
+	switch r.State {
+	case "accepted":
+		if !validID(r.PromptID) {
+			return Receipt{}, errors.New("invalid accepted receipt")
+		}
+	case "prepared", "uncertain", "rejected":
+		if r.PromptID != "" {
+			return Receipt{}, errors.New("invalid receipt identity")
+		}
+	default:
+		return Receipt{}, errors.New("invalid receipt state")
 	}
 	return r, nil
 }
@@ -50,7 +85,7 @@ func (c *Client) SubmitOnce(ctx context.Context, w Workflow, file string) (r Rec
 	// on errors: delivery cannot be inferred from a local connection failure.
 	f, e := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if e != nil {
-		return r, errors.New("receipt exists or cannot be created; inspect it instead of resubmitting")
+		return Receipt{}, errors.New("receipt exists or cannot be created; inspect it instead of resubmitting")
 	}
 	e = json.NewEncoder(f).Encode(r)
 	if e == nil {

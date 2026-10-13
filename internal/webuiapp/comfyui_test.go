@@ -133,3 +133,39 @@ func TestComfyBrowserSparkLive(t *testing.T) {
 		t.Fatal("live replay protection", w.Code, w.Body.String())
 	}
 }
+
+func TestComfyBrowserSparkRejectedAndOwnedCancelLive(t *testing.T) {
+	endpoint := os.Getenv("NEXUS_COMFY_LIVE_ENDPOINT")
+	if endpoint == "" {
+		t.Skip("explicit live endpoint required")
+	}
+	root := t.TempDir()
+	os.Chmod(root, 0700)
+	svc, err := comfyui.OpenService(endpoint, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := svc.Submit(context.Background(), "qa-invalid", comfyui.Workflow{"1": {ClassType: "NexusRouterNonexistentQANode", Inputs: map[string]any{}}})
+	if err == nil || job.State != "rejected" {
+		t.Fatal("validation rejection not retained", job, err)
+	}
+	replay, err := svc.Submit(context.Background(), "qa-invalid", comfyui.Workflow{"1": {ClassType: "NexusRouterNonexistentQANode", Inputs: map[string]any{}}})
+	if err != nil || !replay.Replayed || replay.State != "rejected" {
+		t.Fatal("rejection replay", replay, err)
+	}
+	w := comfyui.Workflow{"1": {ClassType: "EmptyImage", Inputs: map[string]any{"width": 8, "height": 8, "batch_size": 1, "color": 0}}, "2": {ClassType: "SaveImage", Inputs: map[string]any{"images": []any{"1", 0}, "filename_prefix": "NexusRouterTests/qa-cancel"}}}
+	job, err = svc.Submit(context.Background(), "qa-own", w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if _, err = svc.Client.Wait(ctx, job.PromptID, 100*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	// Exact completed test ID exercises the real queue acknowledgement without
+	// interrupting any running job or clearing shared queue entries.
+	if err = svc.CancelPending(ctx, "qa-own"); err != nil {
+		t.Fatal("real cancellation acknowledgement", err)
+	}
+}

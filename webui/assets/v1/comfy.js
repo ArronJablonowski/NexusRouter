@@ -8,9 +8,12 @@
  if (window.location.pathname !== base + "/comfy") return;
  const view = document.querySelector("#comfy-view"); view.hidden = false;
  const notice = document.querySelector("#comfy-notice"), jobs = document.querySelector("#comfy-jobs"), key = document.querySelector("#comfy-key"), file = document.querySelector("#comfy-file"), run = document.querySelector("#comfy-run"), cancel = document.querySelector("#comfy-cancel"), state = document.querySelector("#comfy-state"), images = document.querySelector("#comfy-images");
- let csrf = "", busy = false, checking = false, refreshing = false, workflow = null, selected = "", uncertain = false;
+ let csrf = "", busy = false, checking = false, refreshing = false, workflow = null, selected = "", uncertain = false, confirmed = "", preview = "";
+ const unresolved = new Set();
+ function select(id) {if(selected!==id){selected=id;confirmed="";preview="";images.replaceChildren();}controls();}
+ key.addEventListener("input",()=>select(key.value.trim()));
  function message(text) { notice.textContent = text; }
- function controls() { run.disabled = busy || !csrf || !workflow || uncertain; cancel.disabled = busy || !csrf || !selected; }
+ function controls() { run.disabled = busy || !csrf || !workflow || uncertain; cancel.disabled = busy || !csrf || !confirmed || confirmed !== selected || selected !== key.value.trim(); }
  async function request(path, options) {
   const response = await fetch(base + "/api/v1" + path, {credentials: "same-origin", cache: "no-store", ...options});
   if (!response.ok) throw new Error("Request unavailable");
@@ -23,9 +26,12 @@
    jobs.replaceChildren();
    for (const job of page.jobs) {
     if (!job || typeof job.key !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(job.key) || typeof job.state !== "string") continue;
+    if (["prepared","uncertain"].includes(job.state)) unresolved.add(job.key);else unresolved.delete(job.key);
     const li = document.createElement("li"), button = document.createElement("button");button.type = "button";button.textContent = job.key + " · " + job.state;
-    button.addEventListener("click", () => {if (busy) return; key.value = job.key; selected = job.key; check();});li.append(button);jobs.append(li);
+    button.addEventListener("click", () => {if (busy) return; key.value = job.key; select(job.key); check();});li.append(button);jobs.append(li);
    }
+   uncertain=unresolved.size>0;controls();
+   if (uncertain) message("Unconfirmed job references: "+[...unresolved].join(", ")+". Inspect these original jobs before submitting again.");
    if (!uncertain) message("Job records refreshed.");
   } catch (_) { message("ComfyUI controls are unavailable. Check the configured connection; saved jobs have not been resent."); }
   finally {refreshing=false;}
@@ -33,13 +39,15 @@
  async function check() {
   if (checking || busy || document.hidden) return;
   const id = key.value.trim();if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {message("Enter a valid job reference.");return;}
-  checking = true;selected = id;controls();
+  checking = true;select(id);confirmed="";controls();
   try {
    const result = await request("/comfy/jobs/" + encodeURIComponent(id));if (result.version !== 1 || !result.job || result.job.key !== id) throw new Error("Invalid job");
    const job = result.job;if (selected !== id) return;
-   uncertain = ["prepared", "uncertain"].includes(job.state);state.textContent = "Job " + id + ": " + job.state;
+   if (["prepared", "uncertain"].includes(job.state)) unresolved.add(id);else unresolved.delete(id);
+   uncertain = unresolved.size>0;confirmed=job.state==="accepted"?id:"";state.textContent = "Job " + id + ": " + job.state;
    if (uncertain) message("Delivery is unconfirmed. Keep this reference and inspect the original job; do not send it again.");
-   images.replaceChildren();
+   const signature=id+JSON.stringify([job.state,job.history?.outputs]);
+   if (preview!==signature) {preview=signature;images.replaceChildren();
    if (job.state === "success" && job.history && job.history.outputs) {
     for (const [node, output] of Object.entries(job.history.outputs)) {
      if (!output || !Array.isArray(output.images)) continue;
@@ -49,8 +57,9 @@
      });
     }
    }
+   }
    cancel.disabled = busy || !csrf || job.state !== "accepted";
-  } catch (_) {state.textContent = "Job status is unavailable. This does not mean it failed or was never submitted.";cancel.disabled=true;}
+  } catch (_) {if(selected!==id)return;state.textContent = "Job status is unavailable. This does not mean it failed or was never submitted.";confirmed="";cancel.disabled=true;}
   finally {checking = false;run.disabled = busy || !csrf || !workflow || uncertain;}
  }
  file.addEventListener("change", async () => {
@@ -65,17 +74,18 @@
  });
  document.querySelector("#comfy-form").addEventListener("submit", async event => {
   event.preventDefault();if (busy || !csrf || !workflow || uncertain) return;
-  busy = true;const id = "web-" + crypto.randomUUID();key.value = id;selected = id;controls();
+  busy = true;const id = "web-" + crypto.randomUUID();key.value = id;select(id);controls();
   try {
    const result = await request("/comfy/jobs", {method: "POST", headers: {"Content-Type":"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({key:id,workflow})});
    if (result.version !== 1 || !result.job || result.job.key !== id) throw new Error("Invalid submission");
-   uncertain = ["prepared","uncertain"].includes(result.job.state);state.textContent = "Job " + id + ": " + result.job.state;
+   if (["prepared","uncertain"].includes(result.job.state)) unresolved.add(id);
+   uncertain=unresolved.size>0;state.textContent = "Job " + id + ": " + result.job.state;
    message(uncertain ? "Delivery is unconfirmed. Check this original job; do not resend." : "Job recorded. Check progress below.");
-  } catch (_) {uncertain = true;message("Submission response was lost or rejected. Keep job reference " + id + " and check it before taking further action.");}
+  } catch (_) {unresolved.add(id);uncertain = true;message("Submission response was lost or rejected. Keep job reference " + id + " and check it before taking further action.");}
   finally {busy = false;controls();await refresh();await check();}
  });
  cancel.addEventListener("click", async () => {
-  if (busy || !csrf || !selected) return;const id = selected;busy = true;controls();
+  if (busy || !csrf || !confirmed || confirmed!==selected || selected!==key.value.trim()) return;const id = selected;busy = true;controls();
   try {await request("/comfy/jobs/" + encodeURIComponent(id) + "/cancel",{method:"POST",headers:{"X-Darwin-CSRF":csrf}});message("Removal requested for this waiting job. Running work is not interrupted.");}
   catch (_) {message("Removal is unconfirmed. Check the original job; no retry was sent.");}
   finally {busy = false;await check();}

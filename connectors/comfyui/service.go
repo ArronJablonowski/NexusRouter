@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -99,8 +100,13 @@ func (s *Service) Status(ctx context.Context, key string) (Job, error) {
 	return j, e
 }
 func (s *Service) List() ([]Job, error) {
-	entries, e := os.ReadDir(s.directory)
-	if e != nil || len(entries) > 1000 {
+	dir, e := os.Open(s.directory)
+	if e != nil {
+		return nil, ErrJob
+	}
+	defer dir.Close()
+	entries, e := dir.ReadDir(1001)
+	if (e != nil && !errors.Is(e, io.EOF)) || len(entries) > 1000 {
 		return nil, ErrJob
 	}
 	jobs := []Job{}
