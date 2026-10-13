@@ -41,3 +41,5 @@ Workflows can invoke installed custom nodes and consume GPU resources. Run trust
 ## Validation
 
 See `docs/validation/2026-10-13-comfyui.md` for mock failure-path tests and Spark execution evidence. Protocol reference: [ComfyUI server routes](https://docs.comfy.org/development/comfyui-server/comms_routes).
+
+For the verified additive installation on Spark, run `~/.local/bin/nexus-comfy comfy help`; on the workstation use `~/.NexusRouter/bin/nexus-comfy comfy help`. Substitute `nexus-comfy` for `nexus` in the examples above. These installations preserve the existing daemon executable. After integrating this branch into a normal NexusRouter build, the same subcommand is available as `nexus comfy`.
