@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 var referenceLabel = regexp.MustCompile(`(?i)^(?:#{1,6}\s*)?(?:retrieved(?:\s+(?:context|document|web page|text))?|reference(?:\s+(?:text|document))?|quoted(?:\s+(?:text|document))?|tool(?:\s+(?:output|result))?|context|document|source|example|transcript|log)(?:\s+says)?\s*:`)
@@ -42,7 +43,7 @@ func instructionSentences(input string) []string {
 	var sentences []string
 	start := 0
 	for index, r := range input {
-		if r == '\n' || (r == '.' || r == '!' || r == '?' || r == ';') && (index+1 == len(input) || unicode.IsSpace(rune(input[index+1]))) {
+		if r == '\n' || (r == '.' || r == '!' || r == '?' || r == ';') && (index+1 == len(input) || sentenceSpace(input[index+1:])) {
 			if sentence := strings.TrimSpace(input[start:index]); sentence != "" {
 				sentences = append(sentences, sentence)
 			}
@@ -93,4 +94,9 @@ func maskQuotes(input string) string {
 		}
 	}
 	return string(chars)
+}
+
+func sentenceSpace(value string) bool {
+	r, _ := utf8.DecodeRuneInString(value)
+	return unicode.IsSpace(r)
 }

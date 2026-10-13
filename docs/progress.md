@@ -2803,3 +2803,11 @@ Remote recovery deployment verified on Spark at an idle boundary (source acce2ef
 QA checkpoint 2026-10-12 10:02 UTC: primary pass terminal, 629/634 reports delivered with five missing reports and two truncated-report quality gaps. Cross-review 1/140 delivered, second running. Additional schema candidates await reproduction; no exhaustive verification claim. See docs/qa/2026-10-09-spark-nexusrouter-findings.md.
 
 QA campaign terminal2026-10-12 22:42UTC: primary629/634 and cross139/140 reports delivered. Five primary missing, one cross canceled, known truncated-report gaps retained; candidate reproduction remains incomplete. Operational admission recovery fix verified/deployed earlier; no exhaustive MVP validation claim. See docs/qa/2026-10-09-spark-nexusrouter-findings.md.
+
+## Campaign follow-up reliability fixes — 2026-10-12
+
+Reproduced and fixed two campaign candidates: skill regression monitor retained a stale error after successful checks, permanently degrading health and Close; sentence splitting read the first byte of Unicode whitespace, merging visible instructions. Monitor now clears the prior error under its existing lock before recording the latest result, so health can recover. Sentence splitting decodes the next rune. Regression tests failed against the preceding source and pass with the fixes.
+
+Reviewer reported-output overrun allegation was not confirmed: the provider/reviewer boundary already rejects the test overrun before producing measurements. No output-budget relaxation or replay behavior changed. Schema, frontend, configuration/privacy and other campaign hypotheses remain unverified; this checkpoint does not claim exhaustive campaign remediation or complete MVP. Linear requirements remain unavailable pending connector reauthentication. No service deployment performed.
+
+Validation on this source state: go test -race ./responsecontract ./internal/app -run 'TestInstruction|TestSkillRegression|TestWorkboardCandidateReviewer' -count=1 passed (app106.6s); full responsecontract tests passed; go vet and go build ./responsecontract ./internal/app passed; gofmt and git diff --check passed. This is targeted validation, not a full-suite pass. No embedded browser assets changed.

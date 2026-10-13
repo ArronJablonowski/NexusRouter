@@ -11,7 +11,7 @@ before it can offer this behavior.
 
 The returned supervisor is caller-owned. Retain it, inspect `Health()`, and call
 `Close()` to cancel and join it. Intervals must be between one second and 24 hours.
-The first tick starts immediately. Each tick inspects one active skill, in lexical
+The first tick starts immediately. A failed check degrades health; a subsequent successful check restores healthy status. Close reports the latest check error, so a recovered transient failure does not permanently poison readiness. Each tick inspects one active skill, in lexical
 name order, then moves to the next. An empty page wraps to the beginning; newly
 added earlier names are discovered on the next cycle. A full cycle includes an
 empty wrap tick. The catalog currently supports at most 1,000 skills; monitoring

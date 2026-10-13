@@ -134,6 +134,7 @@ func startSkillRegressionMonitor(ctx context.Context, interval time.Duration, st
 			}
 			m.mu.Lock()
 			m.stepStarted = time.Time{}
+			m.err = nil
 			if err != nil {
 				m.err = ErrAdmission
 			}
