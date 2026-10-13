@@ -23,4 +23,24 @@ Spark's first candidate exited with `task admission failed`: its auxiliary SDK c
 
 Regression: the unapproved SDK still rejects enabled ComfyUI; the scoped remote inspection SDK now constructs successfully; the original serving configuration is unchanged. Full race-enabled remote CLI tests passed. Related remote/SDK recovery and storage guards passed; scoped final app/bridge/remote CLI collaboration, commander, remote-execution and ComfyUI gates passed. Vet and source formatting/line-limit checks passed. The preexisting broader regression gaps documented in the collaboration and ComfyUI reports remain unresolved.
 
-Final corrected installation and live synchronization verification are recorded below after completion.
+## Completed installation and live verification
+
+Final application source `d1a1166943d0259bd42fff6d8da07d7dde15615b` was committed and pushed before rebuilding/installing. Both trimpath artifacts identify this clean revision (`vcs.modified=false`). Installed SHA-256:
+
+- Commander native: `1d81176d306cfcdba63017c578fd88f403fb1006f49e848082fd588f26a08940`
+- Spark Linux ARM64: `eccff876a35fc94510353f722943516ef01c3a1c88ed69b99175f12c09026e66`
+
+Final rollback copies and consistent private state backups:
+
+- Commander: `/Users/aj_lab/.NexusRouter/bin/backups/20261013T192806Z-d1a11669`
+- Spark: `/home/arron_spark/.local/share/nexusrouter/deployment-backups/20261013T192736Z-d1a11669`
+
+Canonical `nexus` and separate `nexus-comfy` commands were updated on both hosts. Only the existing commander and Spark remote-router processes were restarted. Local remote-host service remains stopped. The central logging process retained PID 1188; Spark Ollama retained PID 2187152 and ComfyUI retained PID 2421. Spark's corrected router is active with zero automatic restarts after this installation. Existing trust and credential files match their original private backups.
+
+Both active configurations enable collaboration and ComfyUI. The commander uses a supervised loopback SSH tunnel on 18188 to Spark's existing loopback 8188; the launch agent uses strict existing host-key trust and automatic reconnect. Verified recovery by terminating only the owned idle tunnel process: its PID changed and queue reads resumed, with no submitted task resent or running model interrupted.
+
+Live paired mTLS info reports `dgx-spark`, hostname `spark-9c8a`, available=true. The commander background collector reports that peer `synced`, with advancing check timestamps. This verifies physical empty-journal collection through the new export endpoint and existing bilateral history grants. Saved collaboration message count remains zero: no real LLM collaboration or synthetic message was fabricated for deployment verification. Nonempty import/provenance/deduplication remains covered by the recorded transport/storage fixtures.
+
+A browser verification request initially timed out while the restarted commander was settling. Nonmutating readiness inspection subsequently returned HTTP 200, then the normal browser challenge/CLI approval/session flow succeeded. Reverified authenticated ComfyUI/collaboration pages, exact source-matching served scripts, enabled collaboration projection, healthy Spark sync status, owned receipt list, a new isolated 48×24 image workflow, PNG retrieval and same-key replay. The test session was explicitly logged out. Original uncertain task requests were never resent; the final smoke workflow was a distinct new test after its earlier predecessor had completed.
+
+Deployment is complete for the pending ComfyUI and collaboration application changes. Existing browser sessions are revoked by restart and may need normal sign-in again. Broader preexisting regression failures, live LLM behavior, historical delegation backfill, heavy diffusion/GPU scheduling, power-loss recovery and signed-release qualification remain outside this deployment's verified scope. Private deployment scripts, logs, receipts, databases, credentials and backups remain outside Git.
