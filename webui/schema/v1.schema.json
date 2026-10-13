@@ -2949,7 +2949,7 @@
         "local_total_kind": {"const": "logical_deduplicated"},
         "local_total_coverage": {"enum": ["complete", "partial"]},
         "local_unknown_size_count": {"type": "integer", "minimum": 0, "maximum": 256},
-        "refresh_interval_ms": {"type": "integer", "minimum": 5000, "maximum": 300000},
+        "refresh_interval_ms": {"type": "integer", "minimum": 0, "maximum": 300000},
         "local_providers": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/local_provider_inspection"}},
         "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}},
         "fitness": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/model_fitness_inspection"}},
@@ -2959,7 +2959,7 @@
         {"if": {"required": ["commander_id"]}, "then": {"required": ["commander_source"]}},
         {"if": {"required": ["commander_source"]}, "then": {"required": ["commander_id"]}},
         {"if": {"required": ["commander_fallback_id"]}, "then": {"required": ["commander_id"]}},
-        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "local_concurrency", "local_pressure_policy", "local_ram_limit_pct", "local_vram_limit_pct", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "commander_id": false, "commander_source": false, "commander_fallback_id": false, "local_concurrency": false, "local_pressure_policy": false, "local_ram_limit_pct": false, "local_vram_limit_pct": false, "managed_residency": {"const": false}, "specialists_allow_cloud": {"const": false}, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}, "fitness": {"maxItems": 0}, "evidence_fallbacks": {"maxItems": 0}}}}
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"properties": {"refresh_interval_ms": {"minimum": 5000}}, "required": ["config_id", "local_concurrency", "local_pressure_policy", "local_ram_limit_pct", "local_vram_limit_pct", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "commander_id": false, "commander_source": false, "commander_fallback_id": false, "local_concurrency": false, "local_pressure_policy": false, "local_ram_limit_pct": false, "local_vram_limit_pct": false, "managed_residency": {"const": false}, "specialists_allow_cloud": {"const": false}, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}, "fitness": {"maxItems": 0}, "evidence_fallbacks": {"maxItems": 0}}}}
       ]
     },
     "routing_evidence_fallback_inspection": {
