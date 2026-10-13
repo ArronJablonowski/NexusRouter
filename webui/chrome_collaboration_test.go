@@ -26,13 +26,13 @@ func TestChromeModelCollaborationPage(t *testing.T) {
 				http.Error(w, "private error", 503)
 				return
 			}
-			m := CollaborationMessage{Sequence: 4, SentAt: time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC), Hostname: "spark-host", Harness: "pi", HarnessID: "pi-coder", Runner: "Ollama", Provider: "ollama", SenderID: "qwen", SenderModel: "Qwen Coder", Recipient: "laguna", Topic: "parser", TaskID: "task-one", SessionID: "session-one", Text: "<img src=x onerror=alert(1)>\nCheck the parser bounds.", Private: true}
+			m := CollaborationMessage{Sequence: 4, SentAt: time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC), OriginInstance: "spark", OriginStream: "00000000000000000000000000000000", OriginSequence: 4, Hostname: "spark-host", Harness: "pi", HarnessID: "pi-coder", Runner: "Ollama", Provider: "ollama", SenderID: "qwen", SenderModel: "Qwen Coder", Recipient: "laguna", Topic: "parser", TaskID: "task-one", SessionID: "session-one", Text: "<img src=x onerror=alert(1)>\nCheck the parser bounds.", Private: true}
 			next := int64(3)
 			if r.URL.Query().Get("before") != "" {
 				m.Sequence = 2
 				next = 0
 			}
-			writeChromeJSON(w, CollaborationPage{Version: 1, Enabled: true, Messages: []CollaborationMessage{m}, NextBefore: next})
+			writeChromeJSON(w, CollaborationPage{Version: 1, Enabled: true, Messages: []CollaborationMessage{m}, NextBefore: next, Sync: []CollaborationSync{{Instance: "spark", State: "unavailable", CheckedAt: m.SentAt}}})
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/app/api/") {
@@ -52,6 +52,7 @@ await cdp('Page.navigate',{url:origin+'/app/collaboration'});
 await eventually('document.querySelectorAll(".collaboration-message").length===1','messages did not load');
 if(!await evaluate('!document.querySelector("#collaboration-view").hidden&&document.querySelector("#chat-view").hidden&&document.querySelector("[data-view=collaboration]").getAttribute("aria-current")==="page"'))throw Error('wrong route');
 if(!await evaluate('document.querySelector(".collaboration-message").textContent.includes("spark-host")&&document.querySelector(".collaboration-message").textContent.includes("pi-coder")&&document.querySelector(".collaboration-message").textContent.includes("Runner: Ollama")&&document.querySelector(".collaboration-message").textContent.includes("Qwen Coder")&&document.querySelector("time").dateTime==="2026-10-09T12:00:00Z"&&!document.querySelector(".collaboration-message img")'))throw Error('provenance or safe text missing');
+if(!await evaluate('document.querySelector("#collaboration-status").textContent.includes("spark unavailable")&&!document.querySelector(".collaboration-message a").hasAttribute("href")'))throw Error('remote sync status or source link wrong');
 await evaluate('window.row=document.querySelector(".collaboration-message");document.querySelector("#collaboration-topic").value="draft";document.querySelector("#collaboration-refresh").click()');
 await eventually('!document.querySelector("#collaboration-refresh").disabled','refresh pending');
 if(!await evaluate('document.querySelector(".collaboration-message")===row&&document.querySelector("#collaboration-topic").value==="draft"'))throw Error('refresh lost row or draft');

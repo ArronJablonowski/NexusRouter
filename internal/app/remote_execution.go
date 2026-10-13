@@ -111,6 +111,18 @@ func (s *Service) bindRemoteDelegate(request Request) delegateRunner {
 		}
 		childID := rand.Text()
 		child := Request{taskID: childID, sessionID: childID, ModelID: id, Prompt: prompt, Validation: validation, ContextTokens: request.ContextTokens, MaxCost: request.MaxCost / float64(x.MaxCalls+1), LocalRequired: request.LocalRequired, delegatedParent: parent, submissionID: request.submissionID, submissionToken: request.submissionToken, eventDelivery: request.eventDelivery}
-		return s.runExplicit(ctx, child)
+		out, err := s.runExplicit(ctx, child)
+		for _, m := range s.settings.Models {
+			if m.ID == id {
+				for _, p := range s.settings.Providers {
+					if p.ID == m.Provider {
+						sender, _ := collaborationSender(m, p, child, childID, request.LocalRequired)
+						sender.SessionID = childID
+						out.CollaborationSender = &sender
+					}
+				}
+			}
+		}
+		return out, err
 	}
 }

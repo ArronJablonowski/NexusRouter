@@ -200,6 +200,12 @@ func (s *Service) BrowserCollaboration(ctx context.Context, o webui.Collaboratio
 	defer store.Close()
 	result, err := store.Read(ctx, o, "", true)
 	result.Enabled = page.Enabled
+	if err == nil {
+		result.Sync, err = store.SyncStatus(ctx)
+	}
+	if err == nil {
+		err = result.Validate()
+	}
 	return result, err
 }
 
@@ -215,4 +221,15 @@ func collaborationRunner(p config.Provider) string {
 	default:
 		return "OpenAI-compatible endpoint (upstream runner undeclared)"
 	}
+}
+
+// RemoteCollaboration exports only the collaboration journal, never runtime
+// envelopes or unrelated task histories. The remote server requires logs grant.
+func (s *Service) RemoteCollaboration(ctx context.Context, stream string, after int64) (agentchat.Batch, error) {
+	store, err := agentchat.Open(ctx, s.settings.Telemetry.Database+".collaboration")
+	if err != nil {
+		return agentchat.Batch{}, err
+	}
+	defer store.Close()
+	return store.Export(ctx, stream, after)
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 	"reflect"
 	"sort"
 	"strings"
@@ -146,6 +147,7 @@ func validRuntimeHostWorkerID(value string) bool {
 }
 
 type Result struct {
+	CollaborationSender     *webui.CollaborationMessage `json:"-"`
 	HarnessEvidenceStatus   string
 	HarnessOutcome          *harness.Execution
 	HarnessSelection        *harness.Selection
@@ -169,6 +171,7 @@ type Result struct {
 // dispatch retains its loopback-only transport even when cloud use is enabled.
 func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
+	captureCollaboration := s.Tools.CollaborationEnabled
 	s = remoteExecutionSettings(s, r)
 	if r.RemoteExecution != nil {
 		s.ComfyUI.Enabled = false
@@ -551,7 +554,18 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 				return result, ErrAdmission
 			}
 		}
-		if err := registerDelegate(registry, delegatedReadCapability, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, compactionAuthority); err != nil {
+		delegateSender := webui.CollaborationMessage{}
+		var senderErr error
+		if captureCollaboration {
+			delegateSender, senderErr = collaborationSender(model, provider, r, result.TaskID, privacy == "local_only")
+		}
+		if senderErr != nil {
+			return result, senderErr
+		}
+		delegateSender.SessionID = sessionID
+		transcriptCfg := s
+		transcriptCfg.Tools.CollaborationEnabled = captureCollaboration
+		if err := registerDelegate(registry, delegatedReadCapability, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, transcriptCfg, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, compactionAuthority, delegateSender); err != nil {
 			return result, ErrAdmission
 		}
 	}

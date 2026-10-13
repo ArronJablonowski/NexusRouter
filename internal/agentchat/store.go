@@ -89,6 +89,10 @@ func Open(ctx context.Context, directory string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if err = s.initSync(ctx); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return s, nil
 }
 func (s *Store) Close() error { return s.db.Close() }
@@ -97,12 +101,18 @@ func (s *Store) Close() error { return s.db.Close() }
 // timestamp and sequence; changed content never overwrites a previous message.
 func (s *Store) Append(ctx context.Context, key string, m webui.CollaborationMessage) (webui.CollaborationMessage, error) {
 	m.Sequence = 1
-	m.SentAt = time.Unix(1, 0).UTC()
+	if m.OriginInstance == "" {
+		m.SentAt = time.Unix(1, 0).UTC()
+	}
 	if len(key) != 64 || m.Validate() != nil {
 		return webui.CollaborationMessage{}, ErrInvalid
 	}
 	canonical, _ := json.Marshal(m)
-	if len(canonical)+64 > 9<<10 {
+	recordLimit := 9 << 10
+	if m.OriginInstance != "" {
+		recordLimit = 10 << 10
+	}
+	if len(canonical)+64 > recordLimit {
 		return webui.CollaborationMessage{}, ErrInvalid
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -124,7 +134,9 @@ func (s *Store) Append(ctx context.Context, key string, m webui.CollaborationMes
 		}
 		copy := old
 		copy.Sequence = m.Sequence
-		copy.SentAt = m.SentAt
+		if m.OriginInstance == "" {
+			copy.SentAt = m.SentAt
+		}
 		encoded, _ := json.Marshal(copy)
 		if string(encoded) != string(canonical) {
 			return m, ErrConflict
@@ -134,16 +146,22 @@ func (s *Store) Append(ctx context.Context, key string, m webui.CollaborationMes
 	if !errors.Is(err, sql.ErrNoRows) {
 		return m, err
 	}
+	storageTask := m.TaskID
+	if m.OriginInstance != "" {
+		storageTask = m.OriginInstance + ":" + m.OriginStream + ":" + m.TaskID
+	}
 	var count, total, taskCount int64
-	if err = tx.QueryRowContext(ctx, "SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0),coalesce(sum(task=?),0) FROM messages", m.TaskID).Scan(&count, &total, &taskCount); err != nil {
+	if err = tx.QueryRowContext(ctx, "SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0),coalesce(sum(task=?),0) FROM messages", storageTask).Scan(&count, &total, &taskCount); err != nil {
 		return m, err
 	}
 	if count >= 50000 || total+int64(len(canonical))+64 > 256<<20 || taskCount >= 64 {
 		return m, ErrLimit
 	}
-	m.SentAt = time.Now().UTC()
+	if m.OriginInstance == "" {
+		m.SentAt = time.Now().UTC()
+	}
 	bodyBytes, _ := json.Marshal(m)
-	result, err := tx.ExecContext(ctx, "INSERT INTO messages(call_key,task,recipient,topic,private,body) VALUES(?,?,?,?,?,?)", key, m.TaskID, m.Recipient, m.Topic, m.Private, string(bodyBytes))
+	result, err := tx.ExecContext(ctx, "INSERT INTO messages(call_key,task,recipient,topic,private,body) VALUES(?,?,?,?,?,?)", key, storageTask, m.Recipient, m.Topic, m.Private, string(bodyBytes))
 	if err != nil {
 		return m, err
 	}

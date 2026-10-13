@@ -398,6 +398,9 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	if err := gridcollab.Install(service, cfg); err != nil {
 		return err
 	}
+	collaborationCtx, stopCollaboration := context.WithCancel(ctx)
+	defer stopCollaboration()
+	gridcollab.StartSync(collaborationCtx, service, cfg)
 	if err := gridroute.Install(service, cfg); err != nil {
 		return err
 	}
@@ -427,7 +430,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		}
 		return app.Request{Messages: t.Messages, RemoteExecution: execution, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private}
 	}
-	backend := &remote.SDKBackend{SubmitTask: func(ctx context.Context, key string, t remote.Task) (submissions.Status, error) {
+	backend := &remote.SDKBackend{CollaborationExport: service.RemoteCollaboration, SubmitTask: func(ctx context.Context, key string, t remote.Task) (submissions.Status, error) {
 		return service.Submit(ctx, key, requestFor(t))
 	}, RecoverTask: func(ctx context.Context, key string, t remote.Task) (submissions.Status, error) {
 		return service.ResumeSubmission(ctx, key, requestFor(t))

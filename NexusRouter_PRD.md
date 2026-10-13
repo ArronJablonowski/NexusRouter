@@ -1713,3 +1713,17 @@ admission, with an advertised capability for coordinated peer upgrades. Preserve
 privacy, trust, capability, context, resource and recovery boundaries. Initial
 implementation scope and deferred automatic/multiple-assignment forms are recorded
 in `docs/host-model-assignments.md`; this does not establish complete MVP coverage.
+
+
+### Commanding-host collaboration collection — 2026-10-13 update
+
+Collect recorded LLM collaboration messages and explicit commander/worker
+assignments and replies on the commanding host, including paired execution hosts.
+The authenticated Web UI must show each producing model's name and hostname,
+retain original timestamps and identify the paired source. Collection must resume
+durably, avoid duplicate messages and synchronization loops, and show unavailable
+or incomplete host checks while retaining saved conversations. Instance-wide
+export continues to require the separate explicit paired history permission;
+ordinary inspection, inference privacy and tool authority must remain unchanged.
+See `docs/model-collaboration.md` and `docs/progress.md` for verified scope,
+historical capture limits and deployment gaps.
