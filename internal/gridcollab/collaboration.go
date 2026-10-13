@@ -144,7 +144,7 @@ func (b *Bridge) Consult(ctx context.Context, instance, key, prompt, validation 
 			sender.SourceInstance = instance
 			sender.SessionID = status.Result.TaskID
 			sender.Private = private
-			return app.Result{TaskID: status.Result.TaskID, Text: status.Result.Text, CollaborationSender: &sender}, nil
+			return (app.Result{TaskID: status.Result.TaskID, Text: status.Result.Text}).WithCollaborationSender(sender), nil
 		case "failed", "canceled":
 			return app.Result{}, errors.New("remote commander did not complete")
 		}

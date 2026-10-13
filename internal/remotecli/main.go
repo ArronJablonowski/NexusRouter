@@ -387,7 +387,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		}
 		defer ledger.Close()
 	}
-	client, err := sdk.New(sdk.ConfigOptions{ProjectFile: configFile, LookupSecret: os.Getenv, HarnessEvidence: ledger})
+	client, err := sdk.New(remoteSDKOptions(configFile, cfg, ledger))
 	if err != nil {
 		return err
 	}

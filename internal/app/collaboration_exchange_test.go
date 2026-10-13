@@ -53,7 +53,7 @@ func TestDelegateCollaborationRecordsExactRedactedAssignmentAndReply(t *testing.
 	sender := webui.CollaborationMessage{Hostname: "commander", SenderID: "chief", SenderModel: "Commander Model", Provider: "local", Runner: "Ollama", Harness: "NexusRouter", SessionID: "session", Private: true}
 	remoteSender := webui.CollaborationMessage{Hostname: "spark", SenderID: "muse", SenderModel: "Muse Glimmer", Provider: "ollama", Runner: "Ollama", Harness: "NexusRouter", SessionID: "remote-child", SourceInstance: "spark", Private: true}
 	run := func(context.Context, string, string, string, bool) (Result, error) {
-		return Result{TaskID: "remote-child", Text: "reply fixture-secret", CollaborationSender: &remoteSender}, nil
+		return Result{TaskID: "remote-child", Text: "reply fixture-secret", collaborationSender: &remoteSender}, nil
 	}
 	journal := redactingJournal{db: db, secrets: []string{"fixture-secret"}}
 	if e = registerDelegate(registry, nil, db, journal, cfg, "parent", "session", "", true, run, nil, nil, sender); e != nil {

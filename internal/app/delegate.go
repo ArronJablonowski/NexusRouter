@@ -186,8 +186,8 @@ func registerDelegate(registry *tools.Registry, delegatedReadCapability *delegat
 				result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)
 				if cfg.Tools.CollaborationEnabled && len(senders) > 0 && result.Text != "" {
 					var sender webui.CollaborationMessage
-					if result.CollaborationSender != nil {
-						sender = *result.CollaborationSender
+					if result.collaborationSender != nil {
+						sender = *result.collaborationSender
 					} else {
 						for _, m := range cfg.Models {
 							if m.ID == cfg.Workers.DelegateModel {

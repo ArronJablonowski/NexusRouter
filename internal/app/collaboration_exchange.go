@@ -46,3 +46,10 @@ func recordExchange(ctx context.Context, cfg config.Settings, work, phase, text 
 	}
 	return nil
 }
+
+// WithCollaborationSender carries trusted transport metadata internally without
+// adding a new field to the public SDK result contract.
+func (r Result) WithCollaborationSender(sender webui.CollaborationMessage) Result {
+	r.collaborationSender = &sender
+	return r
+}

@@ -118,7 +118,7 @@ func (s *Service) bindRemoteDelegate(request Request) delegateRunner {
 					if p.ID == m.Provider {
 						sender, _ := collaborationSender(m, p, child, childID, request.LocalRequired)
 						sender.SessionID = childID
-						out.CollaborationSender = &sender
+						out.collaborationSender = &sender
 					}
 				}
 			}

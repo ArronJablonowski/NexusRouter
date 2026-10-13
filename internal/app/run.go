@@ -147,7 +147,7 @@ func validRuntimeHostWorkerID(value string) bool {
 }
 
 type Result struct {
-	CollaborationSender     *webui.CollaborationMessage `json:"-"`
+	collaborationSender     *webui.CollaborationMessage `json:"-"`
 	HarnessEvidenceStatus   string
 	HarnessOutcome          *harness.Execution
 	HarnessSelection        *harness.Selection
