@@ -31,3 +31,7 @@ This is change-scoped validation, not full `make check`. Two broader existing te
 Chat model responses were deterministic local fixtures, not a live LLM quality evaluation. Windows, diffusion-model performance, shared GPU admission, uploads, audio/video preview and automatic uncertain-delivery reconciliation remain unverified or unimplemented. Existing daemon processes were not restarted; applying opt-in configuration to an existing deployment requires a verified idle restart with the updated executable. Linear requirements remain unavailable pending connector reauthentication.
 
 Private receipts, graphs, logs, screenshots and baseline archives are outside Git. Only sanitized test evidence is committed.
+
+## Installed executable checkpoint
+
+Backed up source commit `9155d222` to the existing GitHub feature branch before installation. Updated only the separate `nexus-comfy` executables on workstation and Spark, after confirming the additive command was unused and ComfyUI idle. Previous additive executables were retained privately. Verified the ARM64 artifact SHA-256 before atomic replacement: `378b1afcd36e6bbdd716255ef1c3cf390f6476ddcdd8424fd4268c9e8f98672a`. Both installed commands successfully inspected the empty ComfyUI queue. Original `nexus` binaries, daemon processes and configuration were preserved. Chat/web activation is opt-in using the guide; it has not been applied to the existing daemon.
