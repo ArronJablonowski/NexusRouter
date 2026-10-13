@@ -22,6 +22,7 @@ import (
 )
 
 type Settings struct {
+	ComfyUI                  ComfyUI                    `yaml:"comfyui,omitempty" json:"comfyui,omitzero"`
 	VLLM                     VLLMSettings               `yaml:"vllm" json:"vllm"`
 	RemoteAdvertisement      remoteconfig.Advertisement `yaml:"remote_advertisement" json:"remote_advertisement"`
 	NativeHarnessEvidenceDir string                     `yaml:"native_harness_evidence_dir,omitempty" json:"native_harness_evidence_dir,omitempty"`
@@ -308,6 +309,9 @@ func Duration(value string) (time.Duration, error) {
 }
 
 func (s Settings) Validate() error {
+	if !s.ComfyUI.Validate() {
+		return errors.New("invalid ComfyUI configuration")
+	}
 	if err := s.validateVLLM(); err != nil {
 		return err
 	}
@@ -671,6 +675,12 @@ func validReasoningEffort(value string) bool {
 // RedactedJSON deliberately hides provider endpoints and local filesystem paths.
 // Credentials are never resolved into Settings in the first place.
 func (s Settings) RedactedJSON() ([]byte, error) {
+	if s.ComfyUI.Endpoint != "" {
+		s.ComfyUI.Endpoint = "[REDACTED]"
+	}
+	if s.ComfyUI.ReceiptDirectory != "" {
+		s.ComfyUI.ReceiptDirectory = "[REDACTED]"
+	}
 	s.Providers = append([]Provider(nil), s.Providers...)
 	for i := range s.Providers {
 		s.Providers[i].Endpoint = "[REDACTED]"

@@ -1,0 +1,34 @@
+{
+  "1": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": 32,
+      "height": 32,
+      "batch_size": 1,
+      "color": 65280
+    }
+  },
+  "3": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "1",
+        0
+      ],
+      "upscale_method": "nearest-exact",
+      "width": 96,
+      "height": 48,
+      "crop": "disabled"
+    }
+  },
+  "2": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "3",
+        0
+      ],
+      "filename_prefix": "NexusRouterTests/smoke"
+    }
+  }
+}

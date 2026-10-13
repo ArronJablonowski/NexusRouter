@@ -27,6 +27,7 @@ Usage:
     Queue new work from an exact recovered-history head; does not run inference
   nexus submissions list --db path [--state state --after cursor --limit 25]
   nexus submissions show|cancel|recoveries --db path --id submission-id
+  nexus comfy help  Control an explicit ComfyUI endpoint and retain submission receipts
   nexus remote help  Inspect and control explicitly paired remote instances
   nexus resources  Inspect current host memory and CPU capacity
   nexus doctor --config path  Inspect the running daemon and dependency health
@@ -95,6 +96,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "comfy" {
+		return runComfy(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "settings" {
 		return runSettingsMenu(args[1:], stdin, stdout, stderr)
 	}

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/connectors/comfyui"
 	"github.com/ArronJablonowski/NexusRouter/daemon"
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"github.com/ArronJablonowski/NexusRouter/health"
@@ -35,6 +36,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"github.com/ArronJablonowski/NexusRouter/workers"
 )
@@ -80,7 +82,17 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "NEXUS_API_TOKEN (or legacy DARWIN_API_TOKEN) must contain at least 32 characters")
 		return 1
 	}
-	service, err := app.NewService(s, os.Getenv)
+	var service *app.Service
+	if s.ComfyUI.Enabled && s.WebUI.Enabled {
+		service, err = app.NewServiceWithToolControls(s, os.Getenv, nil, nil, nil, nil, nil, nil, func(ctx context.Context, p tools.ApprovalPrompt) error {
+			if p.Request.ToolName != "comfy_submit" && p.Request.ToolName != "comfy_cancel_pending" {
+				return tools.ErrDenied
+			}
+			return nil
+		})
+	} else {
+		service, err = app.NewService(s, os.Getenv)
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid application configuration")
 		return 1
@@ -362,7 +374,15 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		if s.WebUI.RemoteDiscoveryInterface != "" {
 			remoteDiscoverer = webuiapp.InterfaceRemoteDiscoverer{Interface: s.WebUI.RemoteDiscoveryInterface}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{ChatPreference: service.ChatPreference,
+		var comfyService webuiapp.ComfyService
+		if s.ComfyUI.Enabled {
+			comfyService, err = comfyui.OpenService(s.ComfyUI.Endpoint, s.ComfyUI.ReceiptDirectory)
+			if err != nil {
+				fmt.Fprintln(stderr, "cannot initialize ComfyUI controls")
+				return 1
+			}
+		}
+		browserHandler, err = webuiapp.New(webuiapp.Options{Comfy: comfyService, RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{ChatPreference: service.ChatPreference,
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,

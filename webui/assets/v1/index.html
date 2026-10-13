@@ -20,6 +20,7 @@
       <a href="__DARWIN_BASE_PATH__/active-jobs" data-view="jobs">Active jobs</a>
       <a href="__DARWIN_BASE_PATH__/cron" data-view="cron">Cron</a>
       <a href="__DARWIN_BASE_PATH__/status" data-view="status">Status</a>
+      <a href="__DARWIN_BASE_PATH__/comfy" data-view="comfy">ComfyUI</a>
       <a href="__DARWIN_BASE_PATH__/models" data-view="models">Models</a>
       <a href="__DARWIN_BASE_PATH__/routing-map" data-view="routing">Command grid</a>
       <a href="__DARWIN_BASE_PATH__/model-elimination" data-view="elimination">Elimination</a>
@@ -193,6 +194,25 @@
             </section>
           </div>
         </aside>
+      </section>
+      <section id="comfy-view" aria-labelledby="comfy-title" hidden>
+        <h1 id="comfy-title">ComfyUI</h1>
+        <p>Run an exported workflow on the configured image server. Job records let you return to existing work without sending it again.</p>
+        <form id="comfy-form">
+          <label for="comfy-file">Workflow file (API format)</label>
+          <input id="comfy-file" type="file" accept="application/json,.json" required>
+          <button id="comfy-run" type="submit" disabled>Run workflow</button>
+        </form>
+        <p id="comfy-notice" role="status" aria-live="polite">Connecting…</p>
+        <button id="comfy-refresh" type="button">Refresh jobs</button>
+        <h2>Saved jobs</h2>
+        <ul id="comfy-jobs"></ul>
+        <label for="comfy-key">Job reference</label>
+        <input id="comfy-key" type="text" maxlength="128" autocomplete="off">
+        <button id="comfy-check" type="button">Check job</button>
+        <button id="comfy-cancel" type="button" disabled>Remove from waiting queue</button>
+        <p id="comfy-state" role="status" aria-live="polite"></p>
+        <div id="comfy-images" class="comfy-images"></div>
       </section>
       <section id="models-view" class="models-view" aria-labelledby="models-page-title" hidden>
         <header class="models-heading">
@@ -646,6 +666,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-membership.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/model-use.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/comfy.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/dependencies.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/logging.js" defer></script>

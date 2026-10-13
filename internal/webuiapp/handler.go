@@ -30,6 +30,7 @@ const (
 var ErrConfiguration = errors.New("invalid browser application configuration")
 
 type Options struct {
+	Comfy                ComfyService
 	RemoteDiscoverer     RemoteDiscoverer
 	RemoteReviewer       RemoteAutomaticReviewer
 	RemoteAutomatic      RemoteAutomatic
@@ -51,6 +52,7 @@ type Options struct {
 }
 
 type Handler struct {
+	comfy                ComfyService
 	remoteDiscoverer     RemoteDiscoverer
 	discoveryActive      atomic.Bool
 	remoteReviewer       RemoteAutomaticReviewer
@@ -108,7 +110,7 @@ func New(options Options) (*Handler, error) {
 	} else {
 		copy(cursorKey[:], options.CursorKey)
 	}
-	handler := &Handler{remoteDiscoverer: options.RemoteDiscoverer, remoteReviewer: options.RemoteReviewer, remoteAutomatic: options.RemoteAutomatic, remoteDispatcher: options.RemoteDispatcher, remoteTaskController: options.RemoteTaskController, remoteInspector: options.RemoteInspector, remoteTrustFile: options.RemoteTrustFile, basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, inspections: options.Inspections, workboards: options.Workboards, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), boardStreamSlots: make(chan struct{}, maxBoardStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey, boardStreamLife: 30 * time.Second}
+	handler := &Handler{comfy: options.Comfy, remoteDiscoverer: options.RemoteDiscoverer, remoteReviewer: options.RemoteReviewer, remoteAutomatic: options.RemoteAutomatic, remoteDispatcher: options.RemoteDispatcher, remoteTaskController: options.RemoteTaskController, remoteInspector: options.RemoteInspector, remoteTrustFile: options.RemoteTrustFile, basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, inspections: options.Inspections, workboards: options.Workboards, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), boardStreamSlots: make(chan struct{}, maxBoardStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey, boardStreamLife: 30 * time.Second}
 	shell, err := contract.NewShellHandler(contract.ShellOptions{BasePath: options.BasePath, HostAllowed: handler.hostAllowed, Authenticated: handler.authenticated})
 	if err != nil {
 		return nil, ErrConfiguration
@@ -128,13 +130,16 @@ func New(options Options) (*Handler, error) {
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	contract.ApplyBrowserSecurityHeaders(writer.Header())
 	chatListPath := h.basePath + "/api/v1/chats"
-	queryReadPath := request.URL != nil && (workboardBrowserQueryPath(h.basePath, request.URL.Path, request.Method) || request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/jobs" || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || boardEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "" || inspectionQueryPath(h.basePath, request.URL.Path))
+	queryReadPath := request.URL != nil && ((request.Method == "GET" && strings.HasPrefix(request.URL.Path, h.basePath+"/api/v1/comfy/jobs/") && strings.HasSuffix(request.URL.Path, "/image")) || workboardBrowserQueryPath(h.basePath, request.URL.Path, request.Method) || request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/jobs" || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || boardEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "" || inspectionQueryPath(h.basePath, request.URL.Path))
 	if !h.hostAllowed(request.Host) || hasForwardedAuthority(request) || request.URL == nil || (request.URL.RawQuery != "" && !queryReadPath) || request.URL.RawPath != "" {
 		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
 		return
 	}
 	if request.URL.Path != h.basePath && !strings.HasPrefix(request.URL.Path, h.basePath+"/") {
 		h.writeError(writer, request, http.StatusNotFound, "not_found")
+		return
+	}
+	if h.serveComfy(writer, request) {
 		return
 	}
 	if chat := chatEventsID(h.basePath, request.URL.Path); chat != "" {

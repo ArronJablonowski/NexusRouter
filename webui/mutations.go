@@ -1,6 +1,10 @@
 package webui
 
 import (
+	"bytes"
+	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/connectors/comfyui"
+	"io"
 	"time"
 )
 
@@ -17,14 +21,15 @@ const (
 // workboard proposal. It deliberately excludes execution authority and the
 // browser operation key; those remain bound by the durable approval record.
 type ApprovalProposal struct {
+	Arguments                json.RawMessage       `json:"arguments,omitempty"`
 	Version                  int                   `json:"version"`
 	Kind                     string                `json:"kind"`
-	BoardID                  string                `json:"board_id"`
-	CardID                   string                `json:"card_id"`
+	BoardID                  string                `json:"board_id,omitempty"`
+	CardID                   string                `json:"card_id,omitempty"`
 	AttemptID                string                `json:"attempt_id,omitempty"`
 	CandidateID              string                `json:"candidate_id,omitempty"`
-	ExpectedBoardRevision    int64                 `json:"expected_board_revision"`
-	ExpectedCardRevision     int64                 `json:"expected_card_revision"`
+	ExpectedBoardRevision    int64                 `json:"expected_board_revision,omitempty"`
+	ExpectedCardRevision     int64                 `json:"expected_card_revision,omitempty"`
 	ExpectedAttemptRevision  int64                 `json:"expected_attempt_revision,omitempty"`
 	ExpectedCriteriaRevision int64                 `json:"expected_criteria_revision,omitempty"`
 	ExpectedCriteriaDigest   string                `json:"expected_criteria_digest,omitempty"`
@@ -40,6 +45,40 @@ type ApprovalProposal struct {
 }
 
 func (p ApprovalProposal) Validate() error {
+	if p.Kind == "comfy_workflow" || p.Kind == "comfy_cancel" {
+		if p.Version != 1 || len(p.Arguments) == 0 || len(p.Arguments) > 64<<10 || RejectDuplicateJSONFields(p.Arguments) != nil {
+			return ErrContract
+		}
+		var a struct {
+			Key      string          `json:"key"`
+			Workflow json.RawMessage `json:"workflow"`
+		}
+		decoder := json.NewDecoder(bytes.NewReader(p.Arguments))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&a) != nil || decoder.Decode(new(any)) != io.EOF || !comfyui.ValidJobKey(a.Key) {
+			return ErrContract
+		}
+		if p.Kind == "comfy_workflow" {
+			if workflow, err := comfyui.ParseWorkflow(a.Workflow); err != nil || len(workflow) > 256 {
+				return ErrContract
+			}
+		} else if len(a.Workflow) > 0 {
+			return ErrContract
+		}
+		copy := p
+		copy.Arguments = nil
+		copy.Kind = ""
+		copy.Version = 0
+		b, _ := json.Marshal(copy)
+		if string(b) != "{\"version\":0,\"kind\":\"\"}" {
+			return ErrContract
+		}
+		return encodedWithin(p, MaxApprovalProposalBytes)
+	}
+	if len(p.Arguments) > 0 {
+		return ErrContract
+	}
+
 	if p.Version != ContractVersion || !validID(p.BoardID) || !validID(p.CardID) ||
 		p.ExpectedBoardRevision < 1 || p.ExpectedCardRevision < 1 {
 		return ErrContract
@@ -337,10 +376,10 @@ func (s ApprovalSummary) Validate() error {
 	default:
 		return ErrContract
 	}
-	proposalTool := s.ToolName == "workboard_propose_criteria" || s.ToolName == "workboard_request_candidate_decision"
+	proposalTool := s.ToolName == "comfy_submit" || s.ToolName == "comfy_cancel_pending" || s.ToolName == "workboard_propose_criteria" || s.ToolName == "workboard_request_candidate_decision"
 	if proposalTool && (s.State == "pending" || s.State == "approved") {
 		if s.Proposal == nil || s.Proposal.Validate() != nil ||
-			s.ToolName == "workboard_propose_criteria" && s.Proposal.Kind != "criteria_change" ||
+			s.ToolName == "comfy_submit" && s.Proposal.Kind != "comfy_workflow" || s.ToolName == "comfy_cancel_pending" && s.Proposal.Kind != "comfy_cancel" || s.ToolName == "workboard_propose_criteria" && s.Proposal.Kind != "criteria_change" ||
 			s.ToolName == "workboard_request_candidate_decision" && s.Proposal.Kind != "candidate_decision" {
 			return ErrContract
 		}
