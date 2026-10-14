@@ -596,3 +596,53 @@ textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3re
 
 .chat-files{margin:1rem 0;padding:1rem;border:1px solid var(--border,#35535d);border-radius:12px;min-width:0}.chat-file-list{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:1rem}.chat-file-card{min-width:0;overflow:hidden;border:1px solid var(--border,#35535d);border-radius:10px;padding:.8rem}.chat-file-preview{display:block}.chat-file-preview img{display:block;width:100%;max-height:340px;object-fit:contain;border-radius:6px}.chat-file-name{font-weight:600;overflow-wrap:anywhere}.chat-file-detail{font-size:.875rem}.chat-file-download{display:inline-block;padding:.55rem .9rem;border:1px solid currentColor;border-radius:6px}.chat-file-download:focus-visible,.chat-file-preview:focus-visible{outline:3px solid #5de0df;outline-offset:3px}
 .transcript-panel:has(.chat-files:not([hidden])) .transcript{flex:0 0 auto;min-height:0}.chat-files{margin:0 1.4rem 1rem}
+
+
+/* Keep chat input in view; only conversation content and the chat list scroll. */
+body:has(#chat-view:not([hidden])) .shell { position: fixed; inset: 0; height: 100vh; height: 100dvh; min-height: 0; grid-template-rows: 4rem minmax(0, 1fr); }
+body:has(#chat-view:not([hidden])) main { min-height: 0; overflow: hidden; }
+body:has(#chat-view:not([hidden])) .rail { min-height: 0; overflow-y: auto; }
+.chat-view { height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.chat-index, .transcript-panel { min-height: 0; }
+.transcript-panel { overflow: hidden; }
+.conversation-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; scrollbar-gutter: stable; overflow-anchor: none; }
+.conversation-scroll .transcript { overflow: visible; min-height: 0; }
+.composer-dock { flex: none; min-width: 0; background: #03141e; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.composer { padding: .65rem 1rem; }
+.composer textarea { display: block; min-height: 3rem; max-height: 20dvh; }
+.composer .host-options { max-height: 8rem; overflow-y: auto; }
+.composer #host-routing, .composer #host-receipt { max-height: 5rem; overflow: auto; }
+.composer-dock .mutation-bar:has(#mutation-state:empty):not(:has(button:not([hidden]))) { display: none; }
+@media (max-width: 760px) {
+ .chat-view { grid-template: minmax(4rem, 18%) minmax(0, 1fr) / minmax(0, 1fr); gap: .4rem; }
+}
+@media (max-width: 42rem) {
+ body:has(#chat-view:not([hidden])) .shell { grid-template-rows: 3rem auto minmax(0, 1fr); }
+ body:has(#chat-view:not([hidden])) .rail { padding: .35rem .5rem; overflow-y: hidden; }
+ body:has(#chat-view:not([hidden])) main { padding: .4rem; }
+ .chat-view { grid-template: minmax(4rem, 18%) minmax(0, 1fr) / minmax(0, 1fr); gap: .4rem; }
+ .chat-index { padding: .35rem .6rem; }
+ .chat-index .section-heading { padding-bottom: .25rem; }
+ .chat-index .eyebrow { display: none; }
+ .composer { padding: .5rem .65rem; }
+ .composer-meta .help { font-size: .75rem; }
+}
+
+body:has(#chat-view:not([hidden])) { height: 100vh; height: 100dvh; overflow: hidden; }
+.composer-dock { padding: .5rem .75rem max(.5rem, env(safe-area-inset-bottom, 0px)); }
+.composer { padding: .6rem .8rem; border: 1px solid #345965; border-radius: 1.4rem; background: #102730; box-shadow: 0 .3rem 1.2rem #0002; }
+.composer:focus-within { border-color: #71cbd3; }
+.composer label, .composer-meta { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+.composer textarea { border: 0; border-radius: .5rem; background: transparent; padding: .3rem .2rem; resize: none; outline: none; }
+.composer > .button-row { justify-content: flex-end; gap: .5rem; margin-top: .3rem; }
+#send-message { flex: none; width: 2.4rem; height: 2.4rem; padding: 0; border-radius: 50%; font-size: 0; }
+#send-message::after { content: "↑"; font-size: 1.5rem; line-height: 1; }
+.composer #new-chat { padding: .35rem .65rem; font-size: .8rem; border-radius: 1rem; }
+.composer-dock .mutation-bar { min-height: 0; padding: .35rem .4rem 0; flex-wrap: wrap; }
+@media (max-width: 42rem) { .composer-dock { padding: .4rem .5rem max(.4rem, env(safe-area-inset-bottom, 0px)); } }
+
+.composer { position: relative; }
+.composer .host-options { position: absolute; bottom: calc(100% + .4rem); left: 0; right: 0; max-height: min(40dvh, 15rem); z-index: 3; border-radius: .8rem; box-shadow: 0 .4rem 1rem #0006; }
+.composer #host-routing, .composer #host-receipt { max-height: 3rem; }
+.composer #new-chat { order: -1; }
+.composer-dock .mutation-bar { max-height: 12dvh; overflow-y: auto; }

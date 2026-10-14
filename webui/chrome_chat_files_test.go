@@ -75,6 +75,7 @@ func TestChromeChatFilesPreviewDownloadAndReload(t *testing.T) {
 	downloadDir := t.TempDir()
 	directory, _ := json.Marshal(downloadDir)
 	script := strings.Split(chromeRemoteDiscoveryCDP, "await cdp('Page.navigate'")[0] + `
+await cdp('Page.addScriptToEvaluateOnNewDocument',{source:'Object.defineProperty(window, "EventSource", {value:class {readyState=1; addEventListener(){} close(){} }, configurable:false});'});
 await cdp('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:` + string(directory) + `});
 await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
 await cdp('Page.navigate',{url:origin+'/app/chats/chat'});
@@ -95,6 +96,26 @@ await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScale
 if(!await evaluate('document.documentElement.scrollWidth<=innerWidth'))throw Error('mobile overflow');
 await evaluate('document.querySelector("#chat-files").scrollIntoView({block:"start"})');
 if(process.env.NEXUS_CHAT_FILES_SCREENSHOT){const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_CHAT_FILES_SCREENSHOT,Buffer.from(shot.data,'base64'));}
+// Long messages, generated files and controls must never displace the composer.
+await evaluate("window.longMessages=Array.from({length:30},(_,i)=>({id:'long-'+i,role:'assistant',text:'Long conversation message '.repeat(100)}));window.NexusChatRender.messages(document.querySelector('#transcript'),longMessages,true);document.querySelector('#feedback-panel').hidden=false;document.querySelector('#task-controls').hidden=false;document.querySelector('#composer-text').value='Keep my draft';");
+for(const [width,height] of [[1440,1000],[1024,700],[700,700],[390,844],[390,480]]){
+ await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+ await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+ for(const end of [false,true]){
+  await evaluate("document.querySelector('.conversation-scroll').scrollTop="+(end?"100000":"0")+"");
+  if(!await evaluate("(()=>{const input=document.querySelector('#composer-text').getBoundingClientRect(),send=document.querySelector('#send-message').getBoundingClientRect();return input.top>=0&&input.bottom<=innerHeight&&send.top>=0&&send.bottom<=innerHeight&&send.right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight+1;})()"))throw Error('composer outside viewport '+width+'x'+height+' '+await evaluate("JSON.stringify({input:document.querySelector('#composer-text').getBoundingClientRect(),send:document.querySelector('#send-message').getBoundingClientRect(),page:document.documentElement.scrollHeight,panel:document.querySelector('.transcript-panel').getBoundingClientRect(),main:document.querySelector('main').getBoundingClientRect(),scroll:{box:document.querySelector('.conversation-scroll').getBoundingClientRect(),overflow:getComputedStyle(document.querySelector('.conversation-scroll')).overflow,html:document.querySelector('.conversation-scroll').children.length},parent:document.querySelector('#transcript').parentElement.className})"));
+ }
+}
+await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+await evaluate("const viewport=document.querySelector('.conversation-scroll');viewport.scrollTop=350;window.savedConversationTop=viewport.scrollTop;document.querySelector('#composer-text').disabled=false;document.querySelector('#composer-text').focus();window.NexusChatRender.messages(document.querySelector('#transcript'),longMessages.concat([{id:'last',role:'assistant',text:'New result'}]),true);");
+if(!await evaluate("Math.abs(document.querySelector('.conversation-scroll').scrollTop-window.savedConversationTop)<2&&document.activeElement.id==='composer-text'&&document.querySelector('#composer-text').value==='Keep my draft'"))throw Error('refresh moved conversation or lost composer draft/focus '+await evaluate("JSON.stringify({top:document.querySelector('.conversation-scroll').scrollTop,saved:window.savedConversationTop,focus:document.activeElement.id,draft:document.querySelector('#composer-text').value})"));
+if(process.env.NEXUS_CHAT_FILES_SCREENSHOT){const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_CHAT_FILES_SCREENSHOT+'.composer.png',Buffer.from(shot.data,'base64'));}
+await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:480,deviceScaleFactor:1,mobile:false});
+await evaluate("document.querySelector('#host-options').hidden=false;document.querySelector('#host-options').textContent='Choose a model';document.querySelector('#host-options').style.height='8rem';document.querySelector('#host-routing').hidden=false;document.querySelector('#host-receipt').hidden=false;document.querySelector('#host-receipt').textContent='Saved request details '.repeat(80);");
+if(!await evaluate("(()=>{const input=document.querySelector('#composer-text').getBoundingClientRect(),send=document.querySelector('#send-message').getBoundingClientRect();return input.top>=0&&send.bottom<=innerHeight;})()"))throw Error('routing details displaced composer');
+if(process.env.NEXUS_CHAT_FILES_SCREENSHOT){const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_CHAT_FILES_SCREENSHOT+'.composer-mobile.png',Buffer.from(shot.data,'base64'));}
+
 await evaluate('window.NexusChatFiles.select("empty")');await new Promise(r=>setTimeout(r,200));
 if(!await evaluate('document.querySelectorAll(".chat-file-card").length===0&&document.querySelector("#chat-files").hidden'))throw Error('old chat files leaked');
 socket.close();`

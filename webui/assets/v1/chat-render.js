@@ -1,15 +1,14 @@
 "use strict";
 window.NexusChatRender = (() => {
  function preserve(root, change) {
-  const top = root.scrollTop, bottom = root.children.length > 0 && root.scrollHeight - root.clientHeight - top < 24;
-  const edge = root.getBoundingClientRect().top;
+  const viewport = root.closest(".conversation-scroll") || root;
+  const top = viewport.scrollTop, bottom = root.children.length > 0 && viewport.scrollHeight - viewport.clientHeight - top < 24;
+  const edge = viewport.getBoundingClientRect().top;
   const anchor = [...root.children].find(node => node.getBoundingClientRect().bottom > edge);
   const offset = anchor ? anchor.getBoundingClientRect().top : 0;
-  const panel = root.closest('.transcript-panel'), panelTop = panel && panel.scrollTop;
   change();
-  if (bottom) root.scrollTop = root.scrollHeight;
-  else root.scrollTop = anchor && anchor.isConnected ? top + anchor.getBoundingClientRect().top - offset : top;
-  if (panel) panel.scrollTop = panelTop;
+  if (bottom) viewport.scrollTop = viewport.scrollHeight;
+  else viewport.scrollTop = anchor && anchor.isConnected ? top + anchor.getBoundingClientRect().top - offset : top;
  }
  function messages(root, items, reset) {
   preserve(root, () => {

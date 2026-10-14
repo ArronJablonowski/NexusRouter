@@ -78,6 +78,7 @@
           <button id="load-more" class="secondary" type="button" hidden>Load more</button>
         </aside>
         <section class="transcript-panel" aria-labelledby="chat-title">
+          <div class="conversation-scroll" tabindex="0" role="region" aria-label="Conversation and generated files">
           <header class="transcript-heading">
             <div><p class="eyebrow">Conversation</p><h2 id="chat-title">New chat</h2></div>
             <output id="chat-state" class="state-pill"></output>
@@ -116,9 +117,11 @@
               <button id="feedback-rejected" class="secondary" type="button">Record rejected</button>
             </div>
           </section>
+          </div>
+          <div class="composer-dock">
           <form id="composer" class="composer" novalidate>
             <label id="composer-label" for="composer-text">Start a new chat</label>
-            <textarea aria-autocomplete="list" aria-controls="host-options" aria-expanded="false" id="composer-text" rows="3" maxlength="1048576" aria-describedby="composer-help composer-error"></textarea>
+            <textarea aria-autocomplete="list" aria-controls="host-options" aria-expanded="false" id="composer-text" placeholder="Message NexusRouter…" rows="2" maxlength="1048576" aria-describedby="composer-help composer-error"></textarea>
             <div id="host-options" class="host-options" role="listbox" aria-label="Choose host or model" hidden></div>
             <div id="host-routing" hidden><p id="host-notice" role="status"></p><select id="host-model" aria-label="Assigned model" hidden></select><button id="host-new-task" type="button" class="secondary">New remote task</button></div>
             <details id="host-receipt" hidden open></details>
@@ -128,7 +131,7 @@
             </div>
             <div id="composer-error" class="field-error" role="alert" hidden></div>
             <div class="button-row">
-              <button id="send-message" type="submit">Start chat</button>
+              <button id="send-message" aria-label="Send message" type="submit">Start chat</button>
               <button id="new-chat" class="secondary" type="button" hidden>New chat</button>
             </div>
           </form>
@@ -136,6 +139,7 @@
             <output id="mutation-state" role="status" aria-live="polite"></output>
             <button id="reconcile" class="secondary" type="button" hidden>Check current status</button>
             <button id="acknowledge-unresolved" class="danger" type="button" hidden>Acknowledge unresolved outcome</button>
+          </div>
           </div>
         </section>
 
