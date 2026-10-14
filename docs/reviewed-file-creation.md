@@ -95,9 +95,10 @@ Hosts own authentication and safe preview delivery. Without either control,
 execution is denied before task dispatch. Side-effecting definitions cannot
 bypass authority by changing policy from `ask` to `allow`.
 
-The default headless CLI and daemon do not install an interactive reviewer.
-Durable submission execution is rejected for this process-local capability;
-there is no silent approval or resumed call with freshly attached authority.
+The default headless CLI and a daemon without the browser approval presenter
+do not install an interactive reviewer. Queued creation requires that trusted
+presenter; a synchronous reviewer alone cannot authorize it. There is no silent
+approval or replay of a spent call with freshly attached authority.
 Children remain read-only even when the parent has creation enabled.
 
 Existing-file modification, bulk writes, executable tools and unattended
