@@ -21,7 +21,7 @@ Models receive these tools during eligible ordinary task loops:
 - `collaboration_send`: supply `recipient` (configured model ID or `*`), `topic`,
   and `text`. Replies use the same topic and address the original sender ID.
 - `collaboration_read`: read the model's own addressed and shared messages;
-  optionally supply `topic` and `before` to retrieve older messages.
+  optionally supply `topic`, `limit` (1–50, default 10) and `before` to retrieve older messages. Follow `next_before` to page without skipping messages.
 
 For example, ask model A to leave an idea for model B under topic `parser-bounds`.
 When model B runs a task, ask it to read that topic and reply to model A. A later
@@ -115,3 +115,7 @@ cross-host collection, collaboration must be enabled, and paired history grants
 must already authorize export. No live service is upgraded or restarted merely
 by installing the source change. Physical multi-host deployment and live-model
 qualification are tracked separately in the validation report and progress log.
+
+## Context planning
+
+Collaboration reads default to ten messages; request `limit: 1` when only the latest addressed message is needed. Send returns a small `{sent, sequence}` receipt; full text/provenance remain in the durable journal and Web UI. Neither operation expands an already admitted context window or retries a send after uncertain delivery. Plan sufficient context for tool definitions, read results, tool calls and final confirmation; a small explicit allocation may be exhausted even when the provider reports fewer tokenizer tokens because runtime admission uses a conservative serialized-byte estimate plus reserve. For the longer live qualification, each read/send task uses an admitted 16K window and bounded reads. This is not unlimited-context recovery.
