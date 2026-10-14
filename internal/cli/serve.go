@@ -101,6 +101,9 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "cannot initialize commander collaboration")
 		return 1
 	}
+	collaborationCtx, stopCollaboration := context.WithCancel(ctx)
+	defer stopCollaboration()
+	gridcollab.StartSync(collaborationCtx, service, s)
 	if err := gridroute.Install(service, s); err != nil {
 		fmt.Fprintln(stderr, "cannot initialize unified routing")
 		return 1

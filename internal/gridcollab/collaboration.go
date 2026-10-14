@@ -12,6 +12,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 type collaborationClient interface {
@@ -84,7 +85,18 @@ func (b *Bridge) eligible(ctx context.Context, id string, tokens int, private bo
 	if !found {
 		return app.CommanderPeer{}, nil, remote.ErrUnavailable
 	}
-	return app.CommanderPeer{InstanceID: id, ModelID: commander, Hostname: info.Hostname}, workers, nil
+	sender := webui.CollaborationMessage{Hostname: info.Hostname, Harness: "Remote NexusRouter", Runner: "Remote backend (runner undeclared)"}
+	for _, m := range info.Models {
+		if m.ID == commander {
+			sender.SenderID = m.ID
+			sender.SenderModel = m.Model
+			sender.Provider = m.Provider
+			if m.Harness != "" {
+				sender.Harness = m.Harness
+			}
+		}
+	}
+	return app.CommanderPeer{InstanceID: id, ModelID: commander, Hostname: info.Hostname, Sender: &sender}, workers, nil
 }
 func (b *Bridge) List(ctx context.Context, tokens int, private bool) ([]app.CommanderPeer, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -128,7 +140,11 @@ func (b *Bridge) Consult(ctx context.Context, instance, key, prompt, validation 
 			if status.Result == nil {
 				return app.Result{}, remote.ErrUnavailable
 			}
-			return app.Result{TaskID: status.Result.TaskID, Text: status.Result.Text}, nil
+			sender := *peer.Sender
+			sender.SourceInstance = instance
+			sender.SessionID = status.Result.TaskID
+			sender.Private = private
+			return (app.Result{TaskID: status.Result.TaskID, Text: status.Result.Text}).WithCollaborationSender(sender), nil
 		case "failed", "canceled":
 			return app.Result{}, errors.New("remote commander did not complete")
 		}

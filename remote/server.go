@@ -134,7 +134,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if r.URL.Path == "/v1/remote/logs" && r.Method == http.MethodGet {
+	if (r.URL.Path == "/v1/remote/logs" || r.URL.Path == "/v1/remote/collaboration") && r.Method == http.MethodGet {
 		op = "logs"
 	}
 	if strings.HasPrefix(r.URL.Path, "/v1/remote/runner/") && r.Method == http.MethodPost {
@@ -187,6 +187,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			result, err = backend.Runner(ctx, action)
 		}
+	} else if r.URL.Path == "/v1/remote/collaboration" {
+		result, err = s.collaborationPage(ctx, r)
 	} else if op == "logs" {
 		result, err = s.logPage(ctx, r)
 	} else if r.URL.Path == "/v1/remote/catalogue" {

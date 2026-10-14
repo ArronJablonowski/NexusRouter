@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/internal/agentchat"
 	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/webui"
@@ -21,14 +22,15 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
-	SubmitTask       func(context.Context, string, Task) (submissions.Status, error)
-	RecoverTask      func(context.Context, string, Task) (submissions.Status, error)
-	ReadDependencies func(context.Context) (webui.DependencyInventory, error)
-	Schedules        func(context.Context) (webui.SchedulePage, error)
-	JobHistory       func(context.Context, string, webui.HistoryOptions) (webui.HistoryPage, error)
-	RunnerModelID    string
-	ControlRunner    func(context.Context, string) (RunnerStatus, error)
-	Routing          func(context.Context, []string) (webui.ModelInspectionPage, error)
+	CollaborationExport func(context.Context, string, int64) (agentchat.Batch, error)
+	SubmitTask          func(context.Context, string, Task) (submissions.Status, error)
+	RecoverTask         func(context.Context, string, Task) (submissions.Status, error)
+	ReadDependencies    func(context.Context) (webui.DependencyInventory, error)
+	Schedules           func(context.Context) (webui.SchedulePage, error)
+	JobHistory          func(context.Context, string, webui.HistoryOptions) (webui.HistoryPage, error)
+	RunnerModelID       string
+	ControlRunner       func(context.Context, string) (RunnerStatus, error)
+	Routing             func(context.Context, []string) (webui.ModelInspectionPage, error)
 	// ReadStatus borrows the serving dispatcher store when available.
 	ReadStatus func(context.Context, string) (submissions.Status, error)
 
@@ -293,4 +295,11 @@ func (b *SDKBackend) Dependencies(ctx context.Context) (webui.DependencyInventor
 		return webui.DependencyInventory{}, ErrUnavailable
 	}
 	return b.ReadDependencies(ctx)
+}
+
+func (b *SDKBackend) Collaboration(ctx context.Context, stream string, after int64) (agentchat.Batch, error) {
+	if b.CollaborationExport == nil {
+		return agentchat.Batch{}, ErrUnavailable
+	}
+	return b.CollaborationExport(ctx, stream, after)
 }

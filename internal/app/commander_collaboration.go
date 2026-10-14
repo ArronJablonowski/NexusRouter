@@ -6,12 +6,14 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 type CommanderPeer struct {
-	InstanceID string `json:"instance_id"`
-	ModelID    string `json:"model_id"`
-	Hostname   string `json:"hostname"`
+	Sender     *webui.CollaborationMessage `json:"-"`
+	InstanceID string                      `json:"instance_id"`
+	ModelID    string                      `json:"model_id"`
+	Hostname   string                      `json:"hostname"`
 }
 
 // CommanderCollaboration is installed by trusted host wiring before serving.

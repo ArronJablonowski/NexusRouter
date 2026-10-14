@@ -16,6 +16,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
@@ -80,10 +81,12 @@ func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent st
 	return s.runExplicit(ctx, r)
 }
 
-func registerDelegate(registry *tools.Registry, delegatedReadCapability *delegateTools, db *telemetry.Store, journal runtime.Journal, cfg config.Settings, parent, session, submissionID string, localOnly bool, run delegateRunner, audit delegateAuditRunner, compactionAuthority *runtime.DelegationCompactionAuthority) error {
+func registerDelegate(registry *tools.Registry, delegatedReadCapability *delegateTools, db *telemetry.Store, journal runtime.Journal, cfg config.Settings, parent, session, submissionID string, localOnly bool, run delegateRunner, audit delegateAuditRunner, compactionAuthority *runtime.DelegationCompactionAuthority, senders ...webui.CollaborationMessage) error {
+	var collaborationSecrets []string
 	var cancellationBoundary *sync.Mutex
 	if guarded, ok := journal.(redactingJournal); ok {
 		cancellationBoundary = guarded.cancellationBoundary
+		collaborationSecrets = guarded.secrets
 	}
 	heartbeat, err := config.Duration(cfg.Workers.Heartbeat)
 	if err != nil {
@@ -172,7 +175,38 @@ func registerDelegate(registry *tools.Registry, delegatedReadCapability *delegat
 				entered.Store(true)
 				ctx = context.WithValue(ctx, remoteSpecialistKey{}, input.ModelID)
 				ctx = context.WithValue(ctx, commanderInstanceKey{}, input.InstanceID)
+				if cfg.Tools.CollaborationEnabled && len(senders) > 0 {
+					sender := senders[0]
+					sender.Text = ""
+					sender.Private = localOnly
+					if err := recordExchange(ctx, cfg, workID, "assignment", redact(input.Prompt, collaborationSecrets), sender); err != nil {
+						return "", runtime.ErrPersistence
+					}
+				}
 				result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)
+				if cfg.Tools.CollaborationEnabled && len(senders) > 0 && result.Text != "" {
+					var sender webui.CollaborationMessage
+					if result.collaborationSender != nil {
+						sender = *result.collaborationSender
+					} else {
+						for _, m := range cfg.Models {
+							if m.ID == cfg.Workers.DelegateModel {
+								for _, p := range cfg.Providers {
+									if p.ID == m.Provider {
+										sender, _ = collaborationSender(m, p, Request{}, result.TaskID, localOnly)
+									}
+								}
+							}
+						}
+					}
+					sender.Private = localOnly
+					if sender.SessionID == "" {
+						sender.SessionID = result.TaskID
+					}
+					if recordErr := recordExchange(ctx, cfg, workID, "reply", redact(result.Text, collaborationSecrets), sender); recordErr != nil {
+						return "", runtime.ErrPersistence
+					}
+				}
 				returned.Store(true)
 				executionID = result.TaskID
 				return result.Text, err

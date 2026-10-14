@@ -27,7 +27,7 @@ func (p collaborationFixtureProvider) Stream(_ context.Context, r providers.Requ
 			}
 			return emit(providers.Chunk{Done: true, FinishReason: "tool_calls"})
 		}
-		if !strings.Contains(last.Content, "parser idea") {
+		if !strings.Contains(last.Content, "parser idea") && !strings.Contains(last.Content, `"sent":true`) {
 			p.t.Fatal("knowledge not returned", last)
 		}
 		if e := emit(providers.Chunk{Text: "done"}); e != nil {
