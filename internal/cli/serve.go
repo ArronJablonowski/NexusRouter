@@ -418,7 +418,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				}
 				return config.UpdateModelUse(s.Telemetry.Database, host, model, *enabled)
 			},
-		}, Reads: webuiapp.ReadServices{ChatPreference: service.ReadChatPreference,
+		}, Reads: webuiapp.ReadServices{ChatFiles: service.ChatFiles, ChatFile: service.ChatFile, ChatPreference: service.ReadChatPreference,
 			JobTasks: service.ListJobTasks, Submissions: service.ListSubmissions, Tasks: service.ListTasks, Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
 				return db.ReadCommittedEventPage(ctx, options)

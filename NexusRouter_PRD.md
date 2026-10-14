@@ -1727,3 +1727,7 @@ export continues to require the separate explicit paired history permission;
 ordinary inspection, inference privacy and tool authority must remain unchanged.
 See `docs/model-collaboration.md` and `docs/progress.md` for verified scope,
 historical capture limits and deployment gaps.
+
+## Chat-generated output attachments
+
+The authenticated Web UI must present NexusRouter-generated outputs in the conversation with inline raster images and downloadable file cards, retained across refresh/reopening. Attachment access must derive from confirmed chat-owned generation, not model-provided paths or links. Downloads must retain original generated content and chat authorization, and must not execute generated active documents in the application origin. Collection/refresh must not replay generation or broaden filesystem/remote-job authority. The initial implemented scope is approved UTF-8 creation/revision and chat-owned ComfyUI image outputs; storage limits, uncaptured-upstream recovery, binary generation and richer previews remain explicit gaps in docs/chat-files.md and docs/progress.md.

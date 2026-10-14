@@ -746,7 +746,7 @@
 			source.close();
 			source = null;
 		}
-		selectedChat = chatID;
+		selectedChat = chatID; window.NexusChatFiles.select(chatID);
 		approvalDialog.hidden = true;
 		activeApproval = null;
 		approvalOpener = null;
@@ -786,7 +786,7 @@
 			source.close();
 			source = null;
 		}
-		selectedChat = "";
+		selectedChat = ""; window.NexusChatFiles.select("");
 		approvalDialog.hidden = true;
 		activeApproval = null;
 		approvalOpener = null;

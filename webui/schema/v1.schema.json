@@ -3,6 +3,7 @@
   "$id": "https://nexusrouter.local/schema/webui/v1",
   "title": "NexusRouter Web UI Contract v1",
   "oneOf": [
+    {"$ref":"#/$defs/chat_file_page"},
     {"$ref":"#/$defs/model_targets"},
     {
       "$ref": "#/$defs/chat_request"
@@ -75,6 +76,7 @@
     }
   ],
   "$defs": {
+"chat_file":{"type": "object", "additionalProperties": false, "required": ["id", "task_id", "name", "media_type", "size"], "properties": {"id": {"$ref": "#/$defs/id"}, "task_id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "minLength": 1, "maxLength": 200, "not": {"enum":[".",".."]}, "pattern": "^[^/\\\\\u0000-\u001f\u007f]+$"}, "media_type": {"enum": ["image/png", "image/jpeg", "image/webp", "text/plain", "application/octet-stream"]}, "size": {"type": "integer", "minimum": 0, "maximum": 33554432}}},"chat_file_page":{"type": "object", "additionalProperties": false, "required": ["version", "chat_id", "files", "pending"], "properties": {"version": {"const": 1}, "chat_id": {"$ref": "#/$defs/id"}, "files": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/chat_file"}}, "pending": {"type": "boolean"}}},
     "model_targets": {
       "type":"object", "additionalProperties":false,
       "required":["version","hostname","models"],

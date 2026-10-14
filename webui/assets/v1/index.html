@@ -85,6 +85,7 @@
           <div id="transcript-state" class="notice" role="status">Choose a session to inspect its committed history.</div>
           <ol id="transcript" class="transcript" aria-label="Committed chat transcript"></ol>
           <button id="load-more-messages" class="secondary transcript-more" type="button" hidden>Load more messages</button>
+          <section id="chat-files" class="chat-files" aria-labelledby="chat-files-title" hidden><h3 id="chat-files-title">Created files</h3><p id="chat-file-status" role="status" hidden></p><ul id="chat-file-list" class="chat-file-list" aria-label="Generated files and images"></ul></section>
           <div id="provisional" class="provisional-stack" aria-label="Provisional assistant output" hidden></div>
           <output id="stream-announcement" class="visually-hidden" aria-live="polite"></output>
           <div id="approval-panel" class="approval-messages" hidden>
@@ -678,6 +679,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/skills.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/stats.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/chat-render.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/chat-files.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/chat-descriptions.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/host-mentions.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/collaboration.js" defer></script>

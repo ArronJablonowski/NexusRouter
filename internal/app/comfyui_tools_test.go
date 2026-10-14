@@ -1,12 +1,15 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/ArronJablonowski/NexusRouter/approvals"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/tools"
+	"image"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -100,7 +103,18 @@ func TestComfyCloudCoordinatorCannotReceiveConnector(t *testing.T) {
 
 func TestComfyBrowserChatShowsExactProposalAndWaits(t *testing.T) {
 	var remoteCalls, modelCalls atomic.Int32
+	var picture bytes.Buffer
+	png.Encode(&picture, image.NewRGBA(image.Rect(0, 0, 16, 16)))
 	comfy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/history/job-1" {
+			w.Write([]byte(`{"job-1":{"status":{"completed":true,"status_str":"success"},"outputs":{"2":{"images":[{"filename":"chat-image.png","type":"output","subfolder":""}]}}}}`))
+			return
+		}
+		if r.URL.Path == "/view" {
+			w.Header().Set("Content-Type", "image/png")
+			w.Write(picture.Bytes())
+			return
+		}
 		remoteCalls.Add(1)
 		w.Write([]byte(`{"prompt_id":"job-1","number":0}`))
 	}))
@@ -162,4 +176,13 @@ func TestComfyBrowserChatShowsExactProposalAndWaits(t *testing.T) {
 	if e = <-done; e != nil || remoteCalls.Load() != 1 {
 		t.Fatal("browser-approved job failed", e, remoteCalls.Load())
 	}
+	pageFiles, err := svc.ChatFiles(ctx, prompt.Request.TaskID)
+	if err != nil || len(pageFiles.Files) != 1 {
+		t.Fatal("approved chat image not attached", pageFiles, err)
+	}
+	_, download, err := svc.ChatFile(ctx, prompt.Request.TaskID, pageFiles.Files[0].ID)
+	if err != nil || !bytes.Equal(download, picture.Bytes()) || remoteCalls.Load() != 1 {
+		t.Fatal("chat image snapshot or dispatch replay", err, remoteCalls.Load())
+	}
+
 }

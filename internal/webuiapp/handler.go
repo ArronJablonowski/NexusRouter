@@ -139,6 +139,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		h.writeError(writer, request, http.StatusNotFound, "not_found")
 		return
 	}
+	if h.serveChatFiles(writer, request) {
+		return
+	}
 	if h.serveComfy(writer, request) {
 		return
 	}
