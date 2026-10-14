@@ -472,11 +472,16 @@ func (b *BrowserMutations) DecideApproval(ctx context.Context, subject string, r
 			decided = decision.Time
 		}
 	}
-	resultSummary, err := b.approvalSummary(ctx, result)
-	if err != nil || decided.IsZero() {
+	// Execution may already have consumed the approval and cleared the pending
+	// tool. Acknowledgement depends only on the durable decision, not a preview.
+	if result.Validate() != nil || decided.IsZero() {
 		return contract.ApprovalDecisionReceipt{}, ErrBrowserMutation
 	}
-	receipt := contract.ApprovalDecisionReceipt{Version: 1, OperationID: record.OperationID, TaskID: request.TaskID, ApprovalID: request.ApprovalID, State: resultSummary.State, Revision: resultSummary.Revision, DecidedAt: decided}
+	revision := int64(len(result.Decisions) + 1)
+	if result.State == approvals.Consumed {
+		revision++
+	}
+	receipt := contract.ApprovalDecisionReceipt{Version: 1, OperationID: record.OperationID, TaskID: request.TaskID, ApprovalID: request.ApprovalID, State: result.State, Revision: revision, DecidedAt: decided}
 	if receipt.Validate() != nil {
 		return contract.ApprovalDecisionReceipt{}, ErrBrowserMutation
 	}
