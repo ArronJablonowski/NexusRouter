@@ -36,7 +36,6 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/skills"
-	"github.com/ArronJablonowski/NexusRouter/tools"
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"github.com/ArronJablonowski/NexusRouter/workers"
 )
@@ -83,13 +82,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	var service *app.Service
-	if s.ComfyUI.Enabled && s.WebUI.Enabled {
-		service, err = app.NewServiceWithToolControls(s, os.Getenv, nil, nil, nil, nil, nil, nil, func(ctx context.Context, p tools.ApprovalPrompt) error {
-			if p.Request.ToolName != "comfy_submit" && p.Request.ToolName != "comfy_cancel_pending" {
-				return tools.ErrDenied
-			}
-			return nil
-		})
+	if (s.ComfyUI.Enabled || s.Tools.CreateEnabled) && s.WebUI.Enabled {
+		service, err = app.NewServiceWithToolControls(s, os.Getenv, nil, nil, nil, nil, nil, nil, browserToolPresenter(s))
 	} else {
 		service, err = app.NewService(s, os.Getenv)
 	}
