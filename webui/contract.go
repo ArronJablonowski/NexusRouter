@@ -135,6 +135,7 @@ const (
 )
 
 type FeedbackRequest struct {
+	Rating           int            `json:"rating,omitempty"`
 	Version          int            `json:"version"`
 	IdempotencyKey   string         `json:"idempotency_key"`
 	TaskID           string         `json:"task_id"`
@@ -146,14 +147,14 @@ type FeedbackRequest struct {
 }
 
 func (r FeedbackRequest) Validate() error {
-	if r.Version != ContractVersion || !validKey(r.IdempotencyKey) || !validID(r.TaskID) ||
+	if r.Rating < 0 || r.Rating > 10 || (r.Rating > 0 && (r.AttemptCost != nil || r.Accepted != (r.Rating >= 6))) || r.Version != ContractVersion || !validKey(r.IdempotencyKey) || !validID(r.TaskID) ||
 		!optionalID(r.FeedbackID) || (r.AttemptCost != nil && (math.IsNaN(*r.AttemptCost) || math.IsInf(*r.AttemptCost, 0) || *r.AttemptCost < 0)) ||
 		!optionalRevision(r.ExpectedRevision) {
 		return ErrContract
 	}
 	switch r.Action {
 	case FeedbackRecord:
-		if r.FeedbackID != "" || r.ExpectedRevision != nil || r.AttemptCost == nil {
+		if r.FeedbackID != "" || r.ExpectedRevision != nil || (r.AttemptCost == nil && r.Rating == 0) {
 			return ErrContract
 		}
 	case FeedbackRevise:
@@ -942,5 +943,29 @@ func encodedWithin(value any, max int) error {
 	if err != nil || len(body) > max {
 		return ErrContract
 	}
+	return nil
+}
+
+// A present rating must be a score, not an omitted legacy field. In particular,
+// null/zero cannot silently turn a rated request into legacy cost feedback.
+func (r *FeedbackRequest) UnmarshalJSON(raw []byte) error {
+	type wire FeedbackRequest
+	var value wire
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&value); err != nil {
+		return err
+	}
+	if d.Decode(new(any)) != io.EOF {
+		return ErrContract
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return ErrContract
+	}
+	if _, present := fields["rating"]; present && (value.Rating < 1 || value.Rating > 10) {
+		return ErrContract
+	}
+	*r = FeedbackRequest(value)
 	return nil
 }

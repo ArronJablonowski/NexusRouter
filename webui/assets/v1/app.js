@@ -481,26 +481,22 @@
 			(body.feedback_id !== undefined && typeof body.feedback_id !== "string") || (body.feedback_id && !presentationID.test(body.feedback_id)) ||
 			(body.denial_code !== undefined && (typeof body.denial_code !== "string" || body.denial_code && !presentationID.test(body.denial_code))) ||
 			body.feedback_allowed === Boolean(body.denial_code)) return null;
+		if ((body.rating !== undefined && (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 10)) || (body.cost_summary !== undefined && (typeof body.cost_summary !== "string" || body.cost_summary.length > 256))) return null;
 		if (body.objective.some(item => !validEvidence(item, "objective"))) return null;
 		if (body.subjective !== undefined && !validEvidence(body.subjective, "subjective")) return null;
 		if (body.advisory !== undefined && !validEvidence(body.advisory, "advisory")) return null;
 		if (Boolean(body.feedback_id) !== Boolean(body.subjective)) return null;
 		return Object.freeze({taskID, revision: body.revision, objective: body.objective.slice(), subjective: body.subjective || null,
-			advisory: body.advisory || null, feedbackID: body.feedback_id || "", feedbackAllowed: body.feedback_allowed});
+			rating: body.rating || 0, costSummary: body.cost_summary || "", advisory: body.advisory || null, feedbackID: body.feedback_id || "", feedbackAllowed: body.feedback_allowed});
 	}
 	function renderFeedbackContext(context) {
 		feedbackSummary.replaceChildren();
-		const groups = [["Objective", context.objective], ["Subjective", context.subjective ? [context.subjective] : []], ["Advisory", context.advisory ? [context.advisory] : []]];
-		for (const [label, items] of groups) {
-			const row = element("p", "help", label + ": " + (items.length ? items.map(item => stateLabel(item.outcome) + " (" + item.source.replaceAll("_", " ") + ", " + String(item.reference_count) + " reference" + (item.reference_count === 1 ? "" : "s") + ")").join(", ") : "none recorded"));
-			feedbackSummary.append(row);
-		}
-		const revise = Boolean(context.feedbackID);
-		attemptCostLabel.hidden = revise;
-		attemptCost.hidden = revise;
-		attemptCostHelp.hidden = revise;
-		feedbackAccepted.textContent = revise ? "Revise as accepted" : "Record accepted";
-		feedbackRejected.textContent = revise ? "Revise as rejected" : "Record rejected";
+        if (context.rating) feedbackSummary.append(element("p", "help", "Your rating: " + context.rating + "/10"));
+        feedbackSummary.append(element("p", "help", context.costSummary || "Model cost is calculated automatically when accounting is available."));
+        attemptCostLabel.hidden = false; attemptCost.hidden = false; attemptCostHelp.hidden = false;
+        if (context.rating && document.activeElement !== attemptCost) attemptCost.value = String(context.rating);
+        feedbackAccepted.textContent = context.feedbackID ? "Update rating" : "Save rating";
+        feedbackRejected.hidden = true;
 	}
 	function loadTaskContext(taskID) {
 		window.NexusInspector.loadTask(taskID);
@@ -901,20 +897,20 @@
 		const controls = selectedControls;
 		const context = feedbackContext;
 		const revise = Boolean(context && context.feedbackID);
-		const cost = Number(attemptCost.value);
-		if (!controls || !controls.canFeedback || !context || !context.feedbackAllowed || (!revise && (attemptCost.value.trim() === "" || !Number.isFinite(cost) || cost < 0))) {
-			showMutation("Enter the observed final-attempt cost before recording evidence.", false);
+		const rating = Number(attemptCost.value);
+		if (!controls || !controls.canFeedback || !context || !context.feedbackAllowed || (attemptCost.value.trim() === "" || !Number.isInteger(rating) || rating < 1 || rating > 10)) {
+			showMutation("Choose a whole-number rating from 1 to 10.", false);
 			return;
 		}
-		const payload = {version: 1, action: revise ? "revise" : "record", task_id: controls.taskID, accepted};
+		const payload = {version: 1, action: revise ? "revise" : "record", task_id: controls.taskID, accepted: rating >= 6, rating};
 		if (revise) {
 			payload.feedback_id = context.feedbackID;
 			payload.expected_revision = context.revision;
 		} else {
-			payload.attempt_cost = cost;
+            // Cost is derived by the server, never supplied by the browser.
 		}
 		mutate(revise ? "/api/v1/feedback/revisions" : "/api/v1/feedback", payload, () => {
-			showMutation("Subjective outcome evidence recorded.", false);
+			showMutation("Quality rating saved for model selection.", false);
 			loadHistory(selectedChat, "", true, false);
 		});
 	}

@@ -15,7 +15,7 @@ func TestProjectToolAccessAtomicUpdate(t *testing.T) {
 	if err != nil || before.Enabled || before.DelegateReadTools || before.ReadRoot != Defaults().Tools.ReadRoot || before.SpecialistsAllowCloud || len(digest) != 64 {
 		t.Fatal(before, digest, err)
 	}
-	next := ToolAccess{CollaborationEnabled: true, Enabled: true, DelegateReadTools: true, ReadRoot: root, SpecialistsAllowCloud: true}
+	next := ToolAccess{AutoApprove: true, CollaborationEnabled: true, Enabled: true, DelegateReadTools: true, ReadRoot: root, SpecialistsAllowCloud: true}
 	saved, nextDigest, err := UpdateProjectToolAccess(path, digest, next)
 	if err != nil || saved != next || nextDigest == digest {
 		t.Fatal(saved, nextDigest, err)

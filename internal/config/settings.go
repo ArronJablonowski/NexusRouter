@@ -242,6 +242,7 @@ type Telemetry struct {
 	TraceExport           *TraceExport          `yaml:"trace_export,omitempty" json:"trace_export,omitempty"`
 }
 type Tools struct {
+	AutoApprove           bool   `yaml:"auto_approve" json:"auto_approve,omitempty"`
 	CollaborationEnabled  bool   `yaml:"collaboration_enabled" json:"collaboration_enabled,omitempty"`
 	CreateEnabled         bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
 	CreateRoot            string `yaml:"create_root" json:"create_root,omitempty"`

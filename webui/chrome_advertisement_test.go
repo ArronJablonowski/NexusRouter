@@ -67,7 +67,7 @@ func TestChromeAdvertisementSettings(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if writes != 1 || saved.MacMemoryPercent != 95 || saved.MacSwapGrowthGB != 3.5 || saved.DNSLogging != "full" || saved.RemoteAdvertisement != (remoteconfig.Advertisement{Enabled: true, Interface: "en1", Name: "node-a", SSHPort: 2222}) {
+	if writes != 1 || !saved.AutoApprove || active.AutoApprove || saved.MacMemoryPercent != 95 || saved.MacSwapGrowthGB != 3.5 || saved.DNSLogging != "full" || saved.RemoteAdvertisement != (remoteconfig.Advertisement{Enabled: true, Interface: "en1", Name: "node-a", SSHPort: 2222}) {
 		t.Fatal(writes, saved)
 	}
 }
@@ -75,10 +75,11 @@ func TestChromeAdvertisementSettings(t *testing.T) {
 const chromeAdvertisementSteps = `
 await cdp('Page.navigate',{url:origin+'/app/settings'});
 await eventually('document.readyState==="complete" && document.querySelector("#settings-status").textContent.includes("Saved settings") && !document.querySelector("#save-settings").disabled','settings unavailable');
+if(await evaluate('document.querySelector("#auto-approve-tools").checked'))throw Error('auto approval enabled by default');
 if(await evaluate('document.querySelector("#remote-advertise-enabled").checked'))throw Error('enabled by default');
 await evaluate('window.fixtureErrors=[];window.addEventListener("error",e=>fixtureErrors.push(e.message));document.querySelector("#remote-advertise-enabled").checked=true;document.querySelector("#tool-settings-form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
 await new Promise(r=>setTimeout(r,100));if(await evaluate('document.querySelector("#settings-validation").hidden'))throw Error(JSON.stringify(await evaluate('({errors:window.fixtureErrors,status:document.querySelector("#settings-status").textContent})')));
-await evaluate('document.querySelector("#mac-memory").value="95";document.querySelector("#mac-swap").value="3.5";document.querySelector("#dns-logging").value="full";document.querySelector("#remote-advertise-interface").value="en1";document.querySelector("#remote-advertise-name").value="node-a";document.querySelector("#remote-advertise-ssh-port").value="2222";document.querySelector("#tool-settings-form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
+await evaluate('document.querySelector("#auto-approve-tools").checked=true;document.querySelector("#mac-memory").value="95";document.querySelector("#mac-swap").value="3.5";document.querySelector("#dns-logging").value="full";document.querySelector("#remote-advertise-interface").value="en1";document.querySelector("#remote-advertise-name").value="node-a";document.querySelector("#remote-advertise-ssh-port").value="2222";document.querySelector("#tool-settings-form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
 await eventually('!document.querySelector("#settings-restart-badge").hidden && !document.querySelector("#save-settings").disabled','saved restart state absent');
 await evaluate('document.querySelector("#remote-advertise-name").value="changed";document.querySelector("#reset-settings").click()');
 if(await evaluate('document.querySelector("#remote-advertise-name").value!=="node-a"'))throw Error('reset failed');
@@ -86,6 +87,7 @@ await cdp('Page.reload');
 await eventually('!document.querySelector("#save-settings").disabled && document.querySelector("#remote-advertise-name").value==="node-a"','saved settings not restored');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
 if(await evaluate('document.documentElement.scrollWidth>document.documentElement.clientWidth'))throw Error('narrow settings overflow');
+if(!await evaluate('document.querySelector("#auto-approve-tools").checked'))throw Error('saved auto approval toggle lost');
 if(await evaluate('document.querySelector("#dns-logging").value!=="full"'))throw Error('DNS mode lost on reload');
 if(await evaluate('!document.querySelector("#dns-logging-status").textContent.includes("off")'))throw Error('saved mode falsely reported active');
 if(await evaluate('document.querySelector("#mac-memory").value!=="95" || document.querySelector("#mac-swap").value!=="3.5"'))throw Error('Mac limits lost on reload');

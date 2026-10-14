@@ -599,6 +599,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		if observationErr != nil {
 			return Result{}, errors.New("cannot read routing observations")
 		}
+
 		observationKeys[key] = key
 		if len(observations.Fitness) == 0 && len(observations.Advisory) == 0 {
 			if domain, profile, ok := cfg.Routing.EvidenceSource(key.Domain, key.Profile); ok {
@@ -610,6 +611,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 				}
 				observationKeys[key] = source
 			}
+		}
+		if kind := creativeKind(r.Prompt); kind != "general" {
+			ratings, ratingErr := db.CreativeOpinions(ctx, key, kind)
+			if ratingErr != nil {
+				return Result{}, errors.New("cannot read creative ratings")
+			}
+			observations.Advisory = append(observations.Advisory, ratings...)
 		}
 		observationSets[key] = observations
 		validity, verr := db.OutputValidity(ctx, key, r.Validation)

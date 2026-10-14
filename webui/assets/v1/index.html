@@ -106,15 +106,15 @@
             </div>
           </section>
           <section id="feedback-panel" class="feedback-panel" aria-labelledby="feedback-title" hidden>
-            <h3 id="feedback-title">Outcome evidence</h3>
-            <p class="help">Your assessment is subjective evidence about the final attempt. It does not approve a tool or prove that every step was correct.</p>
+            <h3 id="feedback-title">Rate the result</h3>
+            <p class="help">How well was this content generated? Your rating helps choose models for similar creative work. It does not approve tool calls.</p>
             <div id="feedback-summary" class="evidence-summary"></div>
-            <label id="attempt-cost-label" for="attempt-cost">Observed final-attempt cost</label>
-            <input id="attempt-cost" type="number" min="0" step="any" inputmode="decimal" aria-describedby="attempt-cost-help">
-            <p id="attempt-cost-help" class="help">Enter a nonnegative observed cost. Zero is valid; leave it blank when the cost is unknown.</p>
-            <div class="button-row" role="group" aria-label="Record outcome evidence">
-              <button id="feedback-accepted" class="secondary" type="button">Record accepted</button>
-              <button id="feedback-rejected" class="secondary" type="button">Record rejected</button>
+            <label id="attempt-cost-label" for="attempt-cost">Quality rating (1–10)</label>
+            <input id="attempt-cost" type="number" min="1" max="10" step="1" inputmode="decimal" aria-describedby="attempt-cost-help">
+            <p id="attempt-cost-help" class="help">1 = very poor · 10 = excellent. NexusRouter calculates available model costs automatically; no cost input is needed.</p>
+            <div class="button-row" role="group" aria-label="Save content quality rating">
+              <button id="feedback-accepted" class="secondary" type="button">Save rating</button>
+              <button id="feedback-rejected" class="secondary" type="button" hidden>Record rejected</button>
             </div>
           </section>
           </div>
@@ -280,6 +280,10 @@
             <label class="setting-toggle" for="tools-enabled">
               <span><strong>Allow model tool use</strong><small>On by default, with read-only workspace access scoped to the launch directory unless you configure another root. Benchmark hosts may attach their own separately scoped tools.</small></span>
               <span class="switch"><input id="tools-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
+            </label>
+            <label class="setting-toggle" for="auto-approve-tools">
+              <span><strong>Auto-approve all tool calls</strong><small>Off by default. When on, permitted tools can act without asking you, including creating files and submitting jobs. Existing access limits and disabled tools stay unchanged. Decisions are logged. Save and restart this service to apply; turning this off does not undo completed calls.</small></span>
+              <span class="switch"><input id="auto-approve-tools" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
             </label>
             <label class="setting-toggle" for="delegate-read-tools">
               <span><strong>Delegated read access</strong><small>Let the configured local worker inherit read-only access within the approved root.</small></span>

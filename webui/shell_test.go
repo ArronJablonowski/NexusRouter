@@ -136,14 +136,15 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 }
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
-	// Reviewed v1 assets: viewport-pinned composer and separate conversation scroll,
+	// Reviewed v1 assets: explicit one-click approvals, opt-in automatic approval
+	// setting, graded quality ratings without manual cost, viewport-pinned composer,
 	// chat-scoped output cards, raster previews/downloads,
 	// compact responsive layout, stable refresh and same-origin private reads.
 	// Additive ComfyUI page, scoped saved-job controls,
 	// same-origin image retrieval, CSRF requests and no automatic submission replay.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "6db2d6897519025eba657f9b0e97159999bdf68937b4bcc1dd6fdaa1b72da469" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "e4765f0174ce987e5b2b7f699c1c8819dc7b106ccbb6d86056400cdfd8600a70" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/comfy.js", "assets/v1/status.js", "assets/v1/cron.js", "assets/v1/remote-models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/chat-render.js", "assets/v1/chat-files.js", "assets/v1/chat-descriptions.js", "assets/v1/host-mentions.js", "assets/v1/collaboration.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -845,8 +846,8 @@ func TestEmbeddedChatMutationsAreExplicitFencedAndAccessible(t *testing.T) {
 		"if (pendingIntent || unresolvedOperations.length > 0 || !operationsReady || !csrfToken) return", `"X-Darwin-CSRF"`, `credentials: "same-origin"`, `cache: "no-store"`,
 		"Outcome unknown. Check current status before taking another action.", "reconcile.hidden = !canReconcile", "response.status >= 500", "pendingIntent.key !== intent.key",
 		`action: "submit"`, `action: "resume"`, `action: "steer"`, `action: "cancel"`, `action: "cancel_submission"`,
-		`expected_revision: controls.revision`, `action: revise ? "revise" : "record"`, "payload.attempt_cost = cost",
-		`attemptCost.value.trim() === "" || !Number.isFinite(cost) || cost < 0`,
+		`expected_revision: controls.revision`, `action: revise ? "revise" : "record"`, "accepted: rating >= 6, rating",
+		`attemptCost.value.trim() === "" || !Number.isInteger(rating) || rating < 1 || rating > 10`,
 		`/controls`, `/feedback`, `/approvals?limit=`, "const maxApprovals = 25", "const maxApprovalPrompt = 16 << 10",
 		`approvalDialogScope.textContent = "Scope: " + item.scopeSummary`, `approvalDialogPrompt.textContent = item.proposalText ? item.prompt`, `"\n\nExact proposal:\n" + item.proposalText`, `item.canDeny ? approvalDeny : approvalClose`, `event.key === "Escape"`,
 		`event.key !== "Tab"`, `event.isComposing`, `!event.shiftKey`, "composer.requestSubmit()", `aria-busy`,
@@ -891,7 +892,7 @@ func TestEmbeddedMutationReconciliationIsReadOnlyBoundedAndContractShaped(t *tes
 		`acknowledgeUnresolved.addEventListener("click", acknowledgeOutcome)`, `approvalAcknowledge.addEventListener("click", acknowledgeOutcome)`,
 		`if (approvalResolved && activeApproval)`, "closeApproval();", "loadApprovals();", "The operation was rejected. No request was replayed.",
 		`body.current_revision`, `body.retryable`, `body.operation_id`, `body.requested ? "Cancellation requested; submission is still "`,
-		`Number.isSafeInteger(item.reference_count)`, `String(item.reference_count)`, `textBytes(item.scope_summary) > maxApprovalScope`,
+		`Number.isSafeInteger(item.reference_count)`, `"Your rating: " + context.rating + "/10"`, `textBytes(item.scope_summary) > maxApprovalScope`,
 		`validApprovalProposal(item.proposal, item.tool_name)`, `Object.hasOwn(item, "proposal")`, `const maxApprovalScope = 4096, maxApprovalProposal = 128 << 10`,
 		`event.key === "Escape" && !pendingIntent && unresolvedOperations.length === 0 && operationsReady`,
 	} {
@@ -918,7 +919,7 @@ func TestEmbeddedMutationReconciliationIsReadOnlyBoundedAndContractShaped(t *tes
 		t.Fatal(err)
 	}
 	markup := string(index)
-	if !strings.Contains(markup, "Zero is valid; leave it blank when the cost is unknown.") {
+	if !strings.Contains(markup, "NexusRouter calculates available model costs automatically; no cost input is needed.") {
 		t.Fatal("feedback cost guidance does not distinguish zero from unknown")
 	}
 	scope := strings.Index(markup, `id="approval-dialog-scope"`)

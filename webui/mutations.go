@@ -279,6 +279,8 @@ func (s EvidenceSummary) Validate() error {
 }
 
 type FeedbackContext struct {
+	Rating          int               `json:"rating,omitempty"`
+	CostSummary     string            `json:"cost_summary,omitempty"`
 	Version         int               `json:"version"`
 	TaskID          string            `json:"task_id"`
 	Revision        int64             `json:"revision"`
@@ -291,7 +293,7 @@ type FeedbackContext struct {
 }
 
 func (c FeedbackContext) Validate() error {
-	if c.Version != ContractVersion || !validID(c.TaskID) || c.Revision < 1 || c.Objective == nil ||
+	if c.Rating < 0 || c.Rating > 10 || len(c.CostSummary) > 256 || c.Version != ContractVersion || !validID(c.TaskID) || c.Revision < 1 || c.Objective == nil ||
 		len(c.Objective) > MaxEvidenceSummaries || !optionalID(c.FeedbackID) || !optionalID(c.DenialCode) ||
 		(c.FeedbackID != "") != (c.Subjective != nil) || c.FeedbackAllowed == (c.DenialCode != "") {
 		return ErrContract

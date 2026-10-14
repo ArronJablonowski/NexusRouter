@@ -34,7 +34,7 @@ window.NexusChatRender = (() => {
    row = element("li", "message approval-message"); row.dataset.approvalId = item.id;
    row.append(element("span", "message-label", "Tool approval"), element("p", "approval-request"), element("p", "approval-scope"), element("pre", "approval-proposal"), element("p", "approval-result"));
    const actions = element("div", "control-actions");
-   for (const [action, label] of [["allow", "Allow once"], ["deny", "Deny"], ["revoke", "Revoke approval"]]) {
+   for (const [action, label] of [["allow", "Approve once"], ["deny", "Deny"], ["revoke", "Revoke approval"]]) {
     const button = element("button", action === "allow" ? "" : "secondary", label);
     button.type = "button"; button.dataset.approvalAction = action;
     button.addEventListener("click", () => decideApproval(action, row.approvalItem)); actions.append(button);
@@ -48,7 +48,7 @@ window.NexusChatRender = (() => {
   set(".approval-request", item.toolName + " · " + item.prompt);
   set(".approval-scope", "Scope: " + item.scopeSummary + " · " + stateLabel(item.behavior));
   set(".approval-proposal", item.proposalText); row.querySelector(".approval-proposal").hidden=!item.proposalText;
-  set(".approval-result", stateLabel(item.state) + (["approved","denied","revoked","consumed"].includes(item.state) ? " · Decision recorded in the approval log." : ""));
+  set(".approval-result", (item.state==="consumed"?"Approval used · This call was already approved; it cannot be approved again.":item.state==="pending"?"Waiting for your approval":stateLabel(item.state)) + (["approved","denied","revoked","consumed"].includes(item.state) ? " · Decision recorded in the approval log." : ""));
   for(const [action, permitted] of [["allow",item.canAllow],["deny",item.canDeny],["revoke",item.canRevoke]]) row.querySelector('[data-approval-action="'+action+'"]').hidden=!permitted;
   return row;
  }
