@@ -86,3 +86,15 @@ func creativeCostSummary(r telemetry.BrowserFeedback) string {
 	}
 	return fmt.Sprintf("Recorded task model cost estimate: $%.6f USD. Not an invoice; excludes electricity and unmetered external tools.", r.AttemptCost)
 }
+
+func creativeRequestKind(r Request) string {
+	if r.Prompt != "" {
+		return creativeKind(r.Prompt)
+	}
+	for i := len(r.Messages) - 1; i >= 0; i-- {
+		if r.Messages[i].Role == "user" {
+			return creativeKind(r.Messages[i].Content)
+		}
+	}
+	return "general"
+}

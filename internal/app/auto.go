@@ -612,10 +612,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 				observationKeys[key] = source
 			}
 		}
-		if kind := creativeKind(r.Prompt); kind != "general" {
+		if kind := creativeRequestKind(r); kind != "general" {
 			ratings, ratingErr := db.CreativeOpinions(ctx, key, kind)
 			if ratingErr != nil {
 				return Result{}, errors.New("cannot read creative ratings")
+			}
+			for i := range ratings {
+				ratings[i].Key = observationKeys[key]
 			}
 			observations.Advisory = append(observations.Advisory, ratings...)
 		}
@@ -667,6 +670,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		set, e := db.ObservationSet(ctx, key, cfg.Evaluation.Judge)
 		if e != nil {
 			return Result{}, ErrAdmission
+		}
+		if kind := creativeRequestKind(r); kind != "general" {
+			ratings, ratingErr := db.CreativeOpinions(ctx, key, kind)
+			if ratingErr != nil {
+				return Result{}, ErrAdmission
+			}
+			set.Advisory = append(set.Advisory, ratings...)
 		}
 		set.Fitness = append(set.Fitness, remote.Observations.Fitness...)
 		set.Advisory = append(set.Advisory, remote.Observations.Advisory...)

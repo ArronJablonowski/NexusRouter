@@ -6,6 +6,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 	contract "github.com/ArronJablonowski/NexusRouter/webui"
 	"testing"
 )
@@ -122,4 +123,50 @@ func TestCreativeRatingsGuideAutomaticChoiceByCategory(t *testing.T) {
 	if out.Text != "z" {
 		t.Fatal("ratings did not improve matching automatic choice", out.Text)
 	}
+}
+
+func TestCreativeRatingsIncludePairedCandidates(t *testing.T) {
+	svc, cfg := autoFixture(t)
+	svc.ConfigureFederatedRouting(strongerFederation())
+	ctx := context.Background()
+	out, err := svc.Run(ctx, Request{ModelID: "auto", Messages: []providers.Message{{Role: "user", Content: "Write a poem"}}, Domain: "creative"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ops, err := browserops.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ops.Close()
+	bridge, err := NewBrowserMutations(svc, ops)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = bridge.Feedback(ctx, browserMutationTestSubject, contract.FeedbackRequest{Version: 1, IdempotencyKey: "paired-creative-rating", TaskID: out.TaskID, Action: contract.FeedbackRecord, Rating: 9, Accepted: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := svc.Run(ctx, Request{ModelID: "auto", Messages: []providers.Message{{Role: "user", Content: "Write another poem"}}, Domain: "creative"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	events, err := db.Read(ctx, next.TaskID, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range events {
+		if event.Kind == runtime.RouteSelected && event.Data.Route != nil {
+			for _, candidate := range event.Data.Route.Ranked {
+				if candidate.Provider == "paired-coder" && candidate.AdvisorySamples == 1 {
+					return
+				}
+			}
+		}
+	}
+	t.Fatal("paired model rating missing from route evidence")
 }
