@@ -45,3 +45,31 @@ func TestCollaborationInspectionAuthorityAndQuery(t *testing.T) {
 		t.Fatal("mutation accepted", r.Code)
 	}
 }
+
+func TestCollaborationFilteredShellSurvivesNavigationAndRejectsExtraAuthority(t *testing.T) {
+	h := mutationHandlerFixture(t, MutationServices{})
+	cookie, _ := authenticateBrowser(t, h)
+	for _, path := range []string{"/app/collaboration?topic=live-collaboration", "/app/collaboration?topic="} {
+		for _, method := range []string{"GET", "HEAD"} {
+			r := browserGET(path, cookie)
+			r.Method = method
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != 200 {
+				t.Fatal(path, method, w.Code)
+			}
+		}
+	}
+	for _, path := range []string{"/app/collaboration?topic=a&topic=b", "/app/collaboration?unknown=x", "/app/collaboration?topic=%00", "/app/collaboration?topic=%zz", "/app/comfy?topic=a"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, browserGET(path, cookie))
+		if w.Code != 400 {
+			t.Fatal(path, w.Code)
+		}
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, browserGET("/app/collaboration?topic=private", nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Fatal("filtered navigation bypassed session", w.Code)
+	}
+}
