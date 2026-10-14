@@ -27,5 +27,6 @@ window.NexusChatFiles=(()=>{
  function select(value){generation++;chat=id(value)?value:'';if(stop)stop();list.replaceChildren();panel.hidden=true;status.hidden=true;
   if(chat)stop=window.NexusLive.watch('chat-files',load,{interval:5000,immediate:true,ready:()=>!busy});
  }
- return{select,refresh:load};
+ function preview(value,maximum){if(!value||value.version!==1||value.kind!=='file_create'||Object.keys(value).length!==3||!value.arguments||typeof value.arguments!=='object'||Array.isArray(value.arguments)||Object.keys(value.arguments).length!==2||typeof value.arguments.path!=='string'||typeof value.arguments.content!=='string')return '';const text=JSON.stringify(value.arguments,null,2);return new TextEncoder().encode(text).length<=maximum?text:'';}
+ return{select,refresh:load,preview};
 })();

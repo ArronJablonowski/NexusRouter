@@ -610,6 +610,7 @@
     },
     "approval_proposal": {
       "oneOf": [
+{"type": "object", "additionalProperties": false, "required": ["version", "kind", "arguments"], "properties": {"version": {"const": 1}, "kind": {"const": "file_create"}, "arguments": {"type": "object", "additionalProperties": false, "required": ["path", "content"], "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 4096, "allOf": [{"not": {"pattern": "^/|/$|//|(^|/)\\.\\.?(/|$)"}}, {"not": {"pattern": "[\\\\\u0000-\u001f\u007f]"}}]}, "content": {"type": "string", "maxLength": 65536, "x-maxBytes": 65536}}}}, "x-maxBytes": 131072},
         {
           "$ref": "#/$defs/workboard_approval_proposal"
         },
@@ -723,12 +724,13 @@
         "proposal": {"$ref": "#/$defs/approval_proposal"}
       },
       "allOf": [
+ {"if":{"properties":{"tool_name":{"const":"create_file"}}},"then":{"properties":{"proposal":{"properties":{"kind":{"const":"file_create"}}}}}},
         {"if": {"properties": {"state": {"const": "pending"}}}, "then": {"properties": {"revision": {"const": 1}, "can_allow": {"const": true}, "can_deny": {"const": true}, "can_revoke": {"const": false}}}},
         {"if": {"properties": {"state": {"const": "approved"}}}, "then": {"properties": {"revision": {"const": 2}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": true}}}},
         {"if": {"properties": {"state": {"const": "denied"}}}, "then": {"properties": {"revision": {"const": 2}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
         {"if": {"properties": {"state": {"enum": ["revoked", "consumed"]}}}, "then": {"properties": {"revision": {"const": 3}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
         {"if": {"properties": {"state": {"const": "expired"}}}, "then": {"properties": {"revision": {"enum": [1, 2]}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
-        {"if": {"properties": {"tool_name": {"enum": ["comfy_submit", "comfy_cancel_pending", "workboard_propose_criteria", "workboard_request_candidate_decision"]}, "state": {"enum": ["pending", "approved"]}}, "required": ["tool_name", "state"]}, "then": {"required": ["proposal"]}, "else": {"not": {"required": ["proposal"]}}}
+        {"if": {"properties": {"tool_name": {"enum": ["create_file", "comfy_submit", "comfy_cancel_pending", "workboard_propose_criteria", "workboard_request_candidate_decision"]}, "state": {"enum": ["pending", "approved"]}}, "required": ["tool_name", "state"]}, "then": {"required": ["proposal"]}, "else": {"not": {"required": ["proposal"]}}}
       ]
     },
     "approval_page": {

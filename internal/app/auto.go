@@ -177,7 +177,10 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 			runErr = errors.Join(runErr, r.eventDelivery.Err())
 		}()
 	}
-	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled) && r.RemoteExecution == nil && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
+	// Browser-queued creation waits for a durable decision through the trusted
+	// presenter. A synchronous reviewer cannot approve background work. Other
+	// queued write capabilities retain their existing admission restriction.
+	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled) && r.RemoteExecution == nil && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "" && (s.toolPresenter == nil || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled)) {
 		return Result{}, ErrAdmission
 	}
 	if s.settings.ComfyUI.Enabled && r.RemoteExecution == nil && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "" && s.toolPresenter == nil) {

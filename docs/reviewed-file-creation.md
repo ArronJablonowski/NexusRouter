@@ -107,3 +107,9 @@ still requires the broader tool, recovery and isolation requirements.
 A separate opt-in [reviewed replacement](reviewed-file-replacement.md) tool now
 supports bounded full-content edits of existing files with private recovery
 copies. Enabling creation does not enable replacement.
+
+## Browser chat creation
+
+Queued Web UI chats can create files when the owning service has a trusted interactive approval presenter. Pending/approved `create_file` requests show the exact relative path and complete new content in a bounded `file_create` proposal, bound to the pending durable call and argument digest. Each write still requires an authenticated Allow once decision; a synchronous reviewer alone cannot authorize queued writes. Replacement/workboard queued-write restrictions are unchanged. Saved generated file cards allow downloading the confirmed original content from chat.
+
+The commander's operator-authorized configuration enables creation in `/Users/aj_lab/.NexusRouter/outputs`. Select a configured local tool-capable model (for example `@local/qwen3-5-9b`) in a new chat; default commander selection is unchanged. This creates UTF-8 documents such as Markdown, CSV and HTML, not arbitrary binary office formats or shell execution. Existing files are never overwritten.

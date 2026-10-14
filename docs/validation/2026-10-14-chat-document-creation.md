@@ -1,0 +1,11 @@
+# Enable document creation and real Web UI qualification — 2026-10-14
+
+User authorized general file creation and testing document/image generation and downloads. Enabled `tools.create_enabled` with private0700 output root `/Users/aj_lab/.NexusRouter/outputs`; preserved replacement disablement, existing read root, approval policy, default commander and service/model trust. Raised tool/runtime turn budget from6 to8 for multistep output tasks. Configured existing zero-cost local Qwen3.5 9B for a16K working context /32K ceiling after reading its actual Ollama metadata (262144 advertised context and tools support). Existing conservative RAM reservation and memory admission remain in place. Configuration validation passed. Private configuration/state rollback backup: `/Users/aj_lab/.NexusRouter/bin/backups/20261014T194050Z-enable-chat-files`. No private configuration is committed.
+
+## Missing browser creation path fixed
+
+Inspection found queued file creation was rejected regardless of an interactive presenter, and browser approvals lacked the exact filename/content. Added `file_create` proposal validation/schema/browser rendering, derived only from the dispatched pending call with matching turn, behavior, argument digest and clean content. Missing/inexact/secret-bearing proposals fail closed. Queued creation now requires a trusted presenter and a durable per-call decision; synchronous reviewers still cannot authorize background writes. Existing replacement/workboard queued restrictions were retained.
+
+Tests proved no output before approval; exact content in preview equals the eventual downloaded attachment; mismatched digests are rejected; queued synchronous-reviewer writes are denied. Broader race-enabled app creation/approval/submission/Comfy tests passed73.062s. Full webui race tests passed32.325s and webuiapp6.317s. Vet, source formatting/size checks, native/ARM64 builds and diff checks passed. This is scoped verification, not full make check.
+
+Patch installation and real-model Web UI generation/download qualification are pending. Private test scripts/configuration/receipts/downloads/screenshots stay outside Git in `/Users/aj_lab/.NexusRouter/resources/chat-output-live-2026-10-14`. Linear connection remains unavailable pending reauthentication; user requirements and local PRD were used.

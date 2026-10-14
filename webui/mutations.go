@@ -45,6 +45,9 @@ type ApprovalProposal struct {
 }
 
 func (p ApprovalProposal) Validate() error {
+	if p.Kind == "file_create" {
+		return p.validateFileCreate()
+	}
 	if p.Kind == "comfy_workflow" || p.Kind == "comfy_cancel" {
 		if p.Version != 1 || len(p.Arguments) == 0 || len(p.Arguments) > 64<<10 || RejectDuplicateJSONFields(p.Arguments) != nil {
 			return ErrContract
@@ -376,10 +379,10 @@ func (s ApprovalSummary) Validate() error {
 	default:
 		return ErrContract
 	}
-	proposalTool := s.ToolName == "comfy_submit" || s.ToolName == "comfy_cancel_pending" || s.ToolName == "workboard_propose_criteria" || s.ToolName == "workboard_request_candidate_decision"
+	proposalTool := s.ToolName == "create_file" || s.ToolName == "comfy_submit" || s.ToolName == "comfy_cancel_pending" || s.ToolName == "workboard_propose_criteria" || s.ToolName == "workboard_request_candidate_decision"
 	if proposalTool && (s.State == "pending" || s.State == "approved") {
 		if s.Proposal == nil || s.Proposal.Validate() != nil ||
-			s.ToolName == "comfy_submit" && s.Proposal.Kind != "comfy_workflow" || s.ToolName == "comfy_cancel_pending" && s.Proposal.Kind != "comfy_cancel" || s.ToolName == "workboard_propose_criteria" && s.Proposal.Kind != "criteria_change" ||
+			s.ToolName == "create_file" && s.Proposal.Kind != "file_create" || s.ToolName == "comfy_submit" && s.Proposal.Kind != "comfy_workflow" || s.ToolName == "comfy_cancel_pending" && s.Proposal.Kind != "comfy_cancel" || s.ToolName == "workboard_propose_criteria" && s.Proposal.Kind != "criteria_change" ||
 			s.ToolName == "workboard_request_candidate_decision" && s.Proposal.Kind != "candidate_decision" {
 			return ErrContract
 		}

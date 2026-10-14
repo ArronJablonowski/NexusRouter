@@ -547,9 +547,9 @@
 			item.state === "denied" && item.revision !== 2 || ["revoked", "consumed"].includes(item.state) && item.revision !== 3 ||
 			item.state === "expired" && ![1, 2].includes(item.revision) ||
 			!["pending", "approved"].includes(item.state) && (item.can_allow || item.can_deny || item.can_revoke)) return null;
-		const proposalTool = ["comfy_submit", "comfy_cancel_pending", "workboard_propose_criteria", "workboard_request_candidate_decision"].includes(item.tool_name);
+		const proposalTool = ["create_file", "comfy_submit", "comfy_cancel_pending", "workboard_propose_criteria", "workboard_request_candidate_decision"].includes(item.tool_name);
 		const proposalRequired = proposalTool && ["pending", "approved"].includes(item.state);
-		const proposalText = proposalRequired ? (["comfy_submit","comfy_cancel_pending"].includes(item.tool_name) ? window.NexusComfyApproval.preview(item.proposal,item.tool_name,maxApprovalProposal) : validApprovalProposal(item.proposal, item.tool_name)) : "";
+		const proposalText = proposalRequired ? (item.tool_name==="create_file" ? window.NexusChatFiles.preview(item.proposal,maxApprovalProposal) : ["comfy_submit","comfy_cancel_pending"].includes(item.tool_name) ? window.NexusComfyApproval.preview(item.proposal,item.tool_name,maxApprovalProposal) : validApprovalProposal(item.proposal, item.tool_name)) : "";
 		if (proposalRequired && !proposalText || !proposalRequired && Object.hasOwn(item, "proposal")) return null;
 		return Object.freeze({id: item.id, taskID, revision: item.revision, state: item.state,
 			prompt: item.prompt, scopeSummary: item.scope_summary, toolName: item.tool_name, behavior: boundedText(item.tool_behavior) || "unspecified",
