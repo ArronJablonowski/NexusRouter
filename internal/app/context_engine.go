@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/contextengine"
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -83,7 +84,8 @@ func prepareTaskContext(ctx context.Context, r *Request, secrets []string) ([]pr
 		// before token estimation/admission. The original request stays intact.
 		parts.Current = append([]providers.Message(nil), parts.Current...)
 		last := len(parts.Current) - 1
-		parts.Current[last].Content += "\n\n" + contract.Instructions()
+		text, files := attachments.Decode(parts.Current[last].Content)
+		parts.Current[last].Content = attachments.Encode(text+"\n\n"+contract.Instructions(), files)
 	}
 	if contextengine.CheckMessages(parts.History, parts.Memory, parts.Skills, parts.Current) != nil {
 		return nil, ErrAdmission
