@@ -19,6 +19,11 @@ func TestBrowserUploadsBoundToSubmissionAndChat(t *testing.T) {
 	defer cancel()
 	s, cfg := autoFixture(t)
 	s.settings.WebUI.DefaultModel = "z"
+	for i := range s.settings.Models {
+		if s.settings.Models[i].ID == "a" {
+			s.settings.Models[i].ID = "friendly-a"
+		}
+	}
 	ops, e := browserops.Open(ctx, cfg.Telemetry.Database)
 	if e != nil {
 		t.Fatal(e)
@@ -26,7 +31,7 @@ func TestBrowserUploadsBoundToSubmissionAndChat(t *testing.T) {
 	defer ops.Close()
 	b, _ := NewBrowserMutations(s, ops)
 	files := []attachments.File{{Name: "revenue.csv", Data: []byte("category,value\nrevenue,76241\n")}, {Name: "example.go", Data: []byte("package example\nconst Value = 42\n")}}
-	r := webui.ChatRequest{Version: 1, Action: webui.ChatSubmit, IdempotencyKey: "uploaded-files-example-01", ModelID: "a", Text: "Review these files", Files: files}
+	r := webui.ChatRequest{Version: 1, Action: webui.ChatSubmit, IdempotencyKey: "uploaded-files-example-01", ModelID: "friendly-a", Text: "Review these files", Files: files}
 	receipt, e := b.Chat(ctx, browserMutationTestSubject, r)
 	if e != nil {
 		t.Fatal(e)
@@ -39,7 +44,7 @@ func TestBrowserUploadsBoundToSubmissionAndChat(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	request := Request{ModelID: "a", Prompt: attachments.Encode(r.Text, inputs), DisableFallback: true}
+	request := Request{ModelID: "friendly-a", Prompt: attachments.Encode(r.Text, inputs), DisableFallback: true}
 	dispatcher, e := StartDispatcher(ctx, s)
 	if e != nil {
 		t.Fatal(e)
@@ -79,7 +84,7 @@ func TestBrowserUploadsBoundToSubmissionAndChat(t *testing.T) {
 	}
 	// Follow-up inherits the actual source model, even when the default changes.
 	model, e := b.inheritedChatModel(ctx, webui.ChatRequest{ChatID: task, TaskID: task})
-	if e != nil || model != "a" {
+	if e != nil || model != "friendly-a" {
 		t.Fatal("source model lost", model, e)
 	}
 	snapshot, e := InspectTask(ctx, cfg.Telemetry.Database, task)

@@ -221,5 +221,18 @@ func (b *BrowserMutations) inheritedChatModel(ctx context.Context, r webui.ChatR
 	if e != nil || len(events) != 1 || events[0].SessionID != r.ChatID || events[0].Data.ModelID == "" {
 		return "", ErrAdmission
 	}
-	return events[0].Data.ModelID, nil
+	source := events[0].Data
+	inherited := ""
+	for _, model := range b.service.settings.Models {
+		if model.Model == source.ModelID && model.Provider == source.ProviderID {
+			if inherited != "" {
+				return "", ErrAdmission
+			}
+			inherited = model.ID
+		}
+	}
+	if inherited == "" {
+		return "", ErrAdmission
+	}
+	return inherited, nil
 }
