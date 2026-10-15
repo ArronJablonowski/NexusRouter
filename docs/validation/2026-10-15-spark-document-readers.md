@@ -26,6 +26,25 @@ Actual Spark execution of cross-compiled test executables:
 
 Synthetic fixtures, executables and private logs remain outside Git in the task's local private QA directory and Spark's `reader-qa-2026-10-15` directory. No private runtime document content was read. Aggregate maintenance state showed zero nonterminal submissions, queued/running task heads and unreleased leases. Existing router, Ollama and other services were not stopped or changed.
 
-## Pending qualification and deployment
+## Initial qualification gap (resolved below)
 
 Scanned/mixed PDF OCR, real antiword extraction, page/output limits with installed dependencies and post-install service verification remain pending package installation. The candidate is staged privately; it is **not deployed**. Installation must preserve current configuration/trust/model services, retain private rollback/state backups and recheck an idle boundary before replacing the router. No full-suite, live OCR, Linux DOC or completed-deployment claim is made.
+
+## Completed Linux qualification and deployment
+
+The operator installed the requested system packages. Fixed-path discovery now finds `/usr/bin/tesseract`, `/usr/bin/antiword` and `/usr/bin/pdftoppm`; Tesseract 5.3.4 / Leptonica 1.82.0 reports English and orientation data available. No application workaround or weakened discovery was necessary. The confirmed issue was missing dependencies, not a new parser defect.
+
+The candidate passed all **13/13** synthetic Linux reader cases, then the installed canonical executable passed all **13/13** again:
+
+- Native PDF and 40-page native PDF accepted; 41 pages rejected.
+- Scanned invoice, 10-page scan and mixed searchable/scanned PDF returned the expected undisclosed references and OCR uncertainty labels. Mixed output retained both searchable and recognized text. The installed 10-page scan took 2.505s.
+- 11 OCR pages rejected in 2.506s with no partial output.
+- Genuine binary Word DOC accepted with the expected reference; text renamed DOC and corrupt OLE rejected.
+- Encrypted, blank and truncated PDFs rejected.
+- Every case left its owned temporary directory empty. Every expected failure emitted zero bytes.
+
+At a verified idle boundary (zero nonterminal submissions, active task heads and unreleased leases), stopped only `nexusrouter-remote.service`. Retained its previous executable, configuration, service definition and private state; copied SQLite databases passed `quick_check`. Backup: `/home/arron_spark/.local/share/nexusrouter/deployment-backups/20261015T145131Z-5ca30c0b-readers`. Atomically installed the qualified clean `5ca30c0b` build with the SHA-256 above, retaining the rollback path on failure.
+
+The remote router is active with zero automatic restarts and new PID 3030862. Existing configuration hashes are unchanged; Ollama retained PID 2187152. No model service, trust, credential or automatic-approval setting changed. A paired authenticated `remote info` request initially failed while the router was settling; a subsequent read-only request succeeded with `hostname=spark-9c8a`, `available=true`, targeting/conversation version 1. No task was dispatched or replayed for this verification.
+
+Linux reader execution and deployment are now qualified for this bounded English synthetic corpus. These checks exercised the installed reader subprocess and Linux owned-process cleanup, not a fresh Spark-hosted Web UI upload/LLM session. The commander's full browser upload/download flow is separately verified in the upload QA report. Non-English/handwriting accuracy, universal hostile-document safety and full-suite qualification remain outside the claim. Private result journals and deployment receipts remain outside Git.
