@@ -114,7 +114,10 @@ const chromeUploadSteps = `
 await cdp('Page.navigate',{url:origin+'/app/chats'});
 await eventually('document.querySelector("#send-message")&&!document.querySelector("#send-message").disabled','composer not ready');
 await cdp('DOM.enable');const doc=await cdp('DOM.getDocument');const picker=await cdp('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'#chat-upload-input'});
+await evaluate('document.querySelector("#composer-text").disabled=true');
 await cdp('DOM.setFileInputFiles',{nodeId:picker.nodeId,files:uploadPaths.slice(0,2)});
+await eventually('document.querySelectorAll("#chat-upload-list li").length===2','picker completion lost files while controls refreshed');
+await evaluate('document.querySelector("#composer-text").disabled=false');
 await eventually('document.querySelectorAll("#chat-upload-list li").length===2&&!document.querySelector("#chat-upload-button").disabled','files not read');
 if(await evaluate('!!document.querySelector("#chat-upload-list img, #chat-upload-list script")||window.uploadExecuted'))throw Error('filename executed');
 await evaluate('document.querySelectorAll("#chat-upload-list button")[1].click()');
