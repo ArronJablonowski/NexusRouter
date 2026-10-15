@@ -267,7 +267,7 @@ func (b *BrowserMutations) Steer(ctx context.Context, subject string, request co
 }
 
 func (b *BrowserMutations) Approvals(ctx context.Context, task, after string, limit int) (contract.ApprovalPage, error) {
-	page, err := ListApprovals(ctx, b.service.settings.Telemetry.Database, approvals.ListOptions{TaskID: task, AfterCallID: after, Limit: limit})
+	page, err := b.service.ListApprovals(ctx, approvals.ListOptions{TaskID: task, AfterCallID: after, Limit: limit})
 	if err != nil {
 		return contract.ApprovalPage{}, err
 	}
@@ -385,7 +385,7 @@ func (b *BrowserMutations) DecideApproval(ctx context.Context, subject string, r
 		}
 		return receipt, nil
 	}
-	current, err := InspectApproval(ctx, b.service.settings.Telemetry.Database, request.TaskID, request.ApprovalID)
+	current, err := b.service.InspectApproval(ctx, request.TaskID, request.ApprovalID)
 	if err != nil {
 		return contract.ApprovalDecisionReceipt{}, b.reject(ctx, subject, record, "approval", request.ApprovalID, err)
 	}
@@ -517,7 +517,7 @@ func (b *BrowserMutations) approvalProposal(ctx context.Context, record approval
 	if b == nil || b.service == nil || ctx == nil {
 		return nil, ErrBrowserMutation
 	}
-	snapshot, err := InspectTask(ctx, b.service.settings.Telemetry.Database, record.Request.TaskID)
+	snapshot, err := b.service.approvalTaskSnapshot(ctx, record.Request.TaskID)
 	if err != nil {
 		return nil, ErrBrowserMutation
 	}

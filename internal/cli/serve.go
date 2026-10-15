@@ -509,16 +509,16 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return app.ListSkillGenerations(ctx, s.Telemetry.Database, scope, after, limit)
 		},
 		ApprovalExecution: func(ctx context.Context, task, id string) (approvals.ExecutionStatus, error) {
-			return app.ApprovalExecutionStatus(ctx, s.Telemetry.Database, task, id)
+			return service.ApprovalExecutionStatus(ctx, task, id)
 		},
 		DecideApproval: func(ctx context.Context, command approvals.Command) (approvals.Record, error) {
 			return service.DecideApproval(ctx, command, "api_operator")
 		},
 		Approval: func(ctx context.Context, task, id string) (approvals.Record, error) {
-			return app.InspectApproval(ctx, s.Telemetry.Database, task, id)
+			return service.InspectApproval(ctx, task, id)
 		},
 		Approvals: func(ctx context.Context, opts approvals.ListOptions) (approvals.Page, error) {
-			return app.ListApprovals(ctx, s.Telemetry.Database, opts)
+			return service.ListApprovals(ctx, opts)
 		},
 		Metrics:              service.Metrics,
 		Submit:               service.Submit,

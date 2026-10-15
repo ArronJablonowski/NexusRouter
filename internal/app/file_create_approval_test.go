@@ -25,6 +25,21 @@ func TestBrowserFileCreateExactPreviewBeforeApproval(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	ops, e := browserops.Open(ctx, cfg.Telemetry.Database)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer ops.Close()
+	// Install receipt fault before pinning the active store schema. Toggling
+	// fault data later must not bypass schema-change identity rejection.
+	raw, e := sql.Open("sqlite", cfg.Telemetry.Database)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer raw.Close()
+	if _, e = raw.Exec(`CREATE TABLE receipt_fault(enabled INTEGER); INSERT INTO receipt_fault VALUES(1); CREATE TRIGGER fail_create_receipt BEFORE UPDATE ON browser_operations WHEN NEW.state='committed' AND EXISTS(SELECT 1 FROM receipt_fault WHERE enabled=1) BEGIN SELECT RAISE(ABORT,'injected receipt failure'); END`); e != nil {
+		t.Fatal(e)
+	}
 	dispatcher, e := StartDispatcher(ctx, svc)
 	if e != nil {
 		t.Fatal(e)
@@ -46,11 +61,6 @@ func TestBrowserFileCreateExactPreviewBeforeApproval(t *testing.T) {
 	if _, e = os.Stat(filepath.Join(cfg.Tools.CreateRoot, "chat-report.md")); !os.IsNotExist(e) {
 		t.Fatal("created before approval", e)
 	}
-	ops, e := browserops.Open(ctx, cfg.Telemetry.Database)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer ops.Close()
 	bridge, e := NewBrowserMutations(svc, ops)
 	if e != nil {
 		t.Fatal(e)
@@ -69,14 +79,6 @@ func TestBrowserFileCreateExactPreviewBeforeApproval(t *testing.T) {
 		t.Fatal("digest mismatch accepted")
 	}
 	command := contract.ApprovalRequest{Version: 1, IdempotencyKey: "file-browser-allow", TaskID: prompt.Request.TaskID, ApprovalID: prompt.Request.ID, Action: contract.ApprovalAllow, ExpectedRevision: page.Items[0].Revision}
-	raw, e := sql.Open("sqlite", cfg.Telemetry.Database)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer raw.Close()
-	if _, e = raw.Exec(`CREATE TRIGGER fail_create_receipt BEFORE UPDATE ON browser_operations WHEN NEW.state='committed' BEGIN SELECT RAISE(ABORT,'injected receipt failure'); END`); e != nil {
-		t.Fatal(e)
-	}
 	_, e = bridge.DecideApproval(ctx, browserMutationTestSubject, command)
 	if !errors.Is(e, ErrBrowserMutation) {
 		t.Fatal("receipt failure not surfaced", e)
@@ -86,7 +88,7 @@ func TestBrowserFileCreateExactPreviewBeforeApproval(t *testing.T) {
 	}
 	// The write has finished and there is no pending tool preview. Recover the
 	// same operation from its consumed durable decision, without another write.
-	if _, e = raw.Exec(`DROP TRIGGER fail_create_receipt`); e != nil {
+	if _, e = raw.Exec(`UPDATE receipt_fault SET enabled=0`); e != nil {
 		t.Fatal(e)
 	}
 	receipt, e := bridge.DecideApproval(ctx, browserMutationTestSubject, command)

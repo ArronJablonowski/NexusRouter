@@ -976,7 +976,7 @@
 	if (!comfyRoute && !collaborationRoute && !dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
 	document.querySelector("#chat-view").hidden = false;
 	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
- window.NexusLive.watch('chat-approvals',loadApprovals,{interval:2000,ready:()=>Boolean(selectedChat&&selectedControls&&approvalNeedsRefresh&&!approvalLoading)});
+ window.NexusLive.watch('chat-approvals',loadApprovals,{interval:2000,ready:()=>Boolean(selectedChat&&selectedControls&&(approvalNeedsRefresh||selectedControls.canCancel)&&!approvalLoading)});
  window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage&&!window.NexusChatDescriptions.busy(),busy:value=>{loadingPage=value;if(!value&&reloadChats){reloadChats=false;loadChats("",true);}},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{window.NexusChatDescriptions.order(list);chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
