@@ -25,6 +25,7 @@ import (
 )
 
 type MutationServices struct {
+	RegisterModel   func(context.Context, ModelRegistration) (string, error)
 	ChatPreference  func(context.Context, sessions.ChatPreferenceUpdate) (sessions.ChatPreference, error)
 	ModelUse        func(context.Context, string, string, *bool) (any, error)
 	Chat            func(context.Context, string, contract.ChatRequest) (contract.ChatMutationReceipt, error)
@@ -46,6 +47,9 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 	base := h.basePath + "/api/v1"
 	path := request.URL.Path
 	switch {
+	case path == base+"/model-registration":
+		h.serveModelRegistration(writer, request)
+		return true
 	case strings.HasPrefix(path, base+"/chat-preferences/"):
 		h.readChatPreference(writer, request, strings.TrimPrefix(path, base+"/chat-preferences/"))
 		return true

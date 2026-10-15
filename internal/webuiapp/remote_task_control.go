@@ -22,15 +22,17 @@ type remoteTaskControlRequest struct {
 	ExpectedSubmissionID string `json:"expected_submission_id,omitempty"`
 }
 type remoteTaskControlPage struct {
-	Version         int       `json:"version"`
-	Instance        string    `json:"instance"`
-	RequestID       string    `json:"request_id"`
-	SubmissionID    string    `json:"submission_id"`
-	State           string    `json:"state"`
-	TaskIDs         []string  `json:"task_ids"`
-	CancelRequested bool      `json:"cancel_requested"`
-	ResultText      string    `json:"result_text,omitempty"`
-	ObservedAt      time.Time `json:"observed_at"`
+	Version         int                         `json:"version"`
+	Conversation    []remoteConversationMessage `json:"conversation,omitempty"`
+	Continuation    *remote.Task                `json:"continuation,omitempty"`
+	Instance        string                      `json:"instance"`
+	RequestID       string                      `json:"request_id"`
+	SubmissionID    string                      `json:"submission_id"`
+	State           string                      `json:"state"`
+	TaskIDs         []string                    `json:"task_ids"`
+	CancelRequested bool                        `json:"cancel_requested"`
+	ResultText      string                      `json:"result_text,omitempty"`
+	ObservedAt      time.Time                   `json:"observed_at"`
 }
 
 func remoteControlID(value string, min int) bool {
@@ -105,6 +107,20 @@ func (h *Handler) serveRemoteTaskControl(w http.ResponseWriter, r *http.Request)
 	page := remoteTaskControlPage{Version: 1, Instance: input.Instance, RequestID: input.RequestID, SubmissionID: status.ID, State: status.State, TaskIDs: status.TaskIDs, CancelRequested: status.CancelRequested, ObservedAt: time.Now().UTC()}
 	if status.State == "succeeded" && status.Result != nil {
 		page.ResultText = status.Result.Text
+	}
+
+	if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+		if c, e := d.conversation(ctx, input.Instance, input.RequestID); e == nil {
+			page.Conversation = c.Messages
+			if status.State == "succeeded" && status.Result != nil && !status.CancelRequested && status.Result.Text != "" {
+				page.Conversation = append(page.Conversation, remoteConversationMessage{Role: "assistant", Text: status.Result.Text, RequestID: input.RequestID, Model: c.Task.ExpectedModel, Host: input.Instance})
+				t := c.Task
+				t.Messages = nil
+				t.Execution = nil
+				t.Prompt = ""
+				page.Continuation = &t
+			}
+		}
 	}
 	h.writeJSON(w, http.StatusOK, page)
 	return true

@@ -395,6 +395,26 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
 			Operations: browserMutations.Operations, Submission: browserMutations.Submission,
 			UpdateSettings: updateSettings,
+			RegisterModel: func(ctx context.Context, input webuiapp.ModelRegistration) (string, error) {
+				report, _ := healthReport(ctx)
+				page, err := service.BrowserModels(ctx, report)
+				if err != nil {
+					return "", err
+				}
+				for _, m := range page.Models {
+					if m.ID == input.CatalogID && !m.Configured && m.Locality == "cloud" {
+						for _, t := range s.Models {
+							if t.ID == input.TemplateID && t.Provider == m.Provider && t.Locality == "cloud" {
+								if m.ContextTokens != nil && int64(input.ContextTokens) > *m.ContextTokens {
+									return "", config.ErrConfigWrite
+								}
+								return config.RegisterCloudModel(*path, input.ExpectedDigest, t.ID, m.ID, m.Model, input.ContextTokens)
+							}
+						}
+					}
+				}
+				return "", config.ErrConfigWrite
+			},
 			ModelUse: func(ctx context.Context, host, model string, enabled *bool) (any, error) {
 				if enabled == nil {
 					return config.ReadModelUse(s.Telemetry.Database)

@@ -31,11 +31,12 @@ func (d *RecordedRemoteDispatcher) Dispatch(ctx context.Context, instance, key s
 }
 
 type remoteDispatchRequest struct {
-	Version   int                `json:"version"`
-	Instance  string             `json:"instance"`
-	RequestID string             `json:"request_id"`
-	Task      remote.Task        `json:"task"`
-	Files     []attachments.File `json:"files,omitempty"`
+	Version         int                `json:"version"`
+	Instance        string             `json:"instance"`
+	RequestID       string             `json:"request_id"`
+	ParentRequestID string             `json:"parent_request_id,omitempty"`
+	Task            remote.Task        `json:"task"`
+	Files           []attachments.File `json:"files,omitempty"`
 }
 
 func (h *Handler) serveRemoteDispatch(w http.ResponseWriter, r *http.Request) bool {
@@ -55,7 +56,7 @@ func (h *Handler) serveRemoteDispatch(w http.ResponseWriter, r *http.Request) bo
 	}
 	defer releaseMutationSlot(h, true)
 	var input remoteDispatchRequest
-	if decodeMutationJSON(r, &input, 12<<20) != nil || input.Version != 1 || !remoteControlID(input.Instance, 1) || !remoteControlID(input.RequestID, 16) || !remoteTaskFits(input.Task) || attachments.Validate(input.Files) != nil {
+	if decodeMutationJSON(r, &input, 12<<20) != nil || input.Version != 1 || !remoteControlID(input.Instance, 1) || !remoteControlID(input.RequestID, 16) || !remoteTaskFits(input.Task) || attachments.Validate(input.Files) != nil || (input.ParentRequestID != "" && !remoteControlID(input.ParentRequestID, 16)) {
 		h.writeError(w, r, http.StatusBadRequest, "invalid_request")
 		return true
 	}
@@ -66,6 +67,13 @@ func (h *Handler) serveRemoteDispatch(w http.ResponseWriter, r *http.Request) bo
 	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
 	defer cancel()
 	s, err := safeCall(func() (submissions.Status, error) {
+		if input.ParentRequestID != "" {
+			d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher)
+			if !ok {
+				return submissions.Status{}, errRemoteUpload
+			}
+			return d.DispatchContinuation(ctx, input.Instance, input.RequestID, input.ParentRequestID, input.Task, input.Files)
+		}
 		if len(input.Files) > 0 {
 			d, ok := h.remoteDispatcher.(remoteFileDispatcher)
 			if !ok {

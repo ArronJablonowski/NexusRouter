@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/internal/chatfiles"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"github.com/ArronJablonowski/NexusRouter/webui"
@@ -34,12 +35,15 @@ func remoteUploadScope(instance, key string) string {
 // Bind the complete original request before any network dispatch. Different
 // original bytes cannot reuse a key even when extraction yields identical text.
 func (d *RecordedRemoteDispatcher) DispatchFiles(ctx context.Context, instance, key string, task remote.Task, files []attachments.File) (submissions.Status, error) {
+	return d.dispatchConversation(ctx, instance, key, "", task, files)
+}
+func (d *RecordedRemoteDispatcher) dispatchConversation(ctx context.Context, instance, key, parent string, task remote.Task, files []attachments.File) (submissions.Status, error) {
 	reject := func() (submissions.Status, error) { return submissions.Status{}, errRemoteUpload }
 	if d == nil || d.Client == nil || d.Store == nil {
 		return reject()
 	}
 	if d.UploadDirectory == "" {
-		if len(files) > 0 {
+		if len(files) > 0 || parent != "" {
 			return reject()
 		}
 		return d.Client.DispatchRecorded(ctx, d.Store, instance, key, task)
@@ -47,15 +51,16 @@ func (d *RecordedRemoteDispatcher) DispatchFiles(ctx context.Context, instance, 
 	if !remoteControlID(instance, 1) || !remoteControlID(key, 16) || !remoteTaskFits(task) || attachments.Validate(files) != nil {
 		return reject()
 	}
-	// Browser attachments are private new tasks, never injected into execution
-	// envelopes or existing conversation histories.
+	// Browser attachment input is a plain private user turn. Only the server
+	// may reconstruct a pinned prior conversation after validating its success.
 	if len(files) > 0 && (!task.Private || len(task.Messages) > 0 || task.Execution != nil || task.HarnessID != "" || d.PrepareUploads == nil) {
 		return reject()
 	}
 	original, _ := json.Marshal(struct {
-		Task  remote.Task
-		Files []attachments.File
-	}{task, files})
+		Task   remote.Task
+		Files  []attachments.File
+		Parent string `json:",omitempty"`
+	}{task, files, parent})
 	digest := sha256.Sum256(original)
 	scope := remoteUploadScope(instance, key)
 	store, e := chatfiles.Open(ctx, d.UploadDirectory)
@@ -66,6 +71,20 @@ func (d *RecordedRemoteDispatcher) DispatchFiles(ctx context.Context, instance, 
 	// Pin the original intent, including an empty file list, before preparation.
 	if e = store.BindInputs(ctx, scope, "plan_"+hex.EncodeToString(digest[:])); e != nil {
 		return reject()
+	}
+
+	displayPrompt := task.Prompt
+	history := remoteConversation{Version: 1, Instance: instance, RequestID: key, Task: task}
+	if parent != "" {
+		if parent == key {
+			return reject()
+		}
+		history, e = d.continuation(ctx, instance, parent, task)
+		if e != nil {
+			return reject()
+		}
+		history.RequestID = key
+		task = history.Task
 	}
 	if len(files) > 0 {
 		task.Prompt, e = d.PrepareUploads(ctx, task.Prompt, files)
@@ -83,6 +102,26 @@ func (d *RecordedRemoteDispatcher) DispatchFiles(ctx context.Context, instance, 
 			if e = store.Put(ctx, scope, meta, f.Data); e != nil {
 				return reject()
 			}
+		}
+	}
+
+	if parent != "" {
+		task.Messages = append(task.Messages, providers.Message{Role: "user", Content: task.Prompt})
+	}
+	if !remoteTaskFits(task) {
+		return reject()
+	}
+	if parent != "" && remote.HasImageInputs(task) {
+		info, err := d.Client.Info(ctx, instance)
+		if err != nil || !remoteUploadVisionAllowed(info, task) {
+			return reject()
+		}
+	}
+	if task.Private && task.MaxCost == 0 && task.ExpectedModel != "" && task.HarnessID == "" && (task.Execution == nil || parent != "") {
+		history.Task = task
+		history.Messages = append(history.Messages, remoteConversationMessage{Role: "user", Text: displayPrompt, RequestID: key, Model: task.ExpectedModel, Host: instance})
+		if e = d.saveConversation(ctx, history); e != nil {
+			return reject()
 		}
 	}
 	return d.Client.DispatchRecorded(ctx, d.Store, instance, key, task)
