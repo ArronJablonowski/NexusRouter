@@ -151,3 +151,22 @@ func TestBrowserRejectsImageForAutomaticOrUnsupportedModel(t *testing.T) {
 		t.Fatal("unsupported image transport admitted", e)
 	}
 }
+
+func TestUploadNoisyImageFitsConservativeContext(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 512, 384))
+	var seed uint32 = 17
+	for y := 0; y < 384; y++ {
+		for x := 0; x < 512; x++ {
+			seed = 1664525*seed + 1013904223
+			img.Set(x, y, color.RGBA{R: byte(seed >> 24), G: byte(seed >> 16), B: byte(seed >> 8), A: 255})
+		}
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := chatInputImage(b.Bytes())
+	if err != nil || len(encoded) > 5464 || len(encoded) == 0 {
+		t.Fatalf("image context budget: bytes=%d err=%v", len(encoded), err)
+	}
+}

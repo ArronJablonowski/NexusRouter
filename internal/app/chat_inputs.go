@@ -99,7 +99,7 @@ func chatInputImage(data []byte) (string, error) {
 	if e != nil {
 		return "", attachments.ErrFile
 	}
-	for size := 512; size >= 128; size /= 2 {
+	for size := 512; size >= 64; size /= 2 {
 		width, height := c.Width, c.Height
 		if width > size || height > size {
 			if width >= height {
@@ -121,7 +121,7 @@ func chatInputImage(data []byte) (string, error) {
 		if jpeg.Encode(&encoded, dst, &jpeg.Options{Quality: 70}) != nil {
 			return "", attachments.ErrFile
 		}
-		if encoded.Len() <= 12<<10 {
+		if encoded.Len() <= 4<<10 {
 			return base64.StdEncoding.EncodeToString(encoded.Bytes()), nil
 		}
 	}

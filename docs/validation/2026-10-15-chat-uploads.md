@@ -15,3 +15,7 @@ Implemented file selection/removal and drag/drop, a typed optional upload field 
 ## Pending live verification
 
 The checkpoint does not yet claim installed-service upload or vision success. Planned live checks use only synthetic CSV/PDF/DOCX/PNG and Markdown follow-up content, verify facts not disclosed in the prompt, image color/shape recognition, original-byte browser downloads, chat reload and narrow layout. Existing production manual-approval timeout remains a separate known gap and is not exercised by this read-only inference test. Linear requirements remain unavailable pending reauthentication. Main task schema is unchanged; new artifact binding metadata is content-free and read-only at collection.
+
+## Installed-service image context correction
+
+Installed `3fb30ac0` after idle checks and private rollback backup `20261015T064442Z-3fb30ac0`. The first synthetic four-file submission was definitively terminal before inference (`context_overflow`, zero turns). Its encoded image plus tool schemas exceeded the configured 16K conservative byte estimate. No uncertain request was resent. The optimized inference JPEG is now bounded to 4 KiB, with further downsampling down to 64 pixels if necessary; original download bytes stay unchanged and context safeguards are unchanged. A deterministic noisy-image regression and the upload/application race selection passed (6.467s). Live success remains pending the corrected build.
