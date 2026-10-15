@@ -26,3 +26,22 @@ A private isolated commander candidate dispatched exactly one Qwen 3.8 27B reque
 Visual QA then found that the legacy remote receipt's three-rem composer scroll box made answers and the new downloads difficult to use. Moved the receipt and its New remote task control into the scrollable conversation area, preserving pinned input/Send. Added a Chrome placement assertion; the complete Web UI race suite passed again in 33.318s. The browser observer's cleanup also needed a fresh CSRF grant after normal status polling evicted its original bounded grant; that private observer was corrected without retrying inference. Candidate shutdown revokes its remaining session. Installed verification follows.
 
 Final input-boundary review enforces the encoded remote-envelope ceiling for both uploaded and ordinary tasks; JSON escaping cannot admit an oversized transport body. Added a regression for that boundary; the complete webuiapp race suite passed again in 7.079s. Static checks and both builds passed on this final source. Reopened the original Qwen candidate request with the corrected result placement and re-downloaded all originals without another dispatch; normal fresh-grant logout succeeded.
+
+## Completed deployment and installed commander verification
+
+Committed/pushed application source `6df244dee2b78a0fdccff0987671cbf68b13aa6d`, then rebuilt clean trimpath native and Linux ARM64 artifacts (`vcs.modified=false`). Installed native SHA-256: `8e97f766ac3a60c833283a349ce9a0e4037608ac9d2f09adba6c293c63c2c8fe`; canonical installed bytes match the verified build. Deployed the commander at an idle boundary with private binary/configuration/service/state rollback backup `/Users/aj_lab/.NexusRouter/bin/backups/20261015T193229Z-6df244de`; copied SQLite databases passed `quick_check`. Existing service configuration/trust/model permissions were preserved. Spark's existing compatible remote protocol needed no software replacement or restart for this commander-side feature.
+
+The deployed commander Web UI completed two independent real `@dgx-spark/model-ID` submissions, each carrying the scanned invoice PDF, mixed searchable/scanned PDF and genuine binary Word DOC through its file picker:
+
+| Producing Spark model | Answers | Original downloads |
+|---|---|---|
+| Qwen `qwen3.8:27b` / ID `qwen3-8-27b` | All four requested references correct | 3/3 byte-exact |
+| Muse Glimmer `muse-glimmer:30b-q4_K_M-dflash` / ID `muse-glimmer-30b-q4-k-m-dflash` | All four requested references correct | 3/3 byte-exact |
+
+Exactly one dispatch was observed for each positive operation, with the explicit instance, model ID/name and file list. Independently queried only these owned Spark submission/task records: both succeeded with the expected exact model and provider `spark-ollama`; no fallback/substitution occurred. The earlier candidate Qwen request was also verified succeeded. Scans were extracted on the commanding Mac, and only sanitized extracted text crossed the paired private transport; the raw original PDFs/DOC remained commander-side downloads.
+
+Both installed requests restored status, result and all three download cards from the saved host/request URL after reload. Reopened the installed Qwen request read-only for additional download/layout inspection, without another dispatch; all downloads still matched. Desktop and 390 px screenshots were inspected, including the file cards in the scrollable conversation with input/Send pinned. The malformed-DOC 422/draft-retention path had already passed on the same candidate backend. No additional reader/model/download defect appeared in installed tests.
+
+Owned browser sessions were logged out with fresh CSRF grants and temporary Chrome profiles removed. The isolated candidate process was stopped and its temporary API credential removed. The commander is running with PID 66241 and no recorded exit after installation. Spark's production router retained PID 3030862 with zero automatic restarts; Ollama retained PID 2187152. Private fixtures, receipt identities, provenance queries, screenshots, byte hashes, databases and backups remain outside Git.
+
+The requested commander-to-Spark document upload flow is complete and deployed. Remaining limits are remote image inputs, independent rather than resumable remote tasks, bounded English OCR accuracy, storage cleanup and the absence of a fresh full `make check`/MVP qualification. Final documentation receipt: reviewed diff and `git diff --check`; no application changes after the tested/deployed checkpoint.
