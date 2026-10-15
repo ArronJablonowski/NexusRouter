@@ -576,8 +576,9 @@
 		(item.canDeny ? approvalDeny : approvalClose).focus();
 	}
  function renderApproval(item) { return window.NexusChatRender.approval(approvalList,item,{element,stateLabel,decideApproval,openApproval}); }
- let approvalTaskID="", approvalEpoch=0;
+ let approvalTaskID="", approvalEpoch=0, approvalLoading=false;
 	function loadApprovals() {
+  if(approvalLoading)return Promise.resolve(true);
 		const task = selectedControls;
   const epoch=++approvalEpoch;
   if(approvalTaskID !== task?.taskID){approvalList.replaceChildren();approvalState.hidden=true;approvalTaskID=task?.taskID||"";}
@@ -587,7 +588,7 @@
 		}
 		if(!approvalList.children.length)approvalState.hidden=true;
   updateControls();
-		requestJSON("/api/v1/tasks/" + encodeURIComponent(task.taskID) + "/approvals?limit=" + String(maxApprovals)).then(body => {
+		approvalLoading=true;return requestJSON("/api/v1/tasks/" + encodeURIComponent(task.taskID) + "/approvals?limit=" + String(maxApprovals)).then(body => {
 			if (selectedControls?.taskID !== task.taskID || epoch !== approvalEpoch) return;
 			if (!body || body.version !== 1 || body.task_id !== task.taskID || !Array.isArray(body.items) || body.items.length > maxApprovals ||
 				typeof body.has_more !== "boolean" || typeof body.next_cursor !== "string" || body.next_cursor.length > 512 || body.has_more !== Boolean(body.next_cursor)) throw new Error("invalid approvals");
@@ -600,7 +601,8 @@
    updateControls();
 		}).catch(() => {
 			if (selectedControls?.taskID === task.taskID && epoch === approvalEpoch) {showNotice(approvalState, "Approvals could not be updated. Previous observations may be stale.", true);updateControls();}
-		});
+   return false;
+		}).finally(()=>{approvalLoading=false;});
 	}
 	function decideApproval(action, item = activeApproval) {
   if (!item || pendingIntent || unresolvedOperations.length || !operationsReady || !csrfToken || taskContextUnavailable || selectedControls?.taskID !== item.taskID) return;
@@ -973,6 +975,7 @@
 	if (!comfyRoute && !collaborationRoute && !dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
 	document.querySelector("#chat-view").hidden = false;
 	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
+ window.NexusLive.watch('chat-approvals',loadApprovals,{interval:2000,ready:()=>Boolean(selectedChat&&selectedControls&&!approvalLoading)});
  window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage&&!window.NexusChatDescriptions.busy(),busy:value=>{loadingPage=value;if(!value&&reloadChats){reloadChats=false;loadChats("",true);}},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{window.NexusChatDescriptions.order(list);chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},

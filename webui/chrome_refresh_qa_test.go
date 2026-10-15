@@ -77,6 +77,7 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
 	var fail atomic.Bool
 	var emptyApprovals atomic.Bool
 	var approvalStage atomic.Int32
+	var approvalReads atomic.Int32
 	var approvalWrites atomic.Int32
 	var qualityRating atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +137,10 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
 			writeChromeJSON(w, FeedbackReceipt{Version: 1, OperationID: "rating-operation", TaskID: "task-fixture", FeedbackID: "quality-feedback", Revision: 1, State: "recorded", Accepted: true, EvidenceClass: SubjectiveEvidence, Source: "user_feedback"})
 			return
 		case "/app/api/v1/tasks/task-fixture/approvals":
+			if approvalReads.Add(1) == 1 {
+				http.Error(w, "transient fixture read failure", http.StatusServiceUnavailable)
+				return
+			}
 			if emptyApprovals.Load() {
 				writeChromeJSON(w, ApprovalPage{Version: 1, TaskID: "task-fixture", Items: []ApprovalSummary{}})
 				return
