@@ -8,7 +8,9 @@ window.NexusRemoteTaskControls = (()=>{
   confirmation.hidden=true;confirmation.setAttribute("role","group");confirmation.setAttribute("aria-label","Confirm task cancellation");
   warning.textContent="Request cancellation of "+task.request_id+" on "+peer.id+"? Work may finish before cancellation takes effect.";
   confirm.type=dismiss.type="button";confirm.textContent="Confirm cancellation";dismiss.textContent="Keep running";confirmation.append(warning,confirm,dismiss);
-  const events=document.createElement("div");
+  const events=document.createElement("div"),files=document.createElement("div");files.className="remote-upload-files";let filesLoaded=false;
+ async function loadFiles(){try{const url=base+"/api/v1/remote-files/"+encodeURIComponent(peer.id)+"/"+encodeURIComponent(task.request_id);const response=await window.NexusLive.fetch(url,{credentials:"same-origin",cache:"no-store"});if(!response.ok)return;const page=await response.json();if(page.version!==1||page.instance!==peer.id||page.request_id!==task.request_id||!Array.isArray(page.files)||page.files.length>4)return;const rows=[];for(const f of page.files){if(!/^file_[a-f0-9]{40}$/.test(f.id)||typeof f.name!=="string")return;const row=document.createElement("div"),name=document.createElement("span"),link=document.createElement("a");row.className="chat-file-card";row.dataset.fileId=f.id;name.className="chat-file-name";name.textContent=f.name;link.className="chat-file-download";link.textContent="Download";link.download=f.name;link.href=url+"/"+encodeURIComponent(f.id)+"/download";row.append(name,link);rows.push(row);}files.replaceChildren(...rows);filesLoaded=true;}catch{}}
+ loadFiles();
   let current=null,busy=false,loaded=false,taskSignature="";
   function lock(value){confirmation.hidden=true;busy=value;refresh.disabled=value;cancel.disabled=value||!current||current.cancel_requested||!["queued","running"].includes(current.state);}
   async function control(action,background=false){
@@ -27,7 +29,7 @@ window.NexusRemoteTaskControls = (()=>{
     const taskIDs=value.task_ids===null?[]:value.task_ids;
     if(!Array.isArray(taskIDs)||taskIDs.length>128)throw Error();
     const signature=JSON.stringify(taskIDs);if(signature!==taskSignature){events.replaceChildren();taskIDs.forEach(id=>window.NexusRemoteEvents.attach(events,peer.id,task.request_id,id,base,csrf));taskSignature=signature;}
-    loaded=true;
+    loaded=true;if(!filesLoaded)loadFiles();
     current=value;status.textContent="Last loaded task state: "+value.state+(value.cancel_requested?" · cancellation requested":"")+". Updates automatically.";result.textContent=value.result_text||"";
    }catch{status.textContent=action==="cancel"?"Cancellation could not be confirmed. It may have taken effect. Load current status before deciding whether to try again.":"Current status is unavailable. No task was dispatched or retried.";current=null;return false;}
    finally{lock(false);}
@@ -36,7 +38,7 @@ window.NexusRemoteTaskControls = (()=>{
   cancel.addEventListener("click",()=>{if(!busy&&current&&!cancel.disabled){confirmation.hidden=false;confirm.focus();}});
   dismiss.addEventListener("click",()=>{confirmation.hidden=true;cancel.focus();});
   confirm.addEventListener("click",()=>{if(!confirmation.hidden&&!busy&&current&&!cancel.disabled)control("cancel");});
-  card.append(title,refresh,cancel,status,result,confirmation,events);parent.append(card);
+  card.append(title,refresh,cancel,status,result,confirmation,events,files);parent.append(card);
   window.NexusLive.watch("remote-task-"+peer.id+"-"+task.request_id,()=>control("status",true),{interval:3000,alive:()=>card.isConnected,immediate:true,ready:()=>!busy&&(!loaded||!current||["queued","running"].includes(current.state))&&confirmation.hidden&&Boolean(card.closest("details[open]"))});
  }
  return {attach};

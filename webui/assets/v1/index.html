@@ -84,6 +84,7 @@
             <output id="chat-state" class="state-pill"></output>
           </header>
           <div id="transcript-state" class="notice" role="status">Choose a session to inspect its committed history.</div>
+          <details id="host-receipt" hidden open></details>
           <ol id="transcript" class="transcript" aria-label="Committed chat transcript"></ol>
           <button id="load-more-messages" class="secondary transcript-more" type="button" hidden>Load more messages</button>
           <section id="chat-files" class="chat-files" aria-labelledby="chat-files-title" hidden><h3 id="chat-files-title">Files</h3><p id="chat-file-status" role="status" hidden></p><ul id="chat-file-list" class="chat-file-list" aria-label="Uploaded and generated files"></ul></section>
@@ -124,7 +125,6 @@
             <textarea aria-autocomplete="list" aria-controls="host-options" aria-expanded="false" id="composer-text" placeholder="Message NexusRouter…" rows="2" maxlength="1048576" aria-describedby="composer-help composer-error"></textarea>
             <div id="host-options" class="host-options" role="listbox" aria-label="Choose host or model" hidden></div>
             <div id="host-routing" hidden><p id="host-notice" role="status"></p><select id="host-model" aria-label="Assigned model" hidden></select><button id="host-new-task" type="button" class="secondary">New remote task</button></div>
-            <details id="host-receipt" hidden open></details>
             <div class="composer-meta">
               <span id="composer-help" class="help">Enter sends. Shift+Enter adds a new line.</span>
               <output id="composer-count" class="count">0</output>

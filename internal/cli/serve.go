@@ -341,7 +341,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 					fmt.Fprintln(stderr, "cannot initialize remote dispatch evidence")
 					return 1
 				}
-				remoteDispatcher = &webuiapp.RecordedRemoteDispatcher{Client: client, Store: store}
+				remoteDispatcher = &webuiapp.RecordedRemoteDispatcher{Client: client, Store: store, UploadDirectory: dir + ".uploads", PrepareUploads: service.PrepareRemoteUploads}
 				if root := s.WebUI.RemoteAutomaticEvidenceDirectory; root != "" {
 					if err := remote.PrepareOutcomeEvidence(root); err != nil {
 						fmt.Fprintln(stderr, "cannot initialize automatic remote evidence")

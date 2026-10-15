@@ -42,11 +42,17 @@ func TestChromeHostMentionsRouting(t *testing.T) {
  await evaluate("window.originalNow=Date.now;Date.now=()=>originalNow()+20000;box.dispatchEvent(new Event('input')); ");
  await eventually("document.querySelector('#host-model').value==='m'",'host refresh lost selected model');
  await evaluate("Date.now=originalNow");
- await evaluate("box.value='@mini.local/Local%20model test task';box.dispatchEvent(new Event('input'));NexusHostMentions.prepare(box.value,'','fixture');NexusHostMentions.prepare(box.value,'','fixture');");
+ await evaluate("box.value='@mini.local/Local%20model test task';box.dispatchEvent(new Event('input'));NexusHostMentions.prepare(box.value,'','fixture',{generation:1,files:[{name:'scan.pdf',data:'cGRm'}]});NexusHostMentions.prepare(box.value,'','fixture');");
  await eventually('sent.length===1&&Boolean(window.recovered)','dispatch recovery missing');
- if(!await evaluate("sent[0].instance==='mini'&&sent[0].task.version===1&&sent[0].task.prompt==='test task'&&sent[0].task.private&&sent[0].task.model_id==='m'&&sent[0].task.expected_model==='Local model'&&location.hash.includes(sent[0].request_id)&&recovered.task.request_id===sent[0].request_id"))throw Error('incorrect bound payload/recovery');
+ if(!await evaluate("sent[0].files.length===1&&sent[0].files[0].name==='scan.pdf'&&sent[0].files[0].data==='cGRm'&&sent[0].instance==='mini'&&sent[0].task.version===1&&sent[0].task.prompt==='test task'&&sent[0].task.private&&sent[0].task.model_id==='m'&&sent[0].task.expected_model==='Local model'&&location.hash.includes(sent[0].request_id)&&recovered.task.request_id===sent[0].request_id"))throw Error('incorrect bound payload/recovery');
  await evaluate("box.dispatchEvent(new Event('input'))");if(!await evaluate("document.querySelector('#host-notice').textContent.includes('Delivery could not be confirmed')"))throw Error('input refresh erased uncertain delivery notice');
  await evaluate("NexusHostMentions.prepare(box.value,'','fixture');");if(!await evaluate('sent.length===1'))throw Error('uncertain request replayed');
+ await evaluate("document.querySelector('#host-new-task').click();window.baseFetch=fetch;window.commits=0;NexusChatUploads.commit=()=>{commits++};fetch=async(url,opts)=>{if(url.endsWith('remote-dispatch')){sent.push(JSON.parse(opts.body));return {ok:false,status:422}}return baseFetch(url,opts)};NexusHostMentions.prepare(box.value,'','fixture',{generation:7,files:[{name:'bad.doc',data:'eA=='}]});");
+ await eventually("sent.length===2&&document.querySelector('#host-new-task').hidden&&document.querySelector('#host-notice').textContent.includes('draft is retained')",'definitive upload rejection did not recover draft');
+ if(!await evaluate('commits===0&&!location.hash'))throw Error('rejected draft consumed or uncertain identity retained');
+ await evaluate("fetch=async(url,opts)=>{if(url.endsWith('remote-dispatch')){sent.push(JSON.parse(opts.body));return {ok:true,json:async()=>({version:1,instance:'mini',request_id:sent.at(-1).request_id,submission_id:'submission-a'})}}return baseFetch(url,opts)};NexusHostMentions.prepare(box.value,'','fixture',{generation:7,files:[{name:'scan.pdf',data:'cGRm'}]});");
+ await eventually('sent.length===3&&commits===1','accepted remote upload draft not committed');
+ if(!await evaluate('!!document.querySelector("#host-receipt").closest(".conversation-scroll")&&!document.querySelector("#host-new-task").closest("#composer")'))throw Error('remote result/controls trapped in composer');
  socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", script, strconv.Itoa(port), server.URL).CombinedOutput()
 	if e != nil {

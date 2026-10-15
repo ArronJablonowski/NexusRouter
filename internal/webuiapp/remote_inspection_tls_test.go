@@ -1,6 +1,8 @@
 package webuiapp
 
 import (
+	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -94,11 +97,18 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := mutationHandlerFixture(t, MutationServices{})
+	cookie, csrf := authenticateBrowser(t, h)
+	authorized := func(target, body string) *http.Request {
+		r := browserRequest(http.MethodPost, target, body)
+		r.AddCookie(cookie)
+		r.Header.Set("X-Darwin-CSRF", csrf)
+		return r
+	}
 	h.remoteTrustFile = string(trust)
 	h.remoteInspector = &remote.Client{Trust: trust, Credentials: remote.Credentials{CertificateFile: certPath, KeyFile: keyPath, CAFile: certPath}}
 	inspect := func(view string, want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-inspection", `{"version":1,"instance":"node-a","view":"`+view+`"}`)
+		r := authorized("/app/api/v1/remote-inspection", `{"version":1,"instance":"node-a","view":"`+view+`"}`)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
@@ -118,7 +128,7 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 			body += `,"expected_submission_id":"submission-a"`
 		}
 		body += `}`
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-task-control", body)
+		r := authorized("/app/api/v1/remote-task-control", body)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
@@ -141,7 +151,7 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	}
 	events := func(want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-task-events", `{"version":1,"instance":"node-a","request_id":"request-existing-0001","task_id":"task-1","after":0}`)
+		r := authorized("/app/api/v1/remote-task-events", `{"version":1,"instance":"node-a","request_id":"request-existing-0001","task_id":"task-1","after":0}`)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
@@ -163,23 +173,73 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.remoteDispatcher = &RecordedRemoteDispatcher{Client: h.remoteInspector.(*remote.Client), Store: routeStore}
+	h.remoteDispatcher = &RecordedRemoteDispatcher{Client: h.remoteInspector.(*remote.Client), Store: routeStore, UploadDirectory: filepath.Join(dir, "uploads"), PrepareUploads: func(_ context.Context, prompt string, files []attachments.File) (string, error) {
+		return attachments.Encode(prompt, []attachments.Input{{Name: files[0].Name, Text: string(files[0].Data)}}), nil
+	}}
 	dispatch := func(body string, want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-dispatch", body)
+		r := authorized("/app/api/v1/remote-dispatch", body)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
 			t.Fatalf("dispatch %d want %d: %s", w.Code, want, w.Body.String())
 		}
 	}
-	body := browserDispatchBody(t)
+	var input remoteDispatchRequest
+	json.Unmarshal([]byte(browserDispatchBody(t)), &input)
+	input.Files = []attachments.File{{Name: "notes.txt", Data: []byte("original reference 31842")}}
+	raw, _ := json.Marshal(input)
+	body := string(raw)
 	dispatch(body, 200)
+	filesPath := "/app/api/v1/remote-files/node-a/request-browser-0001"
+	get := func(path string, want int) *httptest.ResponseRecorder {
+		t.Helper()
+		r := authorized(path, "")
+		r.Method = "GET"
+		r.Body = http.NoBody
+		r.ContentLength = 0
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("file response %d want %d %s", w.Code, want, w.Body.String())
+		}
+		return w
+	}
+	page := get(filesPath, 200)
+	var originals struct {
+		Files []struct {
+			ID string `json:"id"`
+		}
+	}
+	json.Unmarshal(page.Body.Bytes(), &originals)
+	if len(originals.Files) != 1 {
+		t.Fatal(page.Body.String())
+	}
+	originalURL := filesPath + "/" + originals.Files[0].ID + "/download"
+	download := get(originalURL, 200)
+	if !bytes.Equal(download.Body.Bytes(), input.Files[0].Data) || download.Header().Get("Cache-Control") != "no-store" || download.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("unsafe or changed download")
+	}
+	get(strings.Replace(originalURL, "request-browser-0001", "request-other-00001", 1), 404)
+	unauth := httptest.NewRecorder()
+	h.ServeHTTP(unauth, browserRequest("GET", originalURL, ""))
+	if unauth.Code != 401 {
+		t.Fatal("unauthenticated download")
+	}
+	changed := input
+	changed.Files = []attachments.File{{Name: "notes.txt", Data: []byte("changed original")}}
+	changedRaw, _ := json.Marshal(changed)
+	dispatch(string(changedRaw), 422)
+	changed.Files = nil
+	changedRaw, _ = json.Marshal(changed)
+	dispatch(string(changedRaw), 422)
+	// Reopen store through the original GET, retaining request-bound bytes.
+	get(originalURL, 200)
 	binding, err := routeStore.Lookup("request-browser-0001")
 	if err != nil || binding.Destination != "node-a" || binding.CallerFingerprint != remote.Fingerprint(cert) {
 		t.Fatal("missing bound dispatch", binding, err)
 	}
-	dispatch(strings.Replace(body, "test task", "changed task", 1), 503)
+	dispatch(strings.Replace(body, "test task", "changed task", 1), 422)
 	if calls.Load() != 9 {
 		t.Fatal("changed task dispatched", calls.Load())
 	}
@@ -187,7 +247,7 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	h.remoteAutomatic = &RecordedRemoteAutomatic{Client: h.remoteInspector.(*remote.Client), Store: routeStore, EvidenceRoot: filepath.Join(dir, "outcomes")}
 	recorded := func(want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-recorded-status", `{"version":1,"request_id":"request-browser-0001"}`)
+		r := authorized("/app/api/v1/remote-recorded-status", `{"version":1,"request_id":"request-browser-0001"}`)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {

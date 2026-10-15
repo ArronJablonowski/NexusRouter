@@ -159,6 +159,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if h.serveRemoteAutomatic(writer, request) {
 		return
 	}
+	if h.serveRemoteFiles(writer, request) {
+		return
+	}
 	if h.serveRemoteDispatch(writer, request) {
 		return
 	}

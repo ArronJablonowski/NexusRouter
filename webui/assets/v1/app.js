@@ -821,7 +821,7 @@
 		if (selectedChat) loadHistory(selectedChat, "", true, false);
 	}
 	function submitComposer() { const attached=window.NexusChatUploads?.snapshot()||(!window.NexusChatUploads?{files:[]}:null);if(!attached)return;
-		const assignment = window.NexusHostMentions ? window.NexusHostMentions.prepare(composerText.value, selectedChat, csrfToken) : composerText.value; if (assignment === null) return;
+		const assignment = window.NexusHostMentions ? window.NexusHostMentions.prepare(composerText.value, selectedChat, csrfToken, attached) : composerText.value; if (assignment === null) return;
  const text=typeof assignment==="string"?assignment:assignment.text,assignedModel=typeof assignment==="object"?assignment.modelID:"";
 		composerError.hidden = true;
 		if (!text.trim()) {
