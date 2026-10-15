@@ -31,7 +31,15 @@ func TestFileBoundsAndFraming(t *testing.T) {
 	if _, v := Decode(Encode("look", []Input{{Name: "x.jpg", Image: image}})); len(v) != 1 {
 		t.Fatal("image framing rejected")
 	}
-	if _, v := Decode("x" + Marker + strings.Repeat("x", (256<<10)+1)); v != nil {
+	if _, v := Decode("x" + Marker + strings.Repeat("x", MaxEncodedBytes+1)); v != nil {
 		t.Fatal("oversized framing")
+	}
+}
+
+func TestEscapedUploadFrameRoundTrip(t *testing.T) {
+	text := strings.Repeat("<", 64<<10)
+	prompt, files := Decode(Encode("Read normally", []Input{{Name: "source.html", Text: text}}))
+	if prompt != "Read normally" || len(files) != 1 || files[0].Text != text {
+		t.Fatal("valid escaped upload lost its frame")
 	}
 }

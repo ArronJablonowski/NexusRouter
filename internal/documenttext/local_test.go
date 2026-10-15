@@ -40,7 +40,7 @@ func mixedPDF() []byte {
 func TestPDFMixedNativeAndImagePages(t *testing.T) {
 	var pages []int
 	s, err := pdfText(mixedPDF(), func(n int) (string, error) { pages = append(pages, n); return "Scan 68423", nil })
-	if err != nil || !strings.Contains(s, "Native 74319") || !strings.Contains(s, "Scan 68423") || len(pages) != 1 || pages[0] != 2 {
+	if err != nil || !strings.Contains(s, "Native 74319") || !strings.Contains(s, "Scan 68423") || !strings.Contains(s, "Header only") || len(pages) != 1 || pages[0] != 2 {
 		t.Fatalf("text=%q pages=%v err=%v", s, pages, err)
 	}
 	for _, callback := range []func(int) (string, error){
@@ -92,5 +92,12 @@ func TestLegacyDOCWithNativeReader(t *testing.T) {
 	text, err := Local(context.Background(), "doc", doc)
 	if err != nil || !strings.Contains(text, "68423") {
 		t.Fatal(text, err)
+	}
+}
+
+func TestPDFNativeTextSurvivesEmptyOCR(t *testing.T) {
+	text, err := pdfText(mixedPDF(), func(int) (string, error) { return "", nil })
+	if err != nil || !strings.Contains(text, "Header only") {
+		t.Fatal("OCR discarded searchable text", err)
 	}
 }

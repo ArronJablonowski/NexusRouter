@@ -55,3 +55,15 @@ func TestPDFTextAndRejection(t *testing.T) {
 		t.Fatal("malformed PDF accepted")
 	}
 }
+
+func TestDOCXPreservesExplicitLineBreaks(t *testing.T) {
+	var b bytes.Buffer
+	z := zip.NewWriter(&b)
+	w, _ := z.Create("word/document.xml")
+	fmt.Fprint(w, `<w:document xmlns:w="urn:word"><w:body><w:p><w:r><w:t>alpha</w:t><w:br/><w:t>beta</w:t><w:cr/><w:t>gamma</w:t><w:tab/><w:t>delta</w:t></w:r></w:p></w:body></w:document>`)
+	z.Close()
+	text, err := DOCX(b.Bytes())
+	if err != nil || !strings.Contains(text, "alpha\nbeta\ngamma\tdelta") {
+		t.Fatal("Word breaks were joined", text, err)
+	}
+}

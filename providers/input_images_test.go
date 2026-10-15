@@ -13,7 +13,7 @@ import (
 
 func TestUploadedImagesReachHTTPAdapters(t *testing.T) {
 	image := base64.StdEncoding.EncodeToString([]byte{255, 216, 255, 1})
-	prompt := attachments.Encode("Describe", []attachments.Input{{Name: "photo.jpg", Image: image}, {Name: "data.csv", Text: "revenue,42"}})
+	prompt := attachments.Encode("Describe", []attachments.Input{{Name: "photo.jpg", Image: image}, {Name: "data.csv", Text: "revenue,42"}, {Name: "source.html", Text: strings.Repeat("<", 64<<10)}})
 	for _, kind := range []string{"ollama", "openai_compatible"} {
 		t.Run(kind, func(t *testing.T) {
 			p := fixtureProvider(t, kind, func(w http.ResponseWriter, r *http.Request) {

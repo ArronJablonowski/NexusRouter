@@ -3,12 +3,14 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"testing"
 	"time"
@@ -173,5 +175,30 @@ func TestUploadNoisyImageFitsConservativeContext(t *testing.T) {
 	encoded, err := chatInputImage(b.Bytes())
 	if err != nil || len(encoded) > 5464 || len(encoded) == 0 {
 		t.Fatalf("image context budget: bytes=%d err=%v", len(encoded), err)
+	}
+}
+
+func TestUploadTransparentImageKeepsBlackContentVisible(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 64, 64))
+	for y := 20; y < 44; y++ {
+		for x := 20; x < 44; x++ {
+			img.SetNRGBA(x, y, color.NRGBA{A: 255})
+		}
+	}
+	var p bytes.Buffer
+	png.Encode(&p, img)
+	encoded, err := chatInputImage(p.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := base64.StdEncoding.DecodeString(encoded)
+	view, err := jpeg.Decode(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, _, _, _ := view.At(0, 0).RGBA()
+	center, _, _, _ := view.At(32, 32).RGBA()
+	if r < 60000 || center > 5000 {
+		t.Fatal("transparent black image lost contrast")
 	}
 }

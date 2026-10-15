@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"image"
+	"image/color"
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
@@ -65,7 +66,7 @@ func prepareChatInputs(ctx context.Context, files []attachments.File) ([]attachm
 			return nil, e
 		}
 		total += len(v.Text) + len(v.Image)
-		if e != nil || len(v.Text) > 64<<10 || total > 128<<10 {
+		if e != nil || len(v.Text) > attachments.MaxTextBytes || total > attachments.MaxInputBytes {
 			return nil, attachments.ErrFile
 		}
 		out = append(out, v)
@@ -137,7 +138,8 @@ func chatInputImage(data []byte) (string, error) {
 		b := src.Bounds()
 		for y := 0; y < height; y++ {
 			for x := 0; x < width; x++ {
-				dst.Set(x, y, src.At(b.Min.X+x*c.Width/width, b.Min.Y+y*c.Height/height))
+				r, g, blue, a := src.At(b.Min.X+x*c.Width/width, b.Min.Y+y*c.Height/height).RGBA()
+				dst.SetRGBA(x, y, color.RGBA{R: uint8((r + 65535 - a) >> 8), G: uint8((g + 65535 - a) >> 8), B: uint8((blue + 65535 - a) >> 8), A: 255})
 			}
 		}
 		var encoded bytes.Buffer

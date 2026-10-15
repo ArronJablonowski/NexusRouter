@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"github.com/ledongthuc/pdf"
 	"io"
 	"strings"
@@ -34,7 +35,15 @@ func pdfText(data []byte, ocr func(int) (string, error)) (text string, err error
 		page := r.Page(n)
 		s, e := page.GetPlainText(nil)
 		if ocr != nil && (e != nil || strings.TrimSpace(s) == "" || pageHasImages(page.Resources(), 0)) {
+			native, nativeErr := s, e
 			s, e = ocr(n)
+			if e == nil && nativeErr == nil && strings.TrimSpace(native) != "" {
+				if strings.TrimSpace(s) == "" {
+					s = fmt.Sprintf("[Page %d: searchable text; OCR found no text in page imagery]\n%s", n, native)
+				} else {
+					s = fmt.Sprintf("[Page %d: searchable text]\n%s\n%s", n, native, s)
+				}
+			}
 		}
 		if e != nil {
 			return "", e
@@ -87,6 +96,9 @@ func DOCX(data []byte) (string, error) {
 		case xml.StartElement:
 			if t.Name.Local == "t" {
 				inText = true
+			}
+			if t.Name.Local == "br" || t.Name.Local == "cr" {
+				b.WriteByte('\n')
 			}
 			if t.Name.Local == "tab" {
 				b.WriteByte('\t')

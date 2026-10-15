@@ -61,3 +61,27 @@ func TestDocumentReaderFailureIsDefinitiveAndSafe(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }
+
+func TestUploadOriginalByteBoundary(t *testing.T) {
+	calls := 0
+	h := mutationHandlerFixture(t, MutationServices{Chat: func(_ context.Context, _ string, r webui.ChatRequest) (webui.ChatMutationReceipt, error) {
+		calls++
+		return webui.ChatMutationReceipt{Version: 1, OperationID: "op-bound", SubmissionID: "sub-bound", State: "queued"}, nil
+	}})
+	for _, size := range []int{attachments.MaxTotalBytes, attachments.MaxTotalBytes + 1} {
+		body, _ := json.Marshal(webui.ChatRequest{Version: 1, Action: webui.ChatSubmit, IdempotencyKey: "original-size-boundary", Text: "Read", Files: []attachments.File{{Name: "file.bin", Data: bytes.Repeat([]byte("a"), size)}}})
+		r := authorizedMutationRequest(t, h, "/app/api/v1/chats", string(body))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		expected := 202
+		if size > attachments.MaxTotalBytes {
+			expected = 400
+		}
+		if w.Code != expected {
+			t.Fatal(size, w.Code, w.Body.String())
+		}
+	}
+	if calls != 1 {
+		t.Fatal("oversized original reached mutation")
+	}
+}

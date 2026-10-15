@@ -81,6 +81,7 @@ await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceSca
 await cdp('Page.navigate',{url:origin+'/app/chats/chat'});
 await eventually('document.querySelectorAll(".chat-file-card").length===2','attachments did not load with chat');
 await eventually('document.querySelector(".chat-file-preview img").naturalWidth>0','inline image unavailable');
+if(!await evaluate('getComputedStyle(document.querySelector(".chat-file-preview img")).backgroundColor==="rgb(255, 255, 255)"'))throw Error('Transparent image has no readable background');
 if(!await evaluate('document.querySelector("#chat-files").closest(".transcript-panel")!==null'))throw Error('files outside chat');
 await evaluate('window.fileImage=document.querySelector(".chat-file-preview img");document.querySelector(".chat-file-download").focus();window.NexusChatFiles.refresh()');
 await new Promise(r=>setTimeout(r,250));
