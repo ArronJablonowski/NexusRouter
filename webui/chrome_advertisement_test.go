@@ -50,6 +50,7 @@ func TestChromeAdvertisementSettings(t *testing.T) {
 				return
 			}
 			saved = input.Settings
+			active.AutoApprove = saved.AutoApprove
 			writes++
 			digest = strings.Repeat("b", 64)
 		}
@@ -67,7 +68,7 @@ func TestChromeAdvertisementSettings(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if writes != 1 || !saved.AutoApprove || active.AutoApprove || saved.MacMemoryPercent != 95 || saved.MacSwapGrowthGB != 3.5 || saved.DNSLogging != "full" || saved.RemoteAdvertisement != (remoteconfig.Advertisement{Enabled: true, Interface: "en1", Name: "node-a", SSHPort: 2222}) {
+	if writes != 1 || !saved.AutoApprove || !active.AutoApprove || saved.MacMemoryPercent != 95 || saved.MacSwapGrowthGB != 3.5 || saved.DNSLogging != "full" || saved.RemoteAdvertisement != (remoteconfig.Advertisement{Enabled: true, Interface: "en1", Name: "node-a", SSHPort: 2222}) {
 		t.Fatal(writes, saved)
 	}
 }

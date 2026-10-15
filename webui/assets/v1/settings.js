@@ -53,7 +53,7 @@
  addSummary("Advertised interface",value.active.remote_advertisement.interface||"Not configured");addSummary("Advertised TLS name",value.active.remote_advertisement.name||"Not configured");addSummary("SSH port hint",value.active.remote_advertisement.ssh_port?String(value.active.remote_advertisement.ssh_port):"None");
  addSummary("Read root", value.active.read_root || "Not configured");
 		syncDependency(); validation.hidden = true;
-		setStatus(value.restart_required ? "Settings are saved. Restart the owning service to activate them; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
+		setStatus(value.restart_required ? "Settings are saved. Automatic tool approval is active now. Restart the owning service to activate the remaining changes; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
 	}
 	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==((key==="collaboration_enabled"||key==="auto_approve")?(projection.saved[key]===true):key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]));}
  function load() {

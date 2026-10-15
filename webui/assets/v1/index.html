@@ -265,7 +265,7 @@
         <div class="settings-layout">
           <form id="tool-settings-form" class="settings-card" novalidate>
             <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
-            <p class="settings-intro">Choose specialist locality and whether eligible models may use NexusRouter's narrowly scoped tools. Saved changes take effect after the NexusRouter daemon restarts.</p>
+            <p class="settings-intro">Choose specialist locality and whether eligible models may use NexusRouter's narrowly scoped tools. Automatic tool approval takes effect when saved. Other changes take effect after the NexusRouter daemon restarts.</p>
             <label class="setting-toggle"><span><strong>Model collaboration</strong><small>Let models exchange timestamped messages and collect paired-host collaboration on the commanding host. Private messages stay within local inference. Does not start recipients automatically. Restart required after saving.</small></span><span class="switch"><input id="collaboration-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
             <h3>Skills</h3>
 <label class="setting-toggle"><span><strong>Use skills</strong><small>Enable the skill system and use eligible active skills from the configured store.</small></span><span class="switch"><input id="skills-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
@@ -282,7 +282,7 @@
               <span class="switch"><input id="tools-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
             </label>
             <label class="setting-toggle" for="auto-approve-tools">
-              <span><strong>Auto-approve all tool calls</strong><small>Off by default. When on, permitted tools can act without asking you, including creating files and submitting jobs. Existing access limits and disabled tools stay unchanged. Decisions are logged. Save and restart this service to apply; turning this off does not undo completed calls.</small></span>
+              <span><strong>Auto-approve all tool calls</strong><small>Off by default. When on, permitted tools can act without asking you, including creating files and submitting jobs. Existing access limits and disabled tools stay unchanged. Decisions are logged. Takes effect immediately when saved, including calls waiting for approval. Turning this off does not undo calls already approved.</small></span>
               <span class="switch"><input id="auto-approve-tools" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
             </label>
             <label class="setting-toggle" for="delegate-read-tools">
@@ -314,7 +314,7 @@
           </form>
           <aside class="settings-card" aria-labelledby="active-settings-title">
             <p class="eyebrow">Running daemon</p><h2 id="active-settings-title">Active policy</h2>
-            <p class="settings-intro">These values remain active until the daemon restarts.</p>
+            <p class="settings-intro">Automatic tool approval updates when saved. Other values remain active until the daemon restarts.</p>
             <dl id="active-settings" class="settings-summary"></dl>
             <div class="settings-advisory"><strong>Safety boundary</strong><p>Tool use and cloud specialists remain disabled by default. This setting cannot enable unrestricted shell commands, write access, or access beyond the configured directory. Benchmark tools retain their host-defined schemas and scopes.</p></div>
           </aside>

@@ -81,9 +81,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "NEXUS_API_TOKEN (or legacy DARWIN_API_TOKEN) must contain at least 32 characters")
 		return 1
 	}
+	liveApproval := &browserLiveApproval{settings: s}
 	var service *app.Service
-	if (s.ComfyUI.Enabled || s.Tools.CreateEnabled || s.Tools.AutoApprove) && s.WebUI.Enabled {
-		service, err = app.NewServiceWithToolControls(s, os.Getenv, nil, nil, nil, nil, nil, nil, browserToolPresenter(s))
+	if s.WebUI.Enabled {
+		service, err = app.NewServiceWithToolControls(s, os.Getenv, nil, nil, nil, nil, nil, nil, liveApproval.present)
 	} else {
 		service, err = app.NewService(s, os.Getenv)
 	}
@@ -279,6 +280,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			if updateErr != nil {
 				return webui.SettingsInspection{}, updateErr
 			}
+			liveApproval.set(saved.AutoApprove)
+			activeToolSettings.AutoApprove = saved.AutoApprove
 			savedSettings := webui.ToolAccessSettings{AutoApprove: saved.AutoApprove, CollaborationEnabled: saved.CollaborationEnabled, CommanderModel: saved.CommanderModel, MacMemoryPercent: saved.MacMemoryPercent, MacSwapGrowthGB: saved.MacSwapGrowthGB, DNSLogging: saved.DNSLogging, RemoteAdvertisement: saved.RemoteAdvertisement, SkillsEnabled: saved.SkillsEnabled, SkillsAutoDraft: saved.SkillsAutoDraft, SkillsRoot: saved.SkillsRoot, SkillsScope: saved.SkillsScope, ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot, SpecialistsAllowCloud: saved.SpecialistsAllowCloud}
 			return webui.SettingsInspection{Version: webui.ContractVersion, Digest: digest, Active: activeToolSettings, Saved: savedSettings, RestartRequired: activeToolSettings != savedSettings}, nil
 		}
