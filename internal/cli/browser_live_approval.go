@@ -28,6 +28,19 @@ func (a *browserLiveApproval) present(ctx context.Context, p tools.ApprovalPromp
 	if ctx == nil || ctx.Err() != nil {
 		return tools.ErrDenied
 	}
+	a.mu.Lock()
+	settings := a.settings
+	a.mu.Unlock()
+	if !settings.WebUI.Enabled {
+		return tools.ErrDenied
+	}
+	// Opening validates database integrity. Do this once per proposal, never
+	// once per poll: repeated quick_check scans starve large live stores.
+	db, err := telemetry.OpenApprovalControl(ctx, settings.Telemetry.Database)
+	if err != nil {
+		return tools.ErrDenied
+	}
+	defer db.Close()
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -37,14 +50,8 @@ func (a *browserLiveApproval) present(ctx context.Context, p tools.ApprovalPromp
 			a.mu.Unlock()
 			return tools.ErrDenied
 		}
-		db, err := telemetry.OpenApprovalControl(ctx, s.Telemetry.Database)
-		if err != nil {
-			a.mu.Unlock()
-			return tools.ErrDenied
-		}
 		current, err := db.ReadApproval(ctx, p.Request.ID)
 		status, statusErr := db.CancellationStatus(ctx, p.Request.TaskID)
-		db.Close()
 		if err != nil || statusErr != nil || status.Requested || status.State != "running" || !time.Now().Before(p.Request.ExpiresAt) || !current.Request.Matches(p.Request) {
 			a.mu.Unlock()
 			return tools.ErrDenied
