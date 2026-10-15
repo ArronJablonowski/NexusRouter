@@ -32,3 +32,13 @@ go vet ./attachments ./internal/documenttext ./internal/app ./internal/cli ./int
 go build -o <private-native-build> ./cmd/nexus
 GOOS=linux GOARCH=arm64 go build -o <private-arm64-build> ./cmd/nexus
 ```
+
+## Installed-service completion
+
+Installed code checkpoint `db51f7b1` on the commander after idle checks, with private rollback backup `20261015T131533Z-db51f7b1`. The installed binary hash matches the tested native build. No Spark/model service, trust, permission, credential or automatic-approval setting was changed.
+
+A real authenticated Chrome chat on the installed service submitted `scan.pdf`, `mixed.pdf` and a CFB `legacy.doc` once, to the existing local qwen3-5-9b model. The request reached terminal **succeeded**. The answer correctly reported the scanned invoice reference/amount, the searchable mixed-PDF reference and the legacy Word reference without those values being disclosed in the prompt. Exact owned task content also verified the mixed PDF retained its native reference, OCR appendix/header, scanned reference and OCR uncertainty label in page order.
+
+All three original files downloaded through the Web UI and matched fixture bytes exactly. A fresh navigation verified all three attachment cards/details remained, desktop and 390px views had no horizontal overflow, and the composer/send controls remained visible. Screenshots were visually inspected. The owned browser session was logged out and its temporary Chrome profile removed. Private fixtures, request receipt/journal, screenshots and download hashes remain outside Git in `resources/document-upload-live-2026-10-15`.
+
+This completes commanding-host upload verification for the new formats. Linux dependency installation/execution, non-English OCR, handwriting accuracy and broader hostile-document corpus testing remain outside the verified scope. Existing file quotas/context limits still apply, and larger/slower scans may be definitively rejected rather than silently truncated.
