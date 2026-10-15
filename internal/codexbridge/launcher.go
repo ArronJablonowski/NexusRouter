@@ -36,7 +36,7 @@ type launchStart func(context.Context, codexrpc.ProcessSpec) (Wire, error)
 type launchReadMetadata func(context.Context, codexrpc.ProcessSpec, ...string) ([]byte, error)
 
 func launchChecked(ctx context.Context, spec LaunchSpec, start launchStart, metadata launchReadMetadata) (_ *Session, err error) {
-	if ctx == nil || ctx.Err() != nil || (spec.Mode != "hybrid" && spec.Mode != "cloud_only") || spec.Privacy != "cloud_allowed" || spec.Model != "gpt-5.6-sol" ||
+	if ctx == nil || ctx.Err() != nil || (spec.Mode != "hybrid" && spec.Mode != "cloud_only") || spec.Privacy != "cloud_allowed" || !SupportedModel(spec.Model) ||
 		!filepath.IsAbs(spec.Executable) || !filepath.IsAbs(spec.CWD) || !launchEnvValid(spec.Env) || !validReasoningEffort(spec.ReasoningEffort) {
 		return nil, ErrLaunchObservation
 	}

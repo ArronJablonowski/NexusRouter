@@ -16,6 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/ArronJablonowski/NexusRouter/internal/codexbridge"
 	"github.com/ArronJablonowski/NexusRouter/memory"
 	"github.com/ArronJablonowski/NexusRouter/remoteconfig"
 	"github.com/ArronJablonowski/NexusRouter/resources"
@@ -631,7 +632,7 @@ func (s Settings) Validate() error {
 		if m.Locality != "local" && m.Locality != "cloud" {
 			return errors.New("invalid model locality")
 		}
-		if providers[m.Provider].Kind == "codex_app_server" && (m.Locality != "cloud" || m.Model != "gpt-5.6-sol" || m.ContextTokens < 1 || !validReasoningEffort(m.ReasoningEffort)) {
+		if providers[m.Provider].Kind == "codex_app_server" && (m.Locality != "cloud" || !codexbridge.SupportedModel(m.Model) || m.ContextTokens < 1 || !validReasoningEffort(m.ReasoningEffort)) {
 			return errors.New("invalid Codex coordinator model settings")
 		}
 		if providers[m.Provider].Kind != "codex_app_server" && m.ReasoningEffort != "" {
