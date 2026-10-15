@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
@@ -55,13 +56,34 @@ func (b *BrowserMutations) Chat(ctx context.Context, subject string, request con
 		return receipt, nil
 	}
 	model := request.ModelID
+	if model == "" && request.Action == contract.ChatResume {
+		model, err = b.inheritedChatModel(ctx, request)
+		if err != nil {
+			return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "task", request.TaskID, err)
+		}
+	}
 	if model == "" {
 		model = b.service.settings.WebUI.DefaultModel
 		if model == "" {
 			model = "auto"
 		}
 	}
-	input := Request{ModelID: model, Prompt: request.Text, DisableFallback: request.ModelID != "" && request.ModelID != "auto"}
+	inputs, inputErr := prepareChatInputs(ctx, request.Files)
+	if inputErr != nil {
+		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, attachments.ErrFile))
+	}
+	if !b.service.chatImageModelAllowed(model, inputs) {
+		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, attachments.ErrFile))
+	}
+	if err = b.service.retainChatInputs(ctx, record.OperationID, request.Files); err != nil {
+		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, err))
+	}
+	input := Request{ModelID: model, Prompt: attachments.Encode(request.Text, inputs), DisableFallback: request.ModelID != "" && request.ModelID != "auto" || request.Action == contract.ChatResume}
+	for _, file := range inputs {
+		if file.Image != "" {
+			input.DisableFallback = true
+		}
+	}
 	var status submissions.Status
 	if request.Action == contract.ChatSubmit {
 		status, err = b.service.Submit(ctx, record.OperationID, input)

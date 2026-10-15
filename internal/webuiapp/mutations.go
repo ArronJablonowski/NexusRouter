@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
@@ -156,11 +157,19 @@ func (h *Handler) serveChatMutation(writer http.ResponseWriter, request *http.Re
 	}
 	defer releaseMutationSlot(h, control)
 	var input contract.ChatRequest
-	if decodeMutationJSON(request, &input, contract.MaxRequestBytes) != nil || input.Validate() != nil || input.Action != action || pathID != "" && action == contract.ChatResume && input.ChatID != pathID || pathID != "" && (action == contract.ChatSteer || action == contract.ChatCancel) && input.TaskID != pathID || pathID != "" && action == contract.ChatCancelSubmission && input.SubmissionID != pathID {
+	bodyLimit := int64(contract.MaxRequestBytes)
+	if action == contract.ChatSubmit || action == contract.ChatResume {
+		bodyLimit = contract.MaxUploadRequestBytes
+	}
+	if decodeMutationJSON(request, &input, bodyLimit) != nil || input.Validate() != nil || input.Action != action || pathID != "" && action == contract.ChatResume && input.ChatID != pathID || pathID != "" && (action == contract.ChatSteer || action == contract.ChatCancel) && input.TaskID != pathID || pathID != "" && action == contract.ChatCancelSubmission && input.SubmissionID != pathID {
 		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
+	budget := 5 * time.Second
+	if action == contract.ChatSubmit || action == contract.ChatResume {
+		budget = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(request.Context(), budget)
 	defer cancel()
 	subject, ok := h.browserSubject(request)
 	if !ok {
@@ -426,6 +435,9 @@ func (h *Handler) mutationFailure(writer http.ResponseWriter, request *http.Requ
 	status, code := http.StatusServiceUnavailable, "mutation_unavailable"
 	retryable := true
 	switch {
+	case errors.Is(err, attachments.ErrFile):
+		status, code = http.StatusUnprocessableEntity, "attachment_unreadable"
+		retryable = false
 	case errors.Is(err, browserops.ErrConflict), errors.Is(err, telemetry.ErrConflict), errors.Is(err, submissions.ErrConflict), errors.Is(err, approvals.ErrConflict), errors.Is(err, runtime.ErrSteeringClosed):
 		status, code = http.StatusConflict, "revision_conflict"
 	case errors.Is(err, sql.ErrNoRows):
@@ -454,6 +466,8 @@ func (h *Handler) mutationFailure(writer http.ResponseWriter, request *http.Requ
 
 func mutationErrorMessage(code string) string {
 	switch code {
+	case "attachment_unreadable":
+		return "The file could not be read or needs a supported image model. Check format, size and model; try a smaller file."
 	case "revision_conflict":
 		return "The resource changed; refresh it before retrying."
 	case "not_found":

@@ -20,7 +20,7 @@ window.NexusChatRender = (() => {
     const key = item.id || item.role + ':' + item.text;
     let row = existing.get(key);
     if (!row) {row=document.createElement('li');row.className='message '+item.role;row.dataset.messageKey=key;const label=document.createElement('span');label.className='message-label';label.textContent=item.role;row.append(label,document.createElement('p'));}
-    const content=row.querySelector('p');if(content.textContent!==item.text)content.textContent=item.text;
+    const content=row.querySelector('p');if(!window.NexusChatUploads?.renderMessage(row,item)&&content.textContent!==item.text)content.textContent=item.text;
     keep.add(row);
     if (reset) {if(row!==cursor)root.insertBefore(row,cursor);cursor=row.nextElementSibling;}
     else if(!row.isConnected)root.append(row);

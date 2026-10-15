@@ -646,3 +646,13 @@ body:has(#chat-view:not([hidden])) { height: 100vh; height: 100dvh; overflow: hi
 .composer #host-routing, .composer #host-receipt { max-height: 3rem; }
 .composer #new-chat { order: -1; }
 .composer-dock .mutation-bar { max-height: 12dvh; overflow-y: auto; }
+
+.chat-upload-list { display:flex; flex-wrap:wrap; gap:.4rem; list-style:none; padding:0; margin:.3rem 0; max-height:5rem; overflow:auto; }
+.chat-upload-list li { display:flex; gap:.5rem; align-items:center; border:1px solid #345965; border-radius:.7rem; padding:.3rem .5rem; max-width:100%; }
+.chat-upload-list span { overflow-wrap:anywhere; min-width:0; }
+.chat-upload-list button { font-size:.7rem; padding:.2rem .4rem; }
+.upload-help { font-size:.65rem; color:#a1bac4; margin:.2rem 0; line-height:1.2; }
+#chat-upload-button { margin-right:auto; border-radius:1rem; padding:.35rem .65rem; font-size:.8rem; }
+.upload-drop { outline:2px dashed #70e1e8; }
+.uploaded-message-files { margin-top:.5rem; }
+.uploaded-message-files pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:15rem; overflow:auto; }

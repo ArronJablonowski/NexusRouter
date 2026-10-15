@@ -157,12 +157,20 @@
           "maxLength": 1048576,
           "x-maxBytes": 1048576
         },
+        "files": {
+          "type":"array","maxItems":4,
+          "items":{"type":"object","additionalProperties":false,"required":["name","data"],"properties":{
+            "name":{"type":"string","minLength":1,"maxLength":200,"x-maxBytes":200,"pattern":"^[^/\\\\\u0000-\u001f\u007f]+$"},
+            "data":{"type":"string","minLength":4,"maxLength":11184812,"contentEncoding":"base64"}
+          }}
+        },
         "expected_revision": {
           "type": "integer",
           "minimum": 0
         }
       },
       "allOf": [
+        {"if":{"required":["files"],"properties":{"files":{"minItems":1}}},"then":{"properties":{"action":{"enum":["submit","resume"]}}}},
         {
           "if": {
             "properties": {

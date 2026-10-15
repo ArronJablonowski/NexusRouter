@@ -56,7 +56,7 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 		return nil, e
 	}
 	db.SetMaxOpenConns(1)
-	for _, stmt := range []string{"PRAGMA journal_mode=WAL", `CREATE TABLE IF NOT EXISTS files(chat TEXT NOT NULL,id TEXT NOT NULL,metadata BLOB NOT NULL,body BLOB NOT NULL,PRIMARY KEY(chat,id))`} {
+	for _, stmt := range []string{"PRAGMA journal_mode=WAL", `CREATE TABLE IF NOT EXISTS files(chat TEXT NOT NULL,id TEXT NOT NULL,metadata BLOB NOT NULL,body BLOB NOT NULL,PRIMARY KEY(chat,id))`, `CREATE TABLE IF NOT EXISTS input_bindings(submission TEXT PRIMARY KEY,operation TEXT NOT NULL)`} {
 		if _, e = db.ExecContext(ctx, stmt); e != nil {
 			db.Close()
 			return nil, e
@@ -139,4 +139,28 @@ func (s *Store) Get(ctx context.Context, chat, id string) (webui.ChatFile, []byt
 		return f, nil, ErrFile
 	}
 	return f, b, nil
+}
+
+// BindInputs links retained originals to a server-generated request key.
+// An existing binding can never be reassigned to another operation.
+func (s *Store) BindInputs(ctx context.Context, submission, operation string) error {
+	if !webui.ValidID(submission) || !webui.ValidID(operation) {
+		return ErrFile
+	}
+	if _, e := s.db.ExecContext(ctx, `INSERT INTO input_bindings(submission,operation) VALUES(?,?) ON CONFLICT(submission) DO NOTHING`, submission, operation); e != nil {
+		return e
+	}
+	old, e := s.InputOperation(ctx, submission)
+	if e != nil || old != operation {
+		return ErrFile
+	}
+	return nil
+}
+func (s *Store) InputOperation(ctx context.Context, submission string) (string, error) {
+	if !webui.ValidID(submission) {
+		return "", ErrFile
+	}
+	var operation string
+	e := s.db.QueryRowContext(ctx, `SELECT operation FROM input_bindings WHERE submission=?`, submission).Scan(&operation)
+	return operation, e
 }

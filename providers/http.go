@@ -181,6 +181,9 @@ func (p *HTTP) Stream(ctx context.Context, r Request, emit func(Chunk) error) er
 			return &Failure{Code: "invalid_role"}
 		}
 		wire := map[string]any{"role": m.Role, "content": ToolResultContent(m)}
+		if m.Role == "user" {
+			applyInputImages(wire, m.Content, p.kind)
+		}
 		if m.ToolCallID != "" {
 			if p.kind == "ollama" {
 				name, ok := callNames[m.ToolCallID]

@@ -820,7 +820,7 @@
 		refreshChats();
 		if (selectedChat) loadHistory(selectedChat, "", true, false);
 	}
-	function submitComposer() {
+	function submitComposer() { const attached=window.NexusChatUploads?.snapshot()||(!window.NexusChatUploads?{files:[]}:null);if(!attached)return;
 		const assignment = window.NexusHostMentions ? window.NexusHostMentions.prepare(composerText.value, selectedChat, csrfToken) : composerText.value; if (assignment === null) return;
  const text=typeof assignment==="string"?assignment:assignment.text,assignedModel=typeof assignment==="object"?assignment.modelID:"";
 		composerError.hidden = true;
@@ -834,15 +834,15 @@
 			return;
 		}
 		let path = "/api/v1/chats";
-		let payload = {version: 1, action: "submit", text,...(assignedModel?{model_id:assignedModel}:{})};
+		let payload = {version: 1, action: "submit", text,...(attached.files.length?{files:attached.files}:{}),...(assignedModel?{model_id:assignedModel}:{})};
 		if (selectedChat) {
 			const controls = selectedControls;
 			if (!controls || !controls.canResume) return;
 			path = "/api/v1/chats/" + encodeURIComponent(selectedChat) + "/resume";
-			payload = {version: 1, action: "resume", chat_id: selectedChat, task_id: controls.taskID, text, expected_revision: controls.revision};
+			payload = {version: 1, action: "resume", chat_id: selectedChat, task_id: controls.taskID, text,...(attached.files.length?{files:attached.files}:{}), expected_revision: controls.revision};
 		}
 		mutate(path, payload, body => {
-			composerText.value = "";
+   window.NexusChatUploads?.commit(attached);composerText.value = "";
 			composerCount.textContent = "0";
 			if (typeof body.chat_id === "string" && presentationID.test(body.chat_id)) selectChat(body.chat_id, body.state);
 			else {
@@ -860,7 +860,7 @@
 			return;
 		}
 		mutate("/api/v1/tasks/" + encodeURIComponent(controls.taskID) + "/steering", {
-			version: 1, action: "steer", task_id: controls.taskID, text, expected_revision: controls.revision
+			version: 1, action: "steer", task_id: controls.taskID, text,...(attached.files.length?{files:attached.files}:{}), expected_revision: controls.revision
 		}, () => {
 			steeringText.value = "";
 			showMutation("Guidance queued. Application will be shown only after committed confirmation.", false);

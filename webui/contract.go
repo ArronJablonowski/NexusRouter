@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"io"
 	"math"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 const (
 	ContractVersion       = 1
 	MaxRequestBytes       = 1 << 20
+	MaxUploadRequestBytes = 12 << 20
 	MaxEventBytes         = 1 << 20
 	MaxCursorBytes        = 512
 	MaxIDBytes            = 128
@@ -53,18 +55,22 @@ const (
 )
 
 type ChatRequest struct {
-	Version          int        `json:"version"`
-	Action           ChatAction `json:"action"`
-	IdempotencyKey   string     `json:"idempotency_key"`
-	ChatID           string     `json:"chat_id,omitempty"`
-	TaskID           string     `json:"task_id,omitempty"`
-	SubmissionID     string     `json:"submission_id,omitempty"`
-	ModelID          string     `json:"model_id,omitempty"`
-	Text             string     `json:"text,omitempty"`
-	ExpectedRevision *int64     `json:"expected_revision,omitempty"`
+	Files            []attachments.File `json:"files,omitempty"`
+	Version          int                `json:"version"`
+	Action           ChatAction         `json:"action"`
+	IdempotencyKey   string             `json:"idempotency_key"`
+	ChatID           string             `json:"chat_id,omitempty"`
+	TaskID           string             `json:"task_id,omitempty"`
+	SubmissionID     string             `json:"submission_id,omitempty"`
+	ModelID          string             `json:"model_id,omitempty"`
+	Text             string             `json:"text,omitempty"`
+	ExpectedRevision *int64             `json:"expected_revision,omitempty"`
 }
 
 func (r ChatRequest) Validate() error {
+	if attachments.Validate(r.Files) != nil || len(r.Files) > 0 && r.Action != ChatSubmit && r.Action != ChatResume {
+		return ErrContract
+	}
 	if r.Version != ContractVersion || !validKey(r.IdempotencyKey) ||
 		!optionalID(r.ChatID) || !optionalID(r.TaskID) || !optionalID(r.SubmissionID) || !optionalModelID(r.ModelID) ||
 		!optionalRevision(r.ExpectedRevision) || !boundedText(r.Text, MaxRequestBytes, true) {
@@ -93,6 +99,9 @@ func (r ChatRequest) Validate() error {
 		}
 	default:
 		return ErrContract
+	}
+	if len(r.Files) > 0 {
+		return encodedWithin(r, MaxUploadRequestBytes)
 	}
 	return encodedWithin(r, MaxRequestBytes)
 }

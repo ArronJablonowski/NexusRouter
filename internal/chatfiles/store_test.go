@@ -85,3 +85,26 @@ func TestChatFilesPrivateStoreAndQuota(t *testing.T) {
 		t.Fatal("quota rollback", len(files), e)
 	}
 }
+
+func TestInputBindingCannotBeReassigned(t *testing.T) {
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "files")
+	s, e := Open(ctx, root)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	if e = s.BindInputs(ctx, "submission", "operation-a"); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.BindInputs(ctx, "submission", "operation-a"); e != nil {
+		t.Fatal("idempotent binding", e)
+	}
+	if e = s.BindInputs(ctx, "submission", "operation-b"); e == nil {
+		t.Fatal("submission reassigned")
+	}
+	operation, e := s.InputOperation(ctx, "submission")
+	if e != nil || operation != "operation-a" {
+		t.Fatal("binding changed", operation, e)
+	}
+}

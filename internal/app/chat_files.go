@@ -72,6 +72,11 @@ func (s *Service) ChatFiles(ctx context.Context, chat string) (webui.ChatFilePag
 					break
 				}
 				after = event.Sequence
+				if event.Kind == runtime.TaskStarted {
+					if err = s.collectChatInputs(ctx, db, store, chat, task.TaskID, event.Data.SubmissionID); err != nil {
+						return page, err
+					}
+				}
 				if event.Kind == runtime.TurnCompleted {
 					for _, call := range event.Data.ToolCalls {
 						calls[call.ID] = call
