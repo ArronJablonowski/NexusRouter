@@ -29,6 +29,9 @@ import (
 )
 
 func prepareChatInputs(ctx context.Context, files []attachments.File) ([]attachments.Input, error) {
+	return prepareChatInputsWithImageLimit(ctx, files, 4<<10)
+}
+func prepareChatInputsWithImageLimit(ctx context.Context, files []attachments.File, imageLimit int) ([]attachments.Input, error) {
 	ctx, cancel := context.WithTimeout(ctx, 22*time.Second)
 	defer cancel()
 	if attachments.Validate(files) != nil {
@@ -55,7 +58,7 @@ func prepareChatInputs(ctx context.Context, files []attachments.File) ([]attachm
 		case ".docx":
 			v.Text, e = documenttext.DOCX(f.Data)
 		case ".png", ".jpg", ".jpeg", ".gif":
-			v.Image, e = chatInputImage(f.Data)
+			v.Image, e = chatInputImageLimit(f.Data, imageLimit)
 		default:
 			if !utf8.Valid(f.Data) || bytes.IndexByte(f.Data, 0) >= 0 {
 				return nil, attachments.ErrFile
@@ -114,7 +117,11 @@ func (w *cappedDocumentWriter) Write(b []byte) (int, error) {
 	}
 	return w.buffer.Write(b)
 }
-func chatInputImage(data []byte) (string, error) {
+func chatInputImage(data []byte) (string, error) { return chatInputImageLimit(data, 4<<10) }
+func chatInputImageLimit(data []byte, limit int) (string, error) {
+	if limit < 1 || limit > 4<<10 {
+		return "", attachments.ErrFile
+	}
 	c, _, e := image.DecodeConfig(bytes.NewReader(data))
 	if e != nil || c.Width < 1 || c.Height < 1 || int64(c.Width)*int64(c.Height) > 16_000_000 {
 		return "", attachments.ErrFile
@@ -146,7 +153,7 @@ func chatInputImage(data []byte) (string, error) {
 		if jpeg.Encode(&encoded, dst, &jpeg.Options{Quality: 70}) != nil {
 			return "", attachments.ErrFile
 		}
-		if encoded.Len() <= 4<<10 {
+		if encoded.Len() <= limit {
 			return base64.StdEncoding.EncodeToString(encoded.Bytes()), nil
 		}
 	}
