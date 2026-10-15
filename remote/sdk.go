@@ -178,9 +178,10 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 			return submissions.Status{}, ErrDenied
 		}
 	}
+	needsVision := HasImageInputs(t)
 	eligible := false
 	for _, m := range b.Models {
-		if m.ID == t.ModelID && (t.ExpectedModel == "" || t.ExpectedModel == m.Model) && (!t.Private || m.Local) && m.ContextTokens >= t.ContextTokens && m.EstimatedCost != nil && !math.IsNaN(*m.EstimatedCost) && !math.IsInf(*m.EstimatedCost, 0) && *m.EstimatedCost >= 0 && *m.EstimatedCost <= t.MaxCost {
+		if m.ID == t.ModelID && (!needsVision || slices.Contains(m.Capabilities, "vision")) && (t.ExpectedModel == "" || t.ExpectedModel == m.Model) && (!t.Private || m.Local) && m.ContextTokens >= t.ContextTokens && m.EstimatedCost != nil && !math.IsNaN(*m.EstimatedCost) && !math.IsInf(*m.EstimatedCost, 0) && *m.EstimatedCost >= 0 && *m.EstimatedCost <= t.MaxCost {
 			eligible = true
 		}
 	}

@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"github.com/ArronJablonowski/NexusRouter/attachments"
+	"image"
+	"image/png"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -42,10 +44,11 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	}
 	roots := x509.NewCertPool()
 	roots.AddCert(cert)
-	var calls, cancellations atomic.Int32
+	var calls, cancellations, imagePosts atomic.Int32
+	var vision atomic.Bool
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if (r.Method != "GET" && !(r.Method == "POST" && (r.URL.Path == "/v1/remote/tasks/request-existing-0001/cancel" || r.URL.Path == "/v1/remote/tasks/request-browser-0001"))) || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
+		if (r.Method != "GET" && !(r.Method == "POST" && (r.URL.Path == "/v1/remote/tasks/request-existing-0001/cancel" || (r.URL.Path == "/v1/remote/tasks/request-browser-0001" || r.URL.Path == "/v1/remote/tasks/request-image-00001")))) || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
 			http.Error(w, "denied", 403)
 			return
 		}
@@ -54,8 +57,24 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/remote/tasks/request-browser-0001":
 			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-browser", State: "queued"})
+		case "/v1/remote/tasks/request-image-00001":
+			var task remote.Task
+			decoder := json.NewDecoder(r.Body)
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&task) != nil || !remote.HasImageInputs(task) {
+				t.Error("image transport frame missing")
+				http.Error(w, "invalid", 400)
+				return
+			}
+			imagePosts.Add(1)
+			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "image-submission", State: "queued"})
 		case "/v1/remote/info":
-			json.NewEncoder(w).Encode(remote.Info{Version: 1, Instance: "node-a", Available: true})
+			zero := 0.0
+			caps := []string{"chat"}
+			if vision.Load() {
+				caps = append(caps, "vision")
+			}
+			json.NewEncoder(w).Encode(remote.Info{Version: 1, Instance: "node-a", Available: true, Models: []remote.Model{{ID: "model-a", Model: "actual", Local: true, EstimatedCost: &zero, Capabilities: caps}}})
 		case "/v1/remote/tasks":
 			json.NewEncoder(w).Encode(remote.TaskPage{Version: 1, Instance: "node-a", After: r.Header.Get("X-Nexus-After-Request"), Next: "request-existing-0001", Tasks: []remote.TaskSummary{{RequestID: "request-existing-0001", State: "running", TaskIDs: []string{"task-1"}}}})
 		case "/v1/remote/tasks/request-existing-0001":
@@ -174,6 +193,9 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.remoteDispatcher = &RecordedRemoteDispatcher{Client: h.remoteInspector.(*remote.Client), Store: routeStore, UploadDirectory: filepath.Join(dir, "uploads"), PrepareUploads: func(_ context.Context, prompt string, files []attachments.File) (string, error) {
+		if files[0].Name == "photo.png" {
+			return attachments.Encode(prompt, []attachments.Input{{Name: "photo.png", Image: "/9j/AQ=="}}), nil
+		}
 		return attachments.Encode(prompt, []attachments.Input{{Name: files[0].Name, Text: string(files[0].Data)}}), nil
 	}}
 	dispatch := func(body string, want int) {
@@ -258,7 +280,8 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 10 {
 		t.Fatal("saved status did not use pinned mTLS", calls.Load())
 	}
-	if _, err = trust.Revoke("node-a", registry.Digest()); err != nil {
+	revoked, err := trust.Revoke("node-a", registry.Digest())
+	if err != nil {
 		t.Fatal(err)
 	}
 	dispatch(body, 503)
@@ -270,4 +293,35 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 10 || cancellations.Load() != 1 {
 		t.Fatal("revoked peer contacted")
 	}
+	if err = trust.Replace(registry, revoked.Digest()); err != nil {
+		t.Fatal(err)
+	}
+	var picture bytes.Buffer
+	png.Encode(&picture, image.NewRGBA(image.Rect(0, 0, 3, 3)))
+	input.RequestID = "request-image-00001"
+	input.Files = []attachments.File{{Name: "photo.png", Data: picture.Bytes()}}
+	imageBody, _ := json.Marshal(input)
+	dispatch(string(imageBody), 422)
+	if imagePosts.Load() != 0 {
+		t.Fatal("text-only model received images")
+	}
+	vision.Store(true)
+	dispatch(string(imageBody), 200)
+	if imagePosts.Load() != 1 {
+		t.Fatal("vision task not dispatched exactly once")
+	}
+	imagePath := "/app/api/v1/remote-files/node-a/request-image-00001"
+	json.Unmarshal(get(imagePath, 200).Body.Bytes(), &originals)
+	if len(originals.Files) != 1 {
+		t.Fatal("image original absent")
+	}
+	imageURL := imagePath + "/" + originals.Files[0].ID
+	preview := get(imageURL+"/preview", 200)
+	if preview.Header().Get("Content-Type") != "image/png" || !bytes.Equal(preview.Body.Bytes(), picture.Bytes()) {
+		t.Fatal("image preview changed original")
+	}
+	if !bytes.Equal(get(imageURL+"/download", 200).Body.Bytes(), picture.Bytes()) {
+		t.Fatal("image download changed original")
+	}
+	get(strings.Replace(originalURL, "/download", "/preview", 1), 415)
 }

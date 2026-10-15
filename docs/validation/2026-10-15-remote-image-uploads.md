@@ -1,0 +1,17 @@
+# Commander @Spark image uploads — 2026-10-15
+
+## Implementation and source qualification
+
+Extended remote uploads from text/document frames to bounded image analysis inputs. The commander preserves original bytes for authenticated downloads and safe PNG/JPEG previews, while its existing image preparation produces small JPEG inputs (at most 512 pixels on the longest side / 4 KiB JPEG). GIF analysis uses the first frame; original downloads remain unchanged. Text/name credential redaction never rewrites binary image data.
+
+Vision capability is checked at three boundaries: the browser's selected paired model, a fresh commander-side paired `info` read before task dispatch, and Spark SDK admission. Models without declared `vision` cannot accept image-bearing prompt/conversation frames. Configuration rejects a vision declaration on unsupported provider transports. Existing model-name pinning, private/local/cost/context limits, immutable original-byte binding and no uncertain replay remain enforced. Image context requests are at most 8192 tokens and clamped by the peer/model ceilings. No transport body/file limit was relaxed.
+
+Read-only Spark Ollama metadata reports `completion, vision, tools, thinking` for installed `gemma4:31b` and `qwen3.5:122b`. NexusRouter's current declarations omit vision; deployment will add only that truthful capability to existing IDs `gemma4-31b` and `qwen3-5-122b`, retaining their other settings and existing pairing. No model install/service/credential/trust change is required.
+
+Passed source checks: formatting/1000-line gate, scoped vet, native macOS and Linux ARM64 trimpath builds. Full race package results: config 18.313s, remote 57.542s, remotecli 1.761s, webuiapp 9.519s, chatfiles 1.640s, attachments 1.266s, providers 2.726s, webui 38.309s. Scoped app/CLI race results: app 32.418s, CLI 7.118s. Scope includes image preparation/redaction, explicit model no-fallback, uploads, submissions/recovery, browser remote control and serving boundaries. No full `make check` or MVP pass is claimed.
+
+Tests verify text-only-model rejection before submission, image-preserving redaction, prompt and direct-conversation image detection, ordinary text compatibility, unsupported-provider declarations, fresh vision eligibility, mTLS image-frame dispatch only after vision becomes available, exact originals/downloads, safe previews and non-image preview rejection. Existing changed-byte/omitted-file binding and concurrency tests remain intact. The browser fixture rejects non-vision selection while retaining its image draft. Embedded asset manifest reviewed: `1f8e3dcf4e4a5d7899335dbf1b6775cafc1e13e741da34e950d95c1987739cda`.
+
+Commands: `go test -race ./internal/config ./remote ./internal/remotecli ./internal/webuiapp ./internal/chatfiles ./attachments ./providers ./webui -count=1 -timeout=5m`; scoped app/CLI `-run 'Test(RemoteUpload|Upload|BrowserUploads|ExactModel|DocumentProcess|BrowserRemote|Serve|Submission|ResumeSubmission)'`; `go run ./cmd/check`; scoped `go vet`; native and Linux ARM64 `go build -trimpath ./cmd/nexus`.
+
+Actual Spark vision-model answers, original downloads and installed-service verification follow this source checkpoint. Synthetic image fixtures use neutral filenames and no answer hints in the prompt. All private fixtures, operations, credentials, logs and screenshots remain outside Git. Linear authentication remains unavailable. Fine-detail/orientation fidelity, general model accuracy and storage cleanup remain existing limits.

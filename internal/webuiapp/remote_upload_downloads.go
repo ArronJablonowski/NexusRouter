@@ -62,7 +62,7 @@ func (h *Handler) serveRemoteFiles(w http.ResponseWriter, r *http.Request) bool 
 		}{1, p[0], p[1], files})
 		return true
 	}
-	if !webui.ValidID(p[2]) || p[3] != "download" {
+	if !webui.ValidID(p[2]) || (p[3] != "download" && p[3] != "preview") {
 		h.writeError(w, r, 404, "file_unavailable")
 		return true
 	}
@@ -71,8 +71,17 @@ func (h *Handler) serveRemoteFiles(w http.ResponseWriter, r *http.Request) bool 
 		h.writeError(w, r, 404, "file_unavailable")
 		return true
 	}
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": f.Name}))
+	kind, disposition := "application/octet-stream", "attachment"
+	if p[3] == "preview" {
+		kind = http.DetectContentType(b)
+		if kind != f.MediaType || (kind != "image/png" && kind != "image/jpeg") {
+			h.writeError(w, r, 415, "preview_unavailable")
+			return true
+		}
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Type", kind)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": f.Name}))
 	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
 	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	w.Write(b)

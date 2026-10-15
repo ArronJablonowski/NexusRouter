@@ -11,6 +11,8 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"github.com/ArronJablonowski/NexusRouter/webui"
+	"net/http"
+	"slices"
 )
 
 func remoteTaskFits(task remote.Task) bool {
@@ -70,12 +72,37 @@ func (d *RecordedRemoteDispatcher) DispatchFiles(ctx context.Context, instance, 
 		if e != nil || !remoteTaskFits(task) {
 			return reject()
 		}
+		if remote.HasImageInputs(task) {
+			info, err := d.Client.Info(ctx, instance)
+			if err != nil || !remoteUploadVisionAllowed(info, task) {
+				return reject()
+			}
+		}
 		for _, f := range files {
-			meta := webui.ChatFile{ID: chatfiles.ID(scope, f.Name), TaskID: scope, Name: f.Name, MediaType: "application/octet-stream", Size: len(f.Data)}
+			meta := webui.ChatFile{ID: chatfiles.ID(scope, f.Name), TaskID: scope, Name: f.Name, MediaType: remoteUploadMedia(f.Data), Size: len(f.Data)}
 			if e = store.Put(ctx, scope, meta, f.Data); e != nil {
 				return reject()
 			}
 		}
 	}
 	return d.Client.DispatchRecorded(ctx, d.Store, instance, key, task)
+}
+
+func remoteUploadMedia(b []byte) string {
+	kind := http.DetectContentType(b)
+	if kind == "image/png" || kind == "image/jpeg" {
+		return kind
+	}
+	return "application/octet-stream"
+}
+func remoteUploadVisionAllowed(info remote.Info, task remote.Task) bool {
+	if !info.Available {
+		return false
+	}
+	for _, m := range info.Models {
+		if m.ID == task.ModelID && m.Local && m.EstimatedCost != nil && *m.EstimatedCost == 0 && (task.ExpectedModel == "" || task.ExpectedModel == m.Model) && slices.Contains(m.Capabilities, "vision") {
+			return true
+		}
+	}
+	return false
 }

@@ -648,6 +648,9 @@ func (s Settings) Validate() error {
 			if !identifier.MatchString(c) || capabilities[c] {
 				return errors.New("invalid capability name")
 			}
+			if c == "vision" && providers[m.Provider].Kind != "ollama" && providers[m.Provider].Kind != "openai_compatible" {
+				return errors.New("vision requires a supported image provider")
+			}
 			capabilities[c] = true
 		}
 	}

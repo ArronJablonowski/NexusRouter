@@ -70,3 +70,20 @@ func TestRemoteUploadEncodedTransportBound(t *testing.T) {
 		t.Fatal("ordinary remote task rejected")
 	}
 }
+
+func TestRemoteUploadFreshVisionEligibility(t *testing.T) {
+	zero := 0.0
+	task := remote.Task{ModelID: "vision", ExpectedModel: "actual"}
+	info := remote.Info{Available: true, Models: []remote.Model{{ID: "vision", Model: "actual", Local: true, EstimatedCost: &zero, Capabilities: []string{"vision"}}}}
+	if !remoteUploadVisionAllowed(info, task) {
+		t.Fatal("vision metadata rejected")
+	}
+	for _, change := range []func(*remote.Info){func(i *remote.Info) { i.Available = false }, func(i *remote.Info) { i.Models[0].Capabilities = nil }, func(i *remote.Info) { i.Models[0].Local = false }, func(i *remote.Info) { i.Models[0].Model = "changed" }, func(i *remote.Info) { i.Models[0].EstimatedCost = nil }} {
+		candidate := info
+		candidate.Models = append([]remote.Model(nil), info.Models...)
+		change(&candidate)
+		if remoteUploadVisionAllowed(candidate, task) {
+			t.Fatal("unqualified vision model admitted")
+		}
+	}
+}
