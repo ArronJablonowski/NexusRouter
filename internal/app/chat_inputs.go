@@ -28,6 +28,8 @@ import (
 )
 
 func prepareChatInputs(ctx context.Context, files []attachments.File) ([]attachments.Input, error) {
+	ctx, cancel := context.WithTimeout(ctx, 22*time.Second)
+	defer cancel()
 	if attachments.Validate(files) != nil {
 		return nil, attachments.ErrFile
 	}
@@ -35,14 +37,20 @@ func prepareChatInputs(ctx context.Context, files []attachments.File) ([]attachm
 	total := 0
 	for _, f := range files {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, attachments.ErrProcessing
 		}
 		v := attachments.Input{Name: f.Name}
 		ext := strings.ToLower(filepath.Ext(f.Name))
 		var e error
 		switch ext {
-		case ".pdf":
-			v.Text, e = extractPDFChild(ctx, f.Data)
+		case ".pdf", ".doc":
+			if ext == ".doc" && (len(f.Data) < 512 || !bytes.HasPrefix(f.Data, []byte{0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1})) {
+				return nil, attachments.ErrFile
+			}
+			if ext == ".pdf" && !bytes.HasPrefix(f.Data, []byte("%PDF-")) {
+				return nil, attachments.ErrFile
+			}
+			v.Text, e = extractDocumentChild(ctx, ext[1:], f.Data)
 		case ".docx":
 			v.Text, e = documenttext.DOCX(f.Data)
 		case ".png", ".jpg", ".jpeg", ".gif":
@@ -53,6 +61,9 @@ func prepareChatInputs(ctx context.Context, files []attachments.File) ([]attachm
 			}
 			v.Text = string(f.Data)
 		}
+		if errors.Is(e, attachments.ErrProcessing) {
+			return nil, e
+		}
 		total += len(v.Text) + len(v.Image)
 		if e != nil || len(v.Text) > 64<<10 || total > 128<<10 {
 			return nil, attachments.ErrFile
@@ -61,19 +72,31 @@ func prepareChatInputs(ctx context.Context, files []attachments.File) ([]attachm
 	}
 	return out, nil
 }
-func extractPDFChild(ctx context.Context, data []byte) (string, error) {
+func extractDocumentChild(ctx context.Context, kind string, data []byte) (string, error) {
 	binary, e := os.Executable()
 	if e != nil {
 		return "", e
 	}
-	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, binary, "internal-file-text", "pdf")
+	cmd := exec.CommandContext(ctx, binary, "internal-file-text", kind)
+	dir, e := os.MkdirTemp("", "nexus-document-")
+	if e != nil {
+		return "", attachments.ErrProcessing
+	}
+	defer os.RemoveAll(dir)
+	cmd.Env = append(os.Environ(), "TMPDIR="+dir)
+	cmd.Dir = dir
+	defer configureDocumentProcess(cmd)()
 	cmd.Stdin = bytes.NewReader(data)
 	var out cappedDocumentWriter
 	cmd.Stdout = &out
 	cmd.Stderr = io.Discard
 	if e = processaudit.Run(cmd); e != nil {
+		var exit *exec.ExitError
+		if ctx.Err() != nil || errors.As(e, &exit) && exit.ExitCode() == 2 {
+			return "", attachments.ErrProcessing
+		}
 		return "", attachments.ErrFile
 	}
 	if out.buffer.Len() == 0 || !utf8.Valid(out.buffer.Bytes()) {

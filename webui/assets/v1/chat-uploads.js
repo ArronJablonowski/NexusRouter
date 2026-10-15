@@ -8,7 +8,7 @@ window.NexusChatUploads=(()=>{
  async function add(items){
   if(reading||input.disabled)return;reading=true;draw();note('Reading files…');const current=files.slice();
   try{for(const f of items){if(current.length>=4||f.size<1||f.size>max||current.reduce((n,x)=>n+x.size,0)+f.size>max)throw Error('Choose up to 4 files, no more than 8 MB combined.');if(!f.name||new TextEncoder().encode(f.name).length>200||/[\x00-\x1f\x7f/\\]/.test(f.name)||current.some(x=>x.name===f.name))throw Error('Use unique, ordinary filenames.');
-   const bytes=new Uint8Array(await f.arrayBuffer()),ext=f.name.toLowerCase().split('.').pop();if(!['pdf','docx','png','jpg','jpeg','gif'].includes(ext)){try{const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(text.includes('\0'))throw Error();}catch{throw Error('Use UTF-8 text/code/data, PDF, Word (.docx), PNG, JPEG or GIF files.');}}
+   const bytes=new Uint8Array(await f.arrayBuffer()),ext=f.name.toLowerCase().split('.').pop();if(!['pdf','doc','docx','png','jpg','jpeg','gif'].includes(ext)){try{const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(text.includes('\0'))throw Error();}catch{throw Error('Use UTF-8 text/code/data, PDF, Word (.doc/.docx), PNG, JPEG or GIF files.');}}
    let raw='';for(let at=0;at<bytes.length;at+=8192)raw+=String.fromCharCode(...bytes.subarray(at,at+8192));current.push({name:f.name,data:btoa(raw),size:f.size});}
    files=current;generation++;note('Files ready. They will be sent to the selected model with your message.');
   }catch(e){note(e.message||'The file could not be read.');}finally{reading=false;picker.value='';draw();}

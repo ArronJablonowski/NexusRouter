@@ -136,7 +136,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 }
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
-	// Reviewed v1 assets: bounded chat uploads, safe document previews,
+	// Reviewed v1 assets: bounded chat uploads including .doc and scanned-PDF help, safe document previews,
 	// explicit one-click approvals, opt-in automatic approval
 	// setting, graded quality ratings without manual cost, viewport-pinned composer,
 	// chat-scoped output cards, raster previews/downloads,
@@ -145,7 +145,7 @@ func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	// same-origin image retrieval, CSRF requests and no automatic submission replay.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "a86b1399bdf493c5fac6c034cb3658b062822e129a95203c83a5c46a1c1b9be1" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "d2776aaefba43a08d2b2a207dfb4b998b5e590182156e0462e1838bf0c70ca05" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/comfy.js", "assets/v1/status.js", "assets/v1/cron.js", "assets/v1/remote-models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/chat-uploads.js", "assets/v1/chat-render.js", "assets/v1/chat-files.js", "assets/v1/chat-descriptions.js", "assets/v1/host-mentions.js", "assets/v1/collaboration.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {

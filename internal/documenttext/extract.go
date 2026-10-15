@@ -16,7 +16,9 @@ const MaxText = 64 << 10
 
 var ErrDocument = errors.New("document text unavailable")
 
-func PDF(data []byte) (text string, err error) {
+func PDF(data []byte) (text string, err error) { return pdfText(data, nil) }
+
+func pdfText(data []byte, ocr func(int) (string, error)) (text string, err error) {
 	defer func() {
 		if recover() != nil {
 			text = ""
@@ -24,14 +26,20 @@ func PDF(data []byte) (text string, err error) {
 		}
 	}()
 	r, e := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
-	if e != nil || r.NumPage() < 1 || r.NumPage() > 40 {
+	if e != nil || r.NumPage() < 1 || r.NumPage() > 40 || !r.Trailer().Key("Encrypt").IsNull() {
 		return "", ErrDocument
 	}
 	var b strings.Builder
 	for n := 1; n <= r.NumPage(); n++ {
 		page := r.Page(n)
 		s, e := page.GetPlainText(nil)
-		if e != nil || len(s)+b.Len() > MaxText {
+		if ocr != nil && (e != nil || strings.TrimSpace(s) == "" || pageHasImages(page.Resources(), 0)) {
+			s, e = ocr(n)
+		}
+		if e != nil {
+			return "", e
+		}
+		if len(s)+b.Len()+1 > MaxText {
 			return "", ErrDocument
 		}
 		b.WriteString(s)
@@ -103,4 +111,22 @@ func DOCX(data []byte) (string, error) {
 		return "", ErrDocument
 	}
 	return b.String(), nil
+}
+
+// Form XObjects can contain scans too. Bound recursion on hostile/cyclic resources.
+func pageHasImages(resources pdf.Value, depth int) bool {
+	if depth > 8 {
+		return true
+	}
+	objects := resources.Key("XObject")
+	for _, key := range objects.Keys() {
+		v := objects.Key(key)
+		if v.Key("Subtype").Name() == "Image" {
+			return true
+		}
+		if v.Key("Subtype").Name() == "Form" && pageHasImages(v.Key("Resources"), depth+1) {
+			return true
+		}
+	}
+	return false
 }

@@ -435,6 +435,9 @@ func (h *Handler) mutationFailure(writer http.ResponseWriter, request *http.Requ
 	status, code := http.StatusServiceUnavailable, "mutation_unavailable"
 	retryable := true
 	switch {
+	case errors.Is(err, attachments.ErrProcessing):
+		status, code = http.StatusUnprocessableEntity, "attachment_processing_unavailable"
+		retryable = false
 	case errors.Is(err, attachments.ErrFile):
 		status, code = http.StatusUnprocessableEntity, "attachment_unreadable"
 		retryable = false
@@ -466,6 +469,8 @@ func (h *Handler) mutationFailure(writer http.ResponseWriter, request *http.Requ
 
 func mutationErrorMessage(code string) string {
 	switch code {
+	case "attachment_processing_unavailable":
+		return "This host’s document reader is unavailable or took too long. Try fewer scanned pages, or ask the administrator to check the local OCR/Word readers."
 	case "attachment_unreadable":
 		return "The file could not be read or needs a supported image model. Check format, size and model; try a smaller file."
 	case "revision_conflict":

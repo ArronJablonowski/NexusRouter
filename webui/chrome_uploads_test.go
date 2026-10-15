@@ -25,8 +25,8 @@ func TestChromeChatUploadsSelectionRecoveryAndSubmission(t *testing.T) {
 		t.Fatal(e)
 	}
 	dir := t.TempDir()
-	names := []string{"data.csv", "<img src=x>.txt", "report.pdf", "report.docx", "picture.png", "invalid.bin"}
-	bodies := [][]byte{[]byte("value,76241\n"), []byte("<script>window.uploadExecuted=true</script>"), []byte("%PDF-fixture"), []byte("ZIP fixture"), nil, {255, 254, 0}}
+	names := []string{"legacy.doc", "<img src=x>.txt", "report.pdf", "report.docx", "picture.png", "invalid.bin"}
+	bodies := [][]byte{append([]byte{0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1}, make([]byte, 504)...), []byte("<script>window.uploadExecuted=true</script>"), []byte("%PDF-fixture"), []byte("ZIP fixture"), nil, {255, 254, 0}}
 	var imageBody bytes.Buffer
 	png.Encode(&imageBody, image.NewRGBA(image.Rect(0, 0, 12, 12)))
 	bodies[4] = imageBody.Bytes()

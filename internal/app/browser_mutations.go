@@ -70,7 +70,7 @@ func (b *BrowserMutations) Chat(ctx context.Context, subject string, request con
 	}
 	inputs, inputErr := prepareChatInputs(ctx, request.Files)
 	if inputErr != nil {
-		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, attachments.ErrFile))
+		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, inputErr))
 	}
 	if !b.service.chatImageModelAllowed(model, inputs) {
 		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, attachments.ErrFile))

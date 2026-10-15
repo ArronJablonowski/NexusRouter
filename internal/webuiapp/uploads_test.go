@@ -48,3 +48,16 @@ func TestUploadMutationAuthCSRFAndByteBounds(t *testing.T) {
 		t.Fatal("invalid base64 dispatched", w.Code)
 	}
 }
+
+func TestDocumentReaderFailureIsDefinitiveAndSafe(t *testing.T) {
+	h := mutationHandlerFixture(t, MutationServices{Chat: func(context.Context, string, webui.ChatRequest) (webui.ChatMutationReceipt, error) {
+		return webui.ChatMutationReceipt{}, attachments.ErrProcessing
+	}})
+	r := authorizedMutationRequest(t, h, "/app/api/v1/chats", `{"version":1,"action":"submit","idempotency_key":"document-reader-failure-01","text":"Read","files":[{"name":"scan.pdf","data":"JVBERi0="}]}`)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	var result webui.Error
+	if json.Unmarshal(w.Body.Bytes(), &result) != nil || w.Code != 422 || result.Retryable || result.Code != "attachment_processing_unavailable" {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
