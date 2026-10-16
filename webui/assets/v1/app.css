@@ -708,7 +708,7 @@ main { background: #03131b55; }
 .rail a:hover, .rail a:focus-visible, .rail a[aria-current="page"] { box-shadow: none; background: #102e39; border-color: #345e69; }
 :where(button, a, input, textarea, select, summary):focus-visible { outline: 2px solid var(--nx-accent); outline-offset: 3px; }
 button:disabled, .secondary:disabled { cursor: not-allowed; opacity: .5; }
-textarea, input, select { border-color: #345e69; border-radius: .6rem; }
+textarea, input, select { border-color: #578390; border-radius: .6rem; }
 input::placeholder, textarea::placeholder { color: #91aab4; opacity: 1; }
 input[type="file"]::file-selector-button { padding: .4rem .7rem; margin-right: .65rem; border: 1px solid #345e69; border-radius: .5rem; background: #0b2933; color: var(--nx-text); font: inherit; cursor: pointer; }
 .chat-index, .transcript-panel, .inspector, .board-index, .kanban-panel, .settings-card, .model-inventory-section, .stats-card, .active-jobs-panel {

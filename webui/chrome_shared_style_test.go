@@ -38,7 +38,7 @@ const pages=await evaluate('[...document.querySelectorAll(".rail a")].map(a=>({v
 for(const page of pages){
  await cdp('Page.navigate',{url:page.url});
  await eventually('document.querySelector("[data-view='+page.view+']")?.getAttribute("aria-current")==="page"','Page not selected '+page.view);
- for(const width of [1440,768,390]){
+ for(const width of [1440,1024,768,390,320]){
   await cdp('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
   await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
   await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
@@ -54,11 +54,15 @@ for(const page of pages){
     const style=getComputedStyle(b),fg=rgb(style.color),bg=rgb(style.backgroundColor);
     if(!b.disabled&&fg&&bg&&(fg.length===3||fg[3]===1)&&(bg.length===3||bg[3]===1)&&contrast(fg,bg)<4.5)errors.push('button contrast '+b.id);
    }
+   for(const input of main.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select')){
+    if(!visible(input)||input.disabled)continue;const style=getComputedStyle(input),border=rgb(style.borderTopColor),bg=rgb(style.backgroundColor);
+    if(parseFloat(style.borderTopWidth)>0&&border&&bg&&(bg.length===3||bg[3]===1)&&contrast(border,bg)<3)errors.push('field boundary contrast '+input.id);
+   }
    for(const n of main.querySelectorAll('[hidden]'))if(visible(n))errors.push('hidden control exposed '+n.id+' '+n.className);
    const primary=[...main.children].filter(n=>n.tagName==='SECTION'&&visible(n));
    if(primary.length!==1)errors.push('page visibility');
    const button=[...main.querySelectorAll('button')].find(b=>visible(b)&&!b.disabled);
-   if(button){button.focus();if(!button.matches(':focus-visible')||getComputedStyle(button).outlineStyle==='none')errors.push('keyboard focus '+button.id+' active='+document.activeElement.id+' visible='+button.matches(':focus-visible')+' outline='+getComputedStyle(button).outlineStyle);if(parseFloat(getComputedStyle(button).transitionDuration)!==0)errors.push('reduced motion');}
+   if(button){button.focus();if(!button.matches(':focus-visible')||getComputedStyle(button).outlineStyle==='none')errors.push('keyboard focus '+button.id+' active='+document.activeElement.id+' visible='+button.matches(':focus-visible')+' outline='+getComputedStyle(button).outlineStyle+' hasFocus='+document.hasFocus());if(parseFloat(getComputedStyle(button).transitionDuration)!==0)errors.push('reduced motion');}
    return errors;
   })()` + "`" + `);
   if(errors.length)throw Error(page.view+' '+width+': '+errors.join(', '));

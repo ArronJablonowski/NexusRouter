@@ -99,7 +99,7 @@ await evaluate('document.querySelector("#chat-files").scrollIntoView({block:"sta
 if(process.env.NEXUS_CHAT_FILES_SCREENSHOT){const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_CHAT_FILES_SCREENSHOT,Buffer.from(shot.data,'base64'));}
 // Long messages, generated files and controls must never displace the composer.
 await evaluate("window.longMessages=Array.from({length:30},(_,i)=>({id:'long-'+i,role:'assistant',text:'Long conversation message '.repeat(100)}));window.NexusChatRender.messages(document.querySelector('#transcript'),longMessages,true);document.querySelector('#feedback-panel').hidden=false;document.querySelector('#task-controls').hidden=false;document.querySelector('#composer-text').value='Keep my draft';");
-for(const [width,height] of [[1440,1000],[1024,700],[700,700],[390,844],[390,480]]){
+for(const [width,height] of [[1440,1000],[1024,700],[700,700],[390,844],[320,568],[390,480],[844,390]]){
  await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
  await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
  await evaluate("window.headingTop=document.querySelector('.transcript-heading').getBoundingClientRect().top");
