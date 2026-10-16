@@ -20,7 +20,7 @@ a { color: inherit; }
 .rail a:hover, .rail a:focus-visible, .rail a[aria-current="page"] { outline: none; background: #263758; }
 main { min-width: 0; padding: 1.25rem; }
 button, textarea, input, select { font: inherit; }
-button { padding: .65rem 1rem; border: 1px solid #73e6b1; border-radius: .6rem; background: #73e6b1; color: #08130f; font-weight: 700; cursor: pointer; }
+button { min-height: 2.25rem; padding: .45rem .8rem; border: 1px solid #345e69; border-radius: .6rem; background: #0b2933; color: #e0f3f7; font-size: .85rem; line-height: 1.35; font-weight: 600; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
 button:disabled, textarea:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 textarea, input, select { border: 1px solid #66799b; border-radius: .55rem; background: #0d1628; color: inherit; }
 textarea, input { width: 100%; }
@@ -469,10 +469,11 @@ main{background:linear-gradient(#03131b80,#020c13b0),repeating-linear-gradient(9
 h1,h2,h3{color:var(--nx-text)}
 .eyebrow{color:#76dce5;letter-spacing:.11em;font-size:.72rem}
 .status,.help,.notice,.chat-meta,.message-label,.provisional-label,.stats-note,.stats-since{color:var(--nx-muted)}
-button{border-color:#55dce3;border-radius:.3rem;background:#64e1e7;color:#042129}
-button:not(:disabled):hover{filter:brightness(1.1)}
-.secondary{border-color:#317585;background:#09303c;color:#ccf8fb;border-radius:.3rem}
-.danger{border-color:#b45b6c;background:#48212e;color:#ffdae0}
+button{border-color:#345e69;border-radius:.6rem;background:#0b2933;color:var(--nx-text)}
+button:not(:disabled):hover{border-color:#69b5c2;background:#123b47}
+.secondary{border-color:#345e69;background:#0b2933;color:var(--nx-text);border-radius:.6rem;font-weight:600;padding:.45rem .8rem}
+.danger{border-color:#82505a;background:#291f28;color:#f3b5be}
+.danger:hover:not(:disabled){border-color:#d98a98;background:#432630}
 textarea,input,select{background:#03141e;border-color:#477a87;border-radius:.3rem;color:var(--nx-text);accent-color:#56e8e9}
 :where(button,a,input,textarea,select,summary):focus-visible{outline:2px solid #8fffff;outline-offset:3px}
 .chat-index,.transcript-panel,.inspector,.board-index,.kanban-panel,.settings-card,.model-inventory-section,.stats-card{background:linear-gradient(140deg,#06222bdc,#03141ef5);border-color:#24616d;border-radius:.35rem;box-shadow:inset 0 1px #77faff12,0 0 1.5rem #00cddd07}
@@ -698,3 +699,51 @@ body:has(#chat-view:not([hidden])) { height: 100vh; height: 100dvh; overflow: hi
 @media (max-width: 600px) {
   .remote-chat-action, #host-new-task { max-width: 100%; white-space: normal; }
 }
+
+/* Shared control and surface polish; page routing and layout remain intact. */
+:root { --nx-line: #294a55; --nx-button: #0b2933; --nx-button-border: #345e69; }
+body { background: radial-gradient(ellipse at 55% 0, #0b252e, transparent 48rem), var(--nx-bg); }
+main { background: #03131b55; }
+.rail a { border-radius: .6rem; font-size: .9rem; }
+.rail a:hover, .rail a:focus-visible, .rail a[aria-current="page"] { box-shadow: none; background: #102e39; border-color: #345e69; }
+:where(button, a, input, textarea, select, summary):focus-visible { outline: 2px solid var(--nx-accent); outline-offset: 3px; }
+button:disabled, .secondary:disabled { cursor: not-allowed; opacity: .5; }
+textarea, input, select { border-color: #345e69; border-radius: .6rem; }
+input::placeholder, textarea::placeholder { color: #91aab4; opacity: 1; }
+input[type="file"]::file-selector-button { padding: .4rem .7rem; margin-right: .65rem; border: 1px solid #345e69; border-radius: .5rem; background: #0b2933; color: var(--nx-text); font: inherit; cursor: pointer; }
+.chat-index, .transcript-panel, .inspector, .board-index, .kanban-panel, .settings-card, .model-inventory-section, .stats-card, .active-jobs-panel {
+  border-color: var(--nx-line); border-radius: .85rem; background: #061c26; box-shadow: 0 .25rem 1rem #0002;
+}
+.model-summary { border-color: var(--nx-line); border-radius: .85rem; background: #09232e; }
+.setting-toggle, .model-card, .kanban-card, .inspector-list li, .approval-prompt, .kanban-column { border-color: var(--nx-line); border-radius: .65rem; }
+.logging-card, .collaboration-message, .cron-card, .tribunal-panel, .tribunal-card { border-radius: .7rem; }
+.cron-host-panel, #cron-view .os-schedules-panel, #cron-os-hosts section { border-radius: .85rem; }
+.dialog, .workboard-dialog, #stats-reset-dialog, .job-detail-dialog, .chat-rename-dialog {
+  background: #061c26; border-color: #345e69; border-radius: 1rem; box-shadow: 0 1rem 3rem #0006;
+}
+.chat-action-menu { background: #0b2933; border-color: #345e69; }
+.count, .state-pill, .model-badge, .cron-badge { border-radius: 999px; }
+.chat-list button, .board-list a { border-radius: .6rem; }
+.chat-file-download { border-color: #345e69; border-radius: .6rem; background: #0b2933; color: var(--nx-text); font-size: .85rem; font-weight: 600; text-decoration: none; }
+.chat-file-download:hover { border-color: #69b5c2; background: #123b47; }
+.presentation-controls, .control-actions, .chat-rename-buttons { flex-wrap: wrap; gap: .6rem; }
+.control-heading, .settings-heading, .settings-card-heading, .models-heading, .stats-heading, .workboard-heading, .kanban-heading { flex-wrap: wrap; }
+.settings-heading h1, .models-heading h1, .stats-heading h1, .workboard-heading h1, .control-heading h1 { font-size: clamp(1.3rem, 2vw, 1.65rem); line-height: 1.3; }
+.settings-card h2, .model-inventory-section h2, .stats-card h2 { font-size: 1.1rem; line-height: 1.4; }
+#send-message { background: #64e1e7; color: #042129; border-color: #55dce3; }
+#send-message:hover:not(:disabled) { background: #85eef1; }
+button[aria-pressed="true"] { border-color: #69b5c2; background: #123b47; color: var(--nx-text); }
+@media (max-width: 600px) {
+  .button-row > button, .control-actions > button { max-width: 100%; white-space: normal; }
+  .settings-card, .model-inventory-section { padding: 1rem; }
+  .setting-toggle { gap: .8rem; padding: .8rem; }
+}
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }
+.tron-button { border-color: #345e69; background: #0b2933; color: var(--nx-text); box-shadow: none; text-transform: none; letter-spacing: normal; }
+.cron-heading button { border-color: #345e69; background: #0b2933; color: var(--nx-text); }
+#comfy-view > button { margin: .5rem .4rem .5rem 0; }
+#comfy-view > input { margin-top: .4rem; }
+/* Layout display rules must never expose controls hidden by application state. */
+[hidden] { display: none !important; }
+main > section > h1, .cron-heading h1, .tron-heading h1 { font-size: clamp(1.3rem, 2vw, 1.65rem); line-height: 1.3; }
+.settings-card > label:not(.setting-toggle):not(.setting-field) { display: block; margin-top: .75rem; margin-bottom: .3rem; }
