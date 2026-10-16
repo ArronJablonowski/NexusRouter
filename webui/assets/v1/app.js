@@ -78,7 +78,7 @@
 		composerHelp.textContent = selectedChat && !followUp ? "The server has not marked this chat eligible for a follow-up." : "Enter sends. Shift+Enter adds a new line.";
 		composerText.disabled = blocked || Boolean(selectedChat && !followUp);
 		sendMessage.disabled = blocked || Boolean(selectedChat && !followUp);
-		newChat.hidden = !selectedChat;
+		newChat.hidden = !selectedChat&&!window.NexusHostMentions?.active?.();
 		newChat.disabled = blocked;
 		const task = selectedControls;
 		taskControls.hidden = !(queuedSubmissionID && queuedSubmissionCanCancel) && (!task || (!task.canSteer && !task.canCancel));
@@ -345,7 +345,7 @@
 		const row = existing || element("li");
 		const button = existing ? row.firstElementChild : element("button");
 		button.type = "button";
-		button.dataset.chatId = item.chat_id;
+		button.dataset.chatId = item.chat_id;row.dataset.orderTime=String(Date.parse(item.started_at)||0);
 		button.setAttribute("aria-current", item.chat_id === selectedChat ? "true" : "false");
 		window.NexusChatDescriptions.decorate(button, item);
 		if (item.chat_id === selectedChat) {setTaskState(item.state);chatDescription(item.chat_id).then(text=>{if(selectedChat===item.chat_id)title.textContent=text;});}
@@ -368,7 +368,7 @@
 		requestJSON("/api/v1/chats?" + query.toString()).then(page => {
 			if (!page || page.version !== 1 || !Array.isArray(page.items) || page.items.length > pageLimit) throw new Error("invalid chat page");
 			const oldScroll = list.scrollTop;
-			if (reset) { const ids = new Set(page.items.map(item => item.chat_id)); for (const row of [...list.children]) if (!ids.has(row.firstElementChild?.dataset.chatId)) row.remove(); chatTotal = 0; nextCursor = ""; }
+			if (reset) { const ids = new Set(page.items.map(item => item.chat_id)); for (const row of [...list.children]) if (!row.dataset.remoteRoot&&!ids.has(row.firstElementChild?.dataset.chatId)) row.remove(); chatTotal = 0; nextCursor = ""; }
 			let added = 0;
 			for (const item of page.items.slice(0, maxChats - chatTotal)) if (renderChat(item)) added++;
 			chatTotal += added;
@@ -740,7 +740,7 @@
 		};
 	}
 	function selectChat(chatID, state) {
-		if (typeof chatID !== "string" || !chatID || chatID.length > 512) return;
+		if (typeof chatID !== "string" || !chatID || chatID.length > 512 || window.NexusHostMentions?.leave?.()===false) return;
 		if (source) {
 			source.close();
 			source = null;
@@ -779,7 +779,7 @@
 		updateControls();
 	}
 	function startNewChat() {
-		if (pendingIntent) return;
+		if (pendingIntent||window.NexusHostMentions?.leave?.()===false) return;
 		stopSubmissionPolling(); submissionShouldNavigate = false;
 		if (source) {
 			source.close();

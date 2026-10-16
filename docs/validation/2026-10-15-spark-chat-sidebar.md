@@ -1,0 +1,28 @@
+# Spark chat sidebar — 2026-10-15
+
+## Behavior and safeguards
+
+Snapshot-backed paired Spark conversations now appear alongside local chats in the regular sidebar. Titles come from the first user turn, with model/host labels and one entry per root conversation pointing to its most recently recorded turn. Local refreshes retain remote rows; local pins retain priority. Selecting a Spark row reopens its saved request without dispatching work. Selecting a local row clears remote routing/receipt state. The normal New chat control is available for a remote conversation.
+
+The commander incrementally indexes only its private browser-conversation snapshots with matching immutable route/task evidence. The derivative index lives beside immutable original uploads, not in the main task database. Indexing reads no unrelated runtime data and makes no remote submissions. Existing snapshots are backfilled in bounded batches; prepared inputs without a valid route are not promoted. New dispatch completion only marks the index dirty using an atomic flag; it cannot wait behind a sidebar scan. Pages contain 25 conversation roots and a strict numeric cursor. Storage reopening and pagination/grouping are covered by tests.
+
+Confirmed terminal observations are retained locally for final-answer recovery, with a separate 128 MiB aggregate cache limit and per-record bounds. Conflicting terminal receipts cannot overwrite the original. Cached messages and every earlier/new original download can be read while remote status is unavailable. Cached state never grants continuation or cancellation: both retain fresh original destination/caller/model checks. UI reports retention failure rather than claiming a final answer was saved. Existing original-byte and task/context/privacy/memory limits remain unchanged. No automatic model request, decision, tool action or cancellation retry was added.
+
+Conversations created before snapshot retention cannot gain invented history. Snapshot-backed older conversations are imported. Parallel branches retain their individual request evidence; the sidebar presents the newest recorded head of a root. Remote pin/rename controls, search and general retention cleanup are outside this change.
+
+## Verification
+
+Source state: ca9c22b5 plus this sidebar/index/cache checkpoint. Private fixtures, model requests and raw QA logs remain outside Git under spark-sidebar-2026-10-15.
+
+- Full affected webuiapp/chatfiles race suites: PASS, 10.176s / 1.756s.
+- Full Web UI race suite: PASS, 41.138s, including sidebar reload/local switch/no-dispatch, existing chat/approval/upload/model/accessibility/CSRF boundaries and reviewed shell assets.
+- Source formatting/size checker, scoped vet, native and Linux ARM64 builds: PASS.
+- Reviewed embedded manifest: c42d92e9533310f9cdb8fcae7934f20e923508dc9953f35d826e53b506638921.
+
+The real private candidate used independent copies of owned previous QA conversation evidence. The pre-upgrade two-turn Qwen 3.8 27B Spark conversation appeared in the sidebar, reopened its history, and supplied four byte-exact original downloads. Blocking only status requests in that owned test browser then preserved the cached final history, blocked sending, and passed another four original downloads. There were zero model dispatches in this migration/offline-read test. A real mTLS integration test also shuts down its synthetic remote server and verifies saved final history remains readable without granting continuation.
+
+A new real Spark chat uploaded a scanned PDF, genuine legacy DOC and PNG, was reopened through the bare Chats sidebar, and accepted a plain follow-up with a new text attachment. Both earlier document references, image facts and the new attachment fact were correct. The sidebar retained one root with the latest turn; fresh sidebar reopen and reload restored all four messages and four byte-exact original downloads. Exactly two model requests received confirmed receipts. Independent native Spark event records show qwen3.8:27b / spark-ollama for both successful turns. Desktop and 390 px layouts were inspected; heading/composer remained visible.
+
+An existing scroll regression fixture initially failed intermittently: it injected synthetic content across separate browser evaluations and manipulated the transcript element rather than the actual conversation scroll viewport. Live authoritative reconciliation could replace that injected content between evaluations. The fixture now tests one synchronous reconciliation against the actual viewport, requires nonzero scroll, and preserves the same node/position assertions. The final full browser suite passes; no production scroll assertion or authorization check was weakened.
+
+Installed commander verification and deployment remain pending this verified source checkpoint. No full make check or complete MVP claim. Linear requirements could not be refreshed because the connection requires reauthentication.

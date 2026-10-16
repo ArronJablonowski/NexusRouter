@@ -23,6 +23,8 @@ type remoteTaskControlRequest struct {
 }
 type remoteTaskControlPage struct {
 	Version         int                         `json:"version"`
+	RetentionFailed bool                        `json:"retention_failed,omitempty"`
+	Cached          bool                        `json:"cached,omitempty"`
 	Conversation    []remoteConversationMessage `json:"conversation,omitempty"`
 	Continuation    *remote.Task                `json:"continuation,omitempty"`
 	Instance        string                      `json:"instance"`
@@ -77,12 +79,28 @@ func (h *Handler) serveRemoteTaskControl(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	status, err := safeCall(func() (submissions.Status, error) {
+		if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+			if _, e := d.conversation(ctx, input.Instance, input.RequestID); e == nil {
+				observed, e := d.Client.InspectRecorded(ctx, d.Store, input.RequestID)
+				return observed.Status, e
+			}
+		}
 		return h.remoteTaskController.Status(ctx, input.Instance, input.RequestID)
 	})
 	if err == nil && !validRemoteControlStatus(status) {
 		err = remote.ErrInvalid
 	}
 	if err != nil {
+		if input.Action == "status" {
+			if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+				cacheCtx, cacheCancel := context.WithTimeout(r.Context(), time.Second)
+				defer cacheCancel()
+				if p, e := d.savedConversation(cacheCtx, input.Instance, input.RequestID); e == nil {
+					h.writeJSON(w, 200, p)
+					return true
+				}
+			}
+		}
 		h.writeError(w, r, http.StatusServiceUnavailable, "controls_unavailable")
 		return true
 	}
@@ -120,6 +138,11 @@ func (h *Handler) serveRemoteTaskControl(w http.ResponseWriter, r *http.Request)
 				t.Prompt = ""
 				page.Continuation = &t
 			}
+		}
+	}
+	if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+		if _, e := d.conversation(ctx, page.Instance, page.RequestID); e == nil {
+			page.RetentionFailed = d.cacheConversation(ctx, page) != nil
 		}
 	}
 	h.writeJSON(w, http.StatusOK, page)

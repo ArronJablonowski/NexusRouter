@@ -1746,3 +1746,8 @@ Running browser chats must discover tool approval proposals even if persistence 
 Private direct paired-host chats may continue from a confirmed successful, immutable original request. The commander owns bounded persisted history, pins host/model/caller/privacy/bounds, retains original downloads across turns and restores the conversation on reload. Failed or uncertain work must remain inspectable without implicit resend; unsupported or oversized history fails closed. Existing jobs without snapshots do not gain fabricated history.
 
 Cloud catalog entries may be configured through an existing provider template without exposing credentials. Additions require fresh catalog/template binding, optimistic configuration comparison, complete validation, disabled-first publication, an idle restart and explicit enablement. Catalog presence does not verify access; inherited routing estimates must not be described as actual billing. New provider/credential setup remains outside this control.
+
+
+### Paired chat sidebar supplement — 2026-10-15
+
+Snapshot-backed paired chats must appear in the regular chat sidebar and reopen the latest recorded conversation turn without resubmission. History and original uploads must survive reload and storage reopening. Previously retained snapshots require bounded index backfill. Local chat refresh and switching must preserve remote entries while clearing remote routing state when a local conversation is selected. Confirmed final messages may be cached locally for read-only recovery when a paired host is unavailable; cached state cannot authorize continuation or cancellation. Retention/capacity failures must be reported honestly.

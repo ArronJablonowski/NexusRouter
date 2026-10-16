@@ -13,12 +13,14 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"slices"
+	"time"
 )
 
 // Conversation payloads are private snapshots, separate from prompt-free route
 // bindings and original downloads. Publication precedes network dispatch.
 type remoteConversation struct {
 	Version   int                         `json:"version"`
+	CreatedAt time.Time                   `json:"created_at,omitempty"`
 	Instance  string                      `json:"instance"`
 	RequestID string                      `json:"request_id"`
 	Task      remote.Task                 `json:"task"`

@@ -56,7 +56,7 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 		return nil, e
 	}
 	db.SetMaxOpenConns(1)
-	for _, stmt := range []string{"PRAGMA journal_mode=WAL", `CREATE TABLE IF NOT EXISTS files(chat TEXT NOT NULL,id TEXT NOT NULL,metadata BLOB NOT NULL,body BLOB NOT NULL,PRIMARY KEY(chat,id))`, `CREATE TABLE IF NOT EXISTS input_bindings(submission TEXT PRIMARY KEY,operation TEXT NOT NULL)`} {
+	for _, stmt := range []string{"PRAGMA journal_mode=WAL", `CREATE TABLE IF NOT EXISTS files(chat TEXT NOT NULL,id TEXT NOT NULL,metadata BLOB NOT NULL,body BLOB NOT NULL,PRIMARY KEY(chat,id))`, `CREATE TABLE IF NOT EXISTS input_bindings(submission TEXT PRIMARY KEY,operation TEXT NOT NULL)`, `CREATE TABLE IF NOT EXISTS remote_chat_index(scope TEXT PRIMARY KEY,seq INTEGER NOT NULL UNIQUE,instance TEXT NOT NULL,root TEXT NOT NULL,metadata BLOB NOT NULL)`, `CREATE INDEX IF NOT EXISTS remote_chat_roots ON remote_chat_index(instance,root,seq)`, `CREATE TABLE IF NOT EXISTS remote_chat_observations(scope TEXT PRIMARY KEY,body BLOB NOT NULL)`} {
 		if _, e = db.ExecContext(ctx, stmt); e != nil {
 			db.Close()
 			return nil, e

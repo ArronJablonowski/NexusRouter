@@ -5,6 +5,8 @@ import (
 	"errors"
 	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/remote"
@@ -17,6 +19,9 @@ type RemoteDispatcher interface {
 	Dispatch(context.Context, string, string, remote.Task) (submissions.Status, error)
 }
 type RecordedRemoteDispatcher struct {
+	indexMu         sync.Mutex
+	indexAfter      int64
+	indexDirty      atomic.Bool
 	Client          *remote.Client
 	Store           *remote.RouteStore
 	UploadDirectory string

@@ -14,6 +14,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"net/http"
 	"slices"
+	"time"
 )
 
 func remoteTaskFits(task remote.Task) bool {
@@ -74,7 +75,7 @@ func (d *RecordedRemoteDispatcher) dispatchConversation(ctx context.Context, ins
 	}
 
 	displayPrompt := task.Prompt
-	history := remoteConversation{Version: 1, Instance: instance, RequestID: key, Task: task}
+	history := remoteConversation{CreatedAt: time.Now().UTC(), Version: 1, Instance: instance, RequestID: key, Task: task}
 	if parent != "" {
 		if parent == key {
 			return reject()
@@ -84,6 +85,7 @@ func (d *RecordedRemoteDispatcher) dispatchConversation(ctx context.Context, ins
 			return reject()
 		}
 		history.RequestID = key
+		history.CreatedAt = time.Now().UTC()
 		task = history.Task
 	}
 	if len(files) > 0 {
@@ -124,7 +126,11 @@ func (d *RecordedRemoteDispatcher) dispatchConversation(ctx context.Context, ins
 			return reject()
 		}
 	}
-	return d.Client.DispatchRecorded(ctx, d.Store, instance, key, task)
+	status, dispatchErr := d.Client.DispatchRecorded(ctx, d.Store, instance, key, task)
+	// Index recovery is read-only and can complete after uncertain delivery. Never
+	// reinterpret an indexing error as permission to dispatch the request again.
+	d.indexDirty.Store(true)
+	return status, dispatchErr
 }
 
 func remoteUploadMedia(b []byte) string {

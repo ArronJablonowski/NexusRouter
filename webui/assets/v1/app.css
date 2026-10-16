@@ -669,3 +669,6 @@ body:has(#chat-view:not([hidden])) { height: 100vh; height: 100dvh; overflow: hi
 
 .model-card-with-switch > .model-registration { grid-column:1 / -1; min-width:0; }
 .model-registration[hidden] { display:none; }
+
+.remote-chat-row { grid-template-columns:minmax(0,1fr); }
+.remote-chat-row .chat-meta { display:block; overflow-wrap:anywhere; }

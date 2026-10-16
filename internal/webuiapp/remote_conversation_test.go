@@ -7,6 +7,8 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,6 +132,59 @@ func TestRemoteConversationPinnedHistoryUploadsAndRecovery(t *testing.T) {
 	if strings.Contains(string(record), "FACT_ONE") {
 		t.Fatal("route contains content")
 	}
+	// Upgrade old snapshots into one sidebar row, persist a bound final answer,
+	// then reopen while the remote host is unavailable. Reads must not dispatch.
+	h := mutationHandlerFixture(t, MutationServices{})
+	h.remoteDispatcher = d
+	h.remoteTaskController = d.Client
+	cookie, _ := authenticateBrowser(t, h)
+	get := func(path string, want int) []byte {
+		t.Helper()
+		r := browserRequest("GET", path, "")
+		r.Body = http.NoBody
+		r.AddCookie(cookie)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("%d %s", w.Code, w.Body.String())
+		}
+		return w.Body.Bytes()
+	}
+	page := get("/app/api/v1/remote-chats", 200)
+	if strings.Count(string(page), `"request_id"`) != 1 || !strings.Contains(string(page), "conversation-child-02") || !strings.Contains(string(page), "Remember this") || strings.Contains(string(page), "FACT_ONE") {
+		t.Fatal("sidebar projection", string(page))
+	}
+	get("/app/api/v1/remote-chats?after=invalid", 400)
+	get("/app/api/v1/remote-chats/node-b/conversation-child-02", 404)
+	b.mu.Lock()
+	var child submissions.Status
+	for _, v := range b.tasks {
+		if v.ID != initial.ID {
+			child = v
+		}
+	}
+	child.State = "succeeded"
+	child.TaskIDs = []string{"task-two"}
+	child.Result = &submissions.Result{TaskID: "task-two", Text: "FACT_ONE and FACT_TWO"}
+	b.tasks[child.ID] = child
+	b.mu.Unlock()
+	r := authorizedMutationRequest(t, h, "/app/api/v1/remote-task-control", `{"version":1,"instance":"node-a","request_id":"conversation-child-02","action":"status"}`)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "FACT_ONE and FACT_TWO") {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	httpServer.Close()
+	d.indexAfter = 0
+	saved := get("/app/api/v1/remote-chats/node-a/conversation-child-02", 200)
+	if !strings.Contains(string(saved), `"cached":true`) || !strings.Contains(string(saved), "FACT_ONE and FACT_TWO") || strings.Contains(string(saved), `"continuation"`) {
+		t.Fatal("cached authority/history", string(saved))
+	}
+	get("/app/api/v1/remote-chats", 200)
+	if b.creates.Load() != 2 {
+		t.Fatal("sidebar replayed execution")
+	}
+
 	replacement, _ := browserRemoteCredentials(t, t.TempDir())
 	d.Client.Credentials = replacement
 	if _, e = d.DispatchContinuation(ctx, "node-a", "conversation-rotated-01", key, task, nil); e == nil {
