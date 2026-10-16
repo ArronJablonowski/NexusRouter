@@ -17,6 +17,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
+	"github.com/ArronJablonowski/NexusRouter/internal/maintenance"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
@@ -25,6 +26,7 @@ import (
 )
 
 type MutationServices struct {
+	Cleanup         func(context.Context, string, string) (maintenance.Report, error)
 	RegisterModel   func(context.Context, ModelRegistration) (string, error)
 	ChatPreference  func(context.Context, sessions.ChatPreferenceUpdate) (sessions.ChatPreference, error)
 	ModelUse        func(context.Context, string, string, *bool) (any, error)
@@ -47,6 +49,9 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 	base := h.basePath + "/api/v1"
 	path := request.URL.Path
 	switch {
+	case path == base+"/cleanup":
+		h.serveCleanup(writer, request)
+		return true
 	case path == base+"/model-registration":
 		h.serveModelRegistration(writer, request)
 		return true

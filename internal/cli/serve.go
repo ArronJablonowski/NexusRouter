@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/ArronJablonowski/NexusRouter/internal/gridcollab"
 	"github.com/ArronJablonowski/NexusRouter/internal/gridroute"
+	"github.com/ArronJablonowski/NexusRouter/internal/maintenance"
 	"io"
 	"log"
 	"net"
@@ -15,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -389,7 +391,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return 1
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{Comfy: comfyService, RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{ChatPreference: service.ChatPreference,
+		browserHandler, err = webuiapp.New(webuiapp.Options{Comfy: comfyService, RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{Cleanup: localCleanupControls(), ChatPreference: service.ChatPreference,
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
@@ -788,4 +790,12 @@ func serveHTTP(ctx context.Context, listener net.Listener, handler http.Handler,
 		}
 		return err
 	}
+}
+
+func localCleanupControls() func(context.Context, string, string) (maintenance.Report, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return (maintenance.Service{Home: filepath.Join(home, ".NexusRouter")}).Invoke
 }

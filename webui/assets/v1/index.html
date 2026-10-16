@@ -267,6 +267,15 @@
           <div><p class="eyebrow">Operator controls</p><h1 id="settings-title">Settings</h1></div>
           <button id="refresh-settings" class="secondary" type="button">Refresh</button>
         </header>
+        <section class="settings-card" aria-labelledby="cleanup-title">
+          <h2 id="cleanup-title">Storage cleanup</h2>
+          <p>Keep the three newest verified deployment backups. Registered QA builds become eligible after seven days. Chat history, uploads and reports are preserved; files in use are skipped.</p>
+          <p id="cleanup-last" role="status">Loading last cleanup…</p>
+          <div class="settings-actions"><button id="cleanup-refresh" type="button" class="secondary">Refresh last run</button><button id="cleanup-preview" type="button" class="secondary">Preview cleanup</button><button id="cleanup-run" type="button" disabled>Run cleanup</button></div>
+          <p id="cleanup-status" role="status" aria-live="polite">Preview the eligible files before running cleanup.</p>
+          <ul id="cleanup-items" aria-label="Files eligible for cleanup"></ul>
+          <p id="cleanup-retained"></p>
+        </section>
         <div class="settings-layout">
           <form id="tool-settings-form" class="settings-card" novalidate>
             <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>

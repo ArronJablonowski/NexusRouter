@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import datetime
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -201,7 +202,7 @@ def atomic_json(path, value):
     os.replace(str(temporary), str(path))
 
 
-def run(root, apply=False, register=None, probe=inventory, now=None):
+def run(root, apply=False, register=None, probe=inventory, now=None, expected_plan=None):
     root = Path(root).absolute()
     if root.resolve() != root:
         raise ValueError('home must not contain symlinks')
@@ -229,7 +230,10 @@ def run(root, apply=False, register=None, probe=inventory, now=None):
             return {'registered': register}
         snapshot = probe(root)  # Fail before constructing/deleting any candidates.
         result = plan(root, registry, snapshot, time.time() if now is None else now)
-        result.update({'apply': apply, 'deleted': [], 'errors': [], 'time': datetime.datetime.now(datetime.timezone.utc).isoformat()})
+        result['token'] = hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest()
+        if expected_plan is not None and result['token'] != expected_plan:
+            raise PreviewChanged('cleanup preview changed')
+        result.update({'complete': False, 'apply': apply, 'deleted': [], 'errors': [], 'time': datetime.datetime.now(datetime.timezone.utc).isoformat()})
         journal = state / 'last-cleanup.json'
         # Persist intent before any unlink. Interrupted runs are never replayed; re-plan next time.
         if apply:
@@ -255,7 +259,44 @@ def run(root, apply=False, register=None, probe=inventory, now=None):
                     atomic_json(journal, result)
                     break
                 atomic_json(journal, result)
+            result['complete'] = True
+            atomic_json(journal, result)
         return result
+
+
+class PreviewChanged(ValueError):
+    pass
+
+
+def browser_report(root, result=None):
+    root = Path(root).absolute()
+    if root.resolve() != root:
+        raise ValueError('home must not contain symlinks')
+    private_dir(root)
+    def relative(value):
+        p = Path(value)
+        return str(p.relative_to(root))
+    def compact(value):
+        return {'time': value.get('time', ''), 'deleted': [relative(p) for p in value.get('deleted', [])],
+                'complete': value.get('complete', False), 'errors': len(value.get('errors', [])), 'running': len(value.get('candidates', [])) > len(value.get('deleted', [])) and not value.get('errors')}
+    private_dir(root / 'tools')
+    private_dir(root / 'tools/maintenance')
+    last = root / 'tools/maintenance/last-cleanup.json'
+    previous = None
+    if last.exists():
+        if last.is_symlink() or last.stat().st_size > 2 * 1024 * 1024:
+            raise ValueError('invalid cleanup receipt')
+        previous = compact(json.loads(last.read_text()))
+        # Intent may survive interruption. Never claim it is currently running.
+        previous.pop('running')
+    out = {'version': 1, 'last_run': previous, 'preview': None, 'result': None}
+    if result is not None:
+        out['preview'] = {'token': result['token'], 'items': [{'path': relative(x['path']), 'kind': x['kind']} for x in result['candidates']],
+                          'retained': [relative(x) for x in result['retained_backups']], 'skipped': len(result['skipped'])}
+        if result['apply']:
+            out['result'] = compact(result)
+            out['result'].pop('running')
+    return out
 
 
 def main():
@@ -263,14 +304,30 @@ def main():
     parser.add_argument('--home', type=Path, default=Path.home() / '.NexusRouter')
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--register-qa', metavar='resources/RUN/nexus-BINARY')
+    parser.add_argument('--json', action='store_true')
+    parser.add_argument('--status', action='store_true')
+    parser.add_argument('--expected-plan')
     args = parser.parse_args()
+    if args.expected_plan is not None and (not args.apply or not re.fullmatch(r'[0-9a-f]{64}', args.expected_plan)):
+        parser.error('expected plan requires --apply and a SHA-256 token')
     try:
-        result = run(args.home, args.apply, args.register_qa)
+        if args.status:
+            if args.apply or args.register_qa:
+                raise ValueError('status cannot mutate')
+            print(json.dumps(browser_report(args.home)))
+            return 0
+        result = run(args.home, args.apply, args.register_qa, expected_plan=args.expected_plan)
+        if args.json:
+            print(json.dumps(browser_report(args.home, result)))
+            return 1 if result.get('errors') else 0
         # The detailed private journal contains paths, never credentials or file contents.
         print(json.dumps({k: v for k, v in result.items() if k != 'candidates'}, indent=2))
         if 'candidates' in result:
             print('Eligible items:', len(result['candidates']))
         return 1 if result.get('errors') else 0
+    except PreviewChanged:
+        print(json.dumps({'error': 'preview_changed'}) if args.json else 'Cleanup deferred: preview changed', file=sys.stdout if args.json else sys.stderr)
+        return 3
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         print('Cleanup deferred: ' + str(error), file=sys.stderr)
         return 1

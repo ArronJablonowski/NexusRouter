@@ -138,3 +138,41 @@
  }catch{status.textContent='Runner connections could not be loaded.';buttons.forEach(b=>b.disabled=true);}}
  load();
 })();
+
+
+(() => {
+ const base=document.body.dataset.basePath||'';
+ if(!window.NexusRoutes?.settings(window.location.pathname.slice(base.length)))return;
+ const last=document.querySelector('#cleanup-last'),status=document.querySelector('#cleanup-status'),items=document.querySelector('#cleanup-items'),retained=document.querySelector('#cleanup-retained');
+ const refresh=document.querySelector('#cleanup-refresh'),preview=document.querySelector('#cleanup-preview'),run=document.querySelector('#cleanup-run');
+ let busy=false,token='',count=0;
+ function validRun(v){return v===null||(v&&typeof v.time==='string'&&Array.isArray(v.deleted)&&v.deleted.every(p=>typeof p==='string')&&Number.isInteger(v.errors)&&v.errors>=0);}
+ function clearPreview(){token='';count=0;items.replaceChildren();retained.textContent='';run.disabled=true;}
+ function render(value){
+  if(value?.version!==1||!validRun(value.last_run)||!validRun(value.result))throw Error();
+  const v=value.last_run;
+  last.textContent=v?('Last run: '+new Date(v.time).toLocaleString()+' · '+v.deleted.length+' item(s) removed'+(!v.complete?' · Still running, interrupted, or completion unrecorded.':'')+(v.errors?' · Stopped after an error; inspect before retrying.':'')):'No cleanup run recorded yet.';
+  if(value.preview){const p=value.preview;
+   if(!/^[a-f0-9]{64}$/.test(p.token)||!Array.isArray(p.items)||!Array.isArray(p.retained)||!Number.isInteger(p.skipped)||p.items.some(x=>!x||typeof x.path!=='string'||!['backup','qa'].includes(x.kind))||p.retained.some(x=>typeof x!=='string'))throw Error();
+   items.replaceChildren();for(const x of p.items){const li=document.createElement('li');li.textContent=(x.kind==='backup'?'Backup: ':'QA build: ')+x.path;li.style.overflowWrap='anywhere';items.append(li);}
+   retained.textContent=p.retained.length+' deployment backup(s) retained. '+p.skipped+' item(s) or groups skipped by safety checks.';
+   token=p.token;count=p.items.length;
+   status.textContent=count+' item(s) eligible. '+(count?'Run cleanup removes only files that still match this preview.':'Nothing needs to be deleted.');
+  }
+  if(value.result){clearPreview();status.textContent=value.result.errors?'Cleanup stopped after an error. Refresh last run and preview again before retrying.':'Cleanup finished: '+value.result.deleted.length+' item(s) removed.';}
+ }
+ async function action(name){if(busy)return;busy=true;[refresh,preview,run].forEach(b=>b.disabled=true);
+  const oldToken=token;if(name!=='run')clearPreview();status.textContent=name==='run'?'Running cleanup…':'Checking cleanup…';
+  try{let options={credentials:'same-origin',cache:'no-store'};
+   if(name!=='status'){
+    const session=await window.NexusLive.fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!session.ok)throw Error();const csrf=await session.json();
+    options={...options,method:'POST',headers:{'Content-Type':'application/json','X-Darwin-CSRF':csrf.csrf_token},body:JSON.stringify({version:1,action:name,token:name==='run'?oldToken:''})};
+   }
+   const response=await window.NexusLive.fetch(base+'/api/v1/cleanup',options,60000);
+   if(response.status===409){clearPreview();status.textContent='The eligible files changed. Preview cleanup again before running it.';return;}
+   if(!response.ok)throw Error();render(await response.json());if(name==='status')status.textContent='Preview the eligible files before running cleanup.';
+  }catch{clearPreview();status.textContent=name==='run'?'Cleanup outcome unavailable. Refresh last run before trying again. Cleanup is never retried automatically.':'Cleanup unavailable. Check that the qualified cleanup utility is installed and no other cleanup is running.';}
+  finally{busy=false;refresh.disabled=false;preview.disabled=false;run.disabled=!token||!count;}
+ }
+ refresh.addEventListener('click',()=>action('status'));preview.addEventListener('click',()=>action('preview'));run.addEventListener('click',()=>action('run'));action('status');
+})();

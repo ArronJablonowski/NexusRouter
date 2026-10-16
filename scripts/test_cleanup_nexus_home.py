@@ -227,6 +227,24 @@ class CleanupTests(unittest.TestCase):
         with patch.object(c.Path, 'home', return_value=self.root.parent), patch.object(c.subprocess, 'run', return_value=c.subprocess.CompletedProcess([], 0, '', '')):
             self.assertFalse(c.used(self.build, c.inventory(self.root)))
 
+    def test_preview_token_conflict_and_matching_apply(self):
+        preview = self.run_cleanup()
+        self.assertEqual(len(preview['token']), 64)
+        self.binary(self.build, large=True)
+        os.utime(str(self.build), (self.now - 9 * c.DAY,) * 2)
+        with self.assertRaises(c.PreviewChanged):
+            self.run_cleanup(apply=True, expected_plan=preview['token'])
+        self.assertTrue(all(p.exists() for p in self.backups))
+        latest = self.run_cleanup()
+        result = self.run_cleanup(apply=True, expected_plan=latest['token'])
+        self.assertEqual(len(result['deleted']), 3)
+        report = c.browser_report(self.root, result)
+        self.assertTrue(report['result']['complete'])
+        self.assertEqual(report['result']['errors'], 0)
+        self.assertNotIn(str(self.root), json.dumps(report))
+        self.assertNotIn('tree', json.dumps(report))
+        self.assertIsNone(c.browser_report(self.root)['preview'])
+
 
 if __name__ == '__main__':
     unittest.main()
