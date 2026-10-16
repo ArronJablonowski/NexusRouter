@@ -747,3 +747,10 @@ button[aria-pressed="true"] { border-color: #69b5c2; background: #123b47; color:
 [hidden] { display: none !important; }
 main > section > h1, .cron-heading h1, .tron-heading h1 { font-size: clamp(1.3rem, 2vw, 1.65rem); line-height: 1.3; }
 .settings-card > label:not(.setting-toggle):not(.setting-field) { display: block; margin-top: .75rem; margin-bottom: .3rem; }
+/* Saved ComfyUI references may be 128 characters; wrap without losing identity. */
+#comfy-view { min-width: 0; overflow-wrap: anywhere; }
+#comfy-jobs { list-style: none; padding: 0; display: grid; gap: .5rem; }
+#comfy-jobs li { min-width: 0; }
+#comfy-jobs button { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+.comfy-images { grid-template-columns: minmax(0, 1fr); }
+.comfy-images img { min-width: 0; }

@@ -22,8 +22,12 @@ func TestChromeComfyWorkflowControls(t *testing.T) {
 		t.Fatal(e)
 	}
 	var submits atomic.Int32
+	var longJobs atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/fixture/long-comfy":
+			longJobs.Store(true)
+			return
 		case "/app/api/v1/comfy/jobs/saved/image":
 			var b bytes.Buffer
 			png.Encode(&b, image.NewRGBA(image.Rect(0, 0, 16, 16)))
@@ -35,6 +39,10 @@ func TestChromeComfyWorkflowControls(t *testing.T) {
 			w.Write([]byte(`{"version":1,"csrf_token":"fixture"}`))
 			return
 		case "/app/api/v1/comfy":
+			if longJobs.Load() {
+				writeChromeJSON(w, map[string]any{"version": 1, "jobs": []any{map[string]string{"key": strings.Repeat("q", 128), "state": "uncertain"}}})
+				return
+			}
 			w.Write([]byte(`{"version":1,"jobs":[{"key":"saved","state":"accepted"}]}`))
 			return
 		case "/app/api/v1/comfy/jobs/waiting":
@@ -88,6 +96,13 @@ await new Promise(r=>setTimeout(r,300));
 if(!await evaluate('window.qaImage===document.querySelector("#comfy-images img")'))throw Error('poll replaced unchanged preview');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
 if(!await evaluate('document.documentElement.scrollWidth<=innerWidth'))throw Error('narrow overflow');
+await evaluate('fetch("/fixture/long-comfy").then(()=>document.querySelector("#comfy-refresh").click())');
+await eventually('document.querySelector("#comfy-jobs button")?.textContent.startsWith("q".repeat(128))&&document.querySelector("#comfy-notice").textContent.includes("q".repeat(128))','long references lost');
+for(const width of [390,320,844]){
+ await cdp('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:false});
+ if(!await evaluate('document.documentElement.scrollWidth<=innerWidth&&document.querySelector("#comfy-jobs button").getBoundingClientRect().right<=innerWidth'))throw Error('long ComfyUI job or uncertainty notice overflow '+width);
+}
+await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
 if(process.env.NEXUS_COMFY_SCREENSHOT){const fs=await import('node:fs');const shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.NEXUS_COMFY_SCREENSHOT,Buffer.from(shot.data,'base64'));}
 socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", script, strconv.Itoa(port), server.URL).CombinedOutput()
