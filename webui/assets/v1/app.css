@@ -754,3 +754,6 @@ main > section > h1, .cron-heading h1, .tron-heading h1 { font-size: clamp(1.3re
 #comfy-jobs button { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
 .comfy-images { grid-template-columns: minmax(0, 1fr); }
 .comfy-images img { min-width: 0; }
+
+.cleanup-card { margin-bottom: 1rem; }
+.cleanup-card .settings-actions { display: flex; flex-wrap: wrap; gap: .5rem; }

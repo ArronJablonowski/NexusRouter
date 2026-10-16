@@ -82,6 +82,7 @@ await eventually('!document.querySelector("#cleanup-run").disabled','preview did
 for(const width of [1440,390,320]){
  await cdp('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
  if(await evaluate('document.documentElement.scrollWidth>innerWidth'))throw Error('cleanup overflow '+width);
+ if(!await evaluate('(()=>{const s=getComputedStyle(document.querySelector(".cleanup-card .settings-actions"));return s.display==="flex"&&parseFloat(s.gap)>=8&&s.flexWrap==="wrap"})()'))throw Error('cleanup button spacing '+width);
 }
 await evaluate('document.querySelector("#cleanup-run").click()');
 await eventually('document.querySelector("#cleanup-status").textContent.includes("changed")','conflict missing');

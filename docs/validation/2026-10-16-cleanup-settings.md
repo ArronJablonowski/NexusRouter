@@ -3,8 +3,8 @@
 Implemented authenticated last-run inspection and CSRF-protected preview/run controls in Settings. Manual cleanup requires an exact plan fingerprint, compared under the existing cleanup lock before unlink. Reports expose relative path metadata only, without internal tree fingerprints or file contents. An installed-script digest check binds the service to the reviewed embedded maintenance source. No arbitrary paths/commands are accepted. A started run retains a two-minute bound and survives browser cancellation; uncertain outcomes are not automatically retried. Last-run completion markers distinguish finished runs from interrupted/older evidence.
 
 Qualified utility SHA-256: `0333c4d1e3ebb6a939e58fb9d4ea16bf2ac62f14639cd0d3fea7715c7772daf1`.
-Qualified native binary SHA-256: `5613919037cd9df0b3dc41ec41f46c7e52051b465541b6f2c1ceb3800580a4c1`.
-Reviewed embedded Web UI asset manifest: `64ac6ae9fed4242a896ef7d2086baa27fbecc28d90a5ab7ab998017cf8302845`.
+Qualified native binary SHA-256: `9b2e39d1560b545febbc0c70e952f8b0306551c4f73732df758a43540f7f84d0`.
+Reviewed embedded Web UI asset manifest: `3c692f1b40e5cf994886b63e43d6dca20effe7e536cc7dd94c94046899bfeb0e`.
 
 Validation:
 
@@ -16,3 +16,12 @@ Validation:
 - Scoped CLI serve/browser-mount race tests passed 1.919s. `go run ./cmd/check`, scoped `go vet`, `git diff --check`, manifest review and native build passed. This is targeted qualification, not full `make check`.
 
 Deployment/installed verification follows. macOS commander only; Linux/Spark cleanup is unavailable rather than falling back to unsafe execution. The existing three-backup/registered-build policy and safety limitations remain unchanged. Browser/UI timeout may report an unavailable outcome while a bounded run continues; use last-run inspection. No unrelated services, settings, model calls or archived campaign evidence are modified. Linear remains subject to the previous reauthentication gap.
+
+
+## Deployment qualification and first installed test
+
+Source 40f92871 was committed/pushed before deployment. The deployment helper's second idle check initially raced SQLite shutdown-sidecar removal and failed before replacing any artifact. The prior service was restored. Corrected the helper to wait for the exact old commander PID to exit, require an empty/absent WAL, and inspect the stopped database immutably before backup. Removed only the empty aborted staging directory. Deployment then succeeded with the shared maintenance lock held, a private rollback executable/config/state/utility backup, SQLite integrity checks and unchanged schedule/registry/settings. No remote service was restarted.
+
+The first installed Firefox preview correctly skipped the fixture because it shared a directory with the active verification worker. Moved the fixture into its own private disposable directory without weakening the policy, then the installed test passed: last-run read, exact one-file preview, manual deletion, report preservation, status refresh, reload, zero-item repeat preview, disabled run without a new preview, and 1440/390/320px layouts. The owned browser session was logged out and temporary profile removed.
+
+Visual inspection of actual installed screenshots found crowded action buttons and no separation from the next panel. Added a scoped wrapping flex row with 8px gaps and panel spacing, plus a geometry/style regression. Final scoped Firefox interaction checks passed 2.282s; Chrome cleanup/shared 15-page responsive style/shell/manifest race checks passed 4.189s. Source checks, diff checks and the final native build passed. Broader backend suites are reused unchanged; no claim that these final scoped checks were a full suite. Final installed verification follows.
