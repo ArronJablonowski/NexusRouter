@@ -2,6 +2,7 @@ package webui
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -23,6 +24,8 @@ func TestChromeLiveStatsAndStylesWithoutReload(t *testing.T) {
 	var styleFailures atomic.Int32
 	var failStyle atomic.Bool
 	failStyle.Store(true)
+	liveCSS := string(mustAsset(t, "assets/v1/app.css")) + "\nbody{--live-style-test:2}"
+	liveDigest := fmt.Sprintf("%x", sha256.Sum256([]byte(liveCSS)))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/fixture/style-attempts" {
 			writeChromeJSON(w, map[string]int32{"failures": styleFailures.Load()})
@@ -42,17 +45,17 @@ func TestChromeLiveStatsAndStylesWithoutReload(t *testing.T) {
 			writeChromeJSON(w, map[string]any{"version": 1, "cloud": meter, "local": meter, "unclassified": 0, "updated_at": time.Now().UTC()})
 			return
 		}
-		if r.URL.Path == "/app/assets/v1/app.css" && stage.Load() == 1 {
+		if (r.URL.Path == "/app/assets/v1/app.css" || r.URL.Path == "/app/assets/v1/app."+liveDigest+".css") && stage.Load() == 1 {
 			w.Header().Set("Content-Type", "text/css")
 			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("ETag", "\"live-style-two\"")
+			w.Header().Set("ETag", "\""+liveDigest+"\"")
 			if r.Method != "HEAD" {
 				if failStyle.Load() {
 					styleFailures.Add(1)
 					http.Error(w, "temporary stylesheet failure", 503)
 					return
 				}
-				fmt.Fprint(w, string(mustAsset(t, "assets/v1/app.css"))+"\nbody{--live-style-test:2}")
+				fmt.Fprint(w, liveCSS)
 			}
 			return
 		}
@@ -76,7 +79,7 @@ func TestChromeLiveStatsAndStylesWithoutReload(t *testing.T) {
  if(!await evaluate('getComputedStyle(document.body).getPropertyValue("--live-style-test").trim()!=="2"&&document.querySelector("#live-draft").value==="Do not overwrite"'))throw Error('failed update replaced stylesheet or lost draft');
  await evaluate('fetch("/fixture/recover-style").then(()=>window.NexusLive.wake())');
  await eventually('getComputedStyle(document.body).getPropertyValue("--live-style-test").trim()==="2"','styles did not update in place');
- if(!await evaluate('new URL(document.querySelector("link[data-live-style]").href).searchParams.get("revision")===document.querySelector("link[data-live-style]").dataset.liveStyle'))throw Error('stylesheet revision URL absent');
+ if(!await evaluate('document.querySelector("link[data-live-style]").href.endsWith("/app."+document.querySelector("link[data-live-style]").dataset.liveStyle.slice(1,-1)+".css")'))throw Error('stylesheet revision URL absent');
  if(!await evaluate('window.sameDocument===123&&document.querySelector("#live-draft").value==="Do not overwrite"&&document.activeElement.id==="live-draft"'))throw Error('document reloaded or draft lost');
  socket.close();`
 	out, e := exec.CommandContext(ctx, node, "-e", preamble+steps, strconv.Itoa(port), server.URL).CombinedOutput()

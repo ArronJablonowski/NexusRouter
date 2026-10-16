@@ -69,10 +69,10 @@ window.NexusLive = (() => {
  let link=document.querySelector('link[rel="stylesheet"][data-live-style]');if(!link)return;
  window.NexusLive.watch("stylesheet",async()=>{
   const response=await window.NexusLive.fetch(base+"/assets/v1/app.css",{method:"HEAD",credentials:"same-origin",cache:"no-store"});if(!response.ok)return false;
-  const tag=response.headers.get("ETag");if(!tag||tag.length>256||tag===link.dataset.liveStyle)return;
+  const tag=response.headers.get("ETag"),revision=/^"([a-f0-9]{64})"$/.exec(tag||"");if(!revision||tag===link.dataset.liveStyle)return;
   const next=link.cloneNode();next.dataset.liveStyle=tag;
   // Firefox can reuse an already-loaded stylesheet by URL despite a new ETag.
-  next.href=base+"/assets/v1/app.css?revision="+encodeURIComponent(tag);
+  next.href=base+"/assets/v1/app."+revision[1]+".css";
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{next.remove();reject(Error("Stylesheet update timed out"));},12000);next.onload=()=>{clearTimeout(timer);link.replaceWith(next);link=next;resolve();};next.onerror=()=>{clearTimeout(timer);next.remove();reject(Error("Stylesheet unavailable"));};link.after(next);});
  },{interval:15000});
 })();

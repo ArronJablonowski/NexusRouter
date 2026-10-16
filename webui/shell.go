@@ -245,7 +245,12 @@ func loadShellAssets(basePath string) (map[string]shellAsset, error) {
 		if contentType == "" {
 			return nil, ErrShellConfiguration
 		}
-		loaded[name] = shellAsset{body: body, contentType: contentType}
+		asset := shellAsset{body: body, contentType: contentType}
+		loaded[name] = asset
+		if name == "assets/v1/app.css" {
+			digest := sha256.Sum256(body)
+			loaded["assets/v1/app."+hex.EncodeToString(digest[:])+".css"] = asset
+		}
 	}
 	return loaded, nil
 }
