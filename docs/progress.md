@@ -2982,4 +2982,4 @@ Spark sidebar completion: source 6d2b9f58 deployed to the commander with idle-bo
 
 ### Remote chat button refinement — 2026-10-15
 
-Scoped remote task/progress buttons now have compact muted surfaces, consistent spacing, visible keyboard focus, distinct cancellation styling and separate status lines. Web UI race suite, desktop/narrow Chrome geometry/interactions, source/static checks and native build passed; embedded manifest reviewed. Commander deployment pending. Evidence/limits: docs/validation/2026-10-15-chat-buttons.md.
+Scoped remote task/progress buttons now have compact muted surfaces, consistent spacing, visible keyboard focus, distinct cancellation styling and separate status lines. Web UI race suite, desktop/narrow Chrome geometry/interactions, source/static checks and native build passed; embedded manifest reviewed. Source 84fc3944 deployed to the commander after private idle-boundary rollback backup. Installed desktop/narrow status/progress controls and reload passed with zero model submissions; verification session logged out. Evidence/limits: docs/validation/2026-10-15-chat-buttons.md.
