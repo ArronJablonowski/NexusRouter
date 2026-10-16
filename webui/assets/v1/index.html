@@ -270,6 +270,17 @@
         <section class="settings-card cleanup-card" aria-labelledby="cleanup-title">
           <h2 id="cleanup-title">Storage cleanup</h2>
           <p>Keep the three newest verified deployment backups. Registered QA builds become eligible after seven days. Chat history, uploads and reports are preserved; files in use are skipped.</p>
+          <form id="cleanup-schedule-form">
+            <label class="setting-toggle"><span><strong>Automatic cleanup</strong><small>Enable or disable scheduled cleanup. Saved changes take effect immediately without restarting NexusRouter. Manual cleanup remains available.</small></span><span class="switch"><input id="cleanup-auto-enabled" type="checkbox" role="switch" disabled><span aria-hidden="true"></span></span></label>
+            <div class="cleanup-schedule-fields">
+              <label>Frequency<select id="cleanup-frequency" disabled><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
+              <label id="cleanup-weekday-field" hidden>Day<select id="cleanup-weekday" disabled><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></label>
+              <label>Time<input id="cleanup-time" type="time" required disabled></label>
+            </div>
+            <p id="cleanup-timezone">Schedule uses the commander's local time.</p>
+            <div class="settings-actions"><button id="cleanup-schedule-save" type="submit" disabled>Save cleanup schedule</button><button id="cleanup-schedule-refresh" type="button" class="secondary">Reload schedule</button></div>
+            <p id="cleanup-schedule-status" role="status" aria-live="polite">Loading automatic cleanup schedule…</p>
+          </form>
           <p id="cleanup-last" role="status">Loading last cleanup…</p>
           <div class="settings-actions"><button id="cleanup-refresh" type="button" class="secondary">Refresh last run</button><button id="cleanup-preview" type="button" class="secondary">Preview cleanup</button><button id="cleanup-run" type="button" disabled>Run cleanup</button></div>
           <p id="cleanup-status" role="status" aria-live="polite">Preview the eligible files before running cleanup.</p>

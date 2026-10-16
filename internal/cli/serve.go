@@ -391,7 +391,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return 1
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{Comfy: comfyService, RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{Cleanup: localCleanupControls(), ChatPreference: service.ChatPreference,
+		browserHandler, err = webuiapp.New(webuiapp.Options{Comfy: comfyService, RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{Cleanup: localCleanupControls(), CleanupSchedule: localCleanupScheduleControls(), ChatPreference: service.ChatPreference,
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
@@ -798,4 +798,12 @@ func localCleanupControls() func(context.Context, string, string) (maintenance.R
 		return nil
 	}
 	return (maintenance.Service{Home: filepath.Join(home, ".NexusRouter")}).Invoke
+}
+
+func localCleanupScheduleControls() func(context.Context, *maintenance.ScheduleUpdate) (maintenance.ScheduleReport, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return (maintenance.Service{Home: filepath.Join(home, ".NexusRouter")}).Schedule
 }

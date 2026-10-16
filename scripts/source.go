@@ -7,3 +7,8 @@ import _ "embed"
 //
 //go:embed cleanup-nexus-home.py
 var CleanupSource []byte
+
+// CleanupScheduleSource is the reviewed local LaunchAgent control helper.
+//
+//go:embed cleanup-schedule.py
+var CleanupScheduleSource []byte

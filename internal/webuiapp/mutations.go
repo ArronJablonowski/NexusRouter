@@ -26,6 +26,7 @@ import (
 )
 
 type MutationServices struct {
+	CleanupSchedule func(context.Context, *maintenance.ScheduleUpdate) (maintenance.ScheduleReport, error)
 	Cleanup         func(context.Context, string, string) (maintenance.Report, error)
 	RegisterModel   func(context.Context, ModelRegistration) (string, error)
 	ChatPreference  func(context.Context, sessions.ChatPreferenceUpdate) (sessions.ChatPreference, error)
@@ -49,6 +50,9 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 	base := h.basePath + "/api/v1"
 	path := request.URL.Path
 	switch {
+	case path == base+"/cleanup-schedule":
+		h.serveCleanupSchedule(writer, request)
+		return true
 	case path == base+"/cleanup":
 		h.serveCleanup(writer, request)
 		return true

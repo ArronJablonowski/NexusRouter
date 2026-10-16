@@ -176,3 +176,28 @@
  }
  refresh.addEventListener('click',()=>action('status'));preview.addEventListener('click',()=>action('preview'));run.addEventListener('click',()=>action('run'));action('status');
 })();
+
+
+(() => {
+ const base=document.body.dataset.basePath||'';
+ if(!window.NexusRoutes?.settings(window.location.pathname.slice(base.length)))return;
+ const form=document.querySelector('#cleanup-schedule-form'),enabled=document.querySelector('#cleanup-auto-enabled'),frequency=document.querySelector('#cleanup-frequency'),day=document.querySelector('#cleanup-weekday'),time=document.querySelector('#cleanup-time'),dayField=document.querySelector('#cleanup-weekday-field'),zone=document.querySelector('#cleanup-timezone'),status=document.querySelector('#cleanup-schedule-status'),save=document.querySelector('#cleanup-schedule-save'),refresh=document.querySelector('#cleanup-schedule-refresh');
+ let projection=null,busy=false;
+ const controls=[enabled,frequency,day,time,save,refresh];
+ function dependency(){dayField.hidden=frequency.value!=='weekly';}
+ function valid(s){return s&&typeof s.enabled==='boolean'&&Number.isInteger(s.hour)&&s.hour>=0&&s.hour<24&&Number.isInteger(s.minute)&&s.minute>=0&&s.minute<60&&(s.weekday===null||(Number.isInteger(s.weekday)&&s.weekday>=0&&s.weekday<7))&&typeof s.loaded==='boolean'&&typeof s.running==='boolean'&&['ready','needs_attention','needs_recovery'].includes(s.state)&&typeof s.timezone==='string'&&/^[0-9a-f]{64}$/.test(s.digest);}
+ function render(value){if(value?.version!==1||!valid(value.schedule))throw Error();projection=value.schedule;const s=projection;
+  enabled.checked=s.enabled;frequency.value=s.weekday===null?'daily':'weekly';day.value=String(s.weekday??0);time.value=String(s.hour).padStart(2,'0')+':'+String(s.minute).padStart(2,'0');dependency();
+  zone.textContent='Local time on this commander ('+s.timezone+'). Daylight-saving changes follow the system calendar.';
+  status.textContent=value.recovered?'The previous schedule was recovered. Review it and save your desired change again.':s.state==='needs_recovery'?'A schedule update was interrupted. Save to recover the previous schedule first.':s.state==='needs_attention'?'Saved schedule and scheduler state differ. Save to reconcile them.':s.running?'Cleanup is running. Wait for it to finish before changing its schedule.':s.enabled?'Automatic cleanup is on. Changes take effect as soon as they are saved.':'Automatic cleanup is off. Manual cleanup remains available.';
+ }
+ async function request(update){if(busy)return;busy=true;controls.forEach(x=>x.disabled=true);status.textContent=update?'Applying cleanup schedule…':'Loading cleanup schedule…';
+  try{let options={credentials:'same-origin',cache:'no-store'};
+   if(update){const r=await window.NexusLive.fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!r.ok)throw Error();const csrf=await r.json();options={...options,method:'POST',headers:{'Content-Type':'application/json','X-Darwin-CSRF':csrf.csrf_token},body:JSON.stringify(update)};}
+   const r=await window.NexusLive.fetch(base+'/api/v1/cleanup-schedule',options,60000);if(r.status===409){status.textContent='The schedule changed elsewhere. Your edits are preserved; reload the schedule before saving again.';return;}if(!r.ok)throw Error();render(await r.json());
+  }catch{status.textContent=update?'The schedule change could not be confirmed. Your edits are preserved. Reload the schedule before trying again; no automatic retry is made.':'Automatic cleanup scheduling is unavailable. Check the installed utility and local scheduler.';}
+  finally{busy=false;controls.forEach(x=>x.disabled=!projection);save.disabled=!projection||projection.running;refresh.disabled=false;dependency();}
+ }
+ form.addEventListener('submit',event=>{event.preventDefault();if(!projection||busy)return;if(!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(time.value)){status.textContent='Choose a valid cleanup time.';return;}const [hour,minute]=time.value.split(':').map(Number);request({version:1,expected_digest:projection.digest,settings:{enabled:enabled.checked,hour,minute,weekday:frequency.value==='weekly'?Number(day.value):null}});});
+ frequency.addEventListener('change',dependency);refresh.addEventListener('click',()=>request(null));request(null);
+})();

@@ -757,3 +757,7 @@ main > section > h1, .cron-heading h1, .tron-heading h1 { font-size: clamp(1.3re
 
 .cleanup-card { margin-bottom: 1rem; }
 .cleanup-card .settings-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.cleanup-schedule-fields { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.cleanup-schedule-fields > label { display: grid; gap: .35rem; min-width: 0; }
+.cleanup-schedule-fields input, .cleanup-schedule-fields select { max-width: 100%; }
