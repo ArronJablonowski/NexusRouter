@@ -2,9 +2,11 @@
 window.NexusRemoteTaskControls = (()=>{
  function attach(parent,peer,task,base,csrf,onStatus){
   const card=document.createElement("section"),title=document.createElement("h4"),refresh=document.createElement("button"),cancel=document.createElement("button"),status=document.createElement("output"),result=document.createElement("pre");
+  card.className="remote-task-card";refresh.className="remote-chat-action";cancel.className="remote-chat-action remote-chat-danger";
   title.textContent="Request "+task.request_id;refresh.type=cancel.type="button";refresh.textContent="Load status and result";cancel.textContent="Request cancellation";cancel.disabled=true;
   status.setAttribute("role","status");status.setAttribute("aria-live","polite");status.textContent="Load current status before requesting cancellation.";
   const confirmation=document.createElement("div"),warning=document.createElement("p"),confirm=document.createElement("button"),dismiss=document.createElement("button");
+  confirmation.className="remote-cancel-confirmation";confirm.className="remote-chat-action remote-chat-danger";dismiss.className="remote-chat-action";
   confirmation.hidden=true;confirmation.setAttribute("role","group");confirmation.setAttribute("aria-label","Confirm task cancellation");
   warning.textContent="Request cancellation of "+task.request_id+" on "+peer.id+"? Work may finish before cancellation takes effect.";
   confirm.type=dismiss.type="button";confirm.textContent="Confirm cancellation";dismiss.textContent="Keep running";confirmation.append(warning,confirm,dismiss);

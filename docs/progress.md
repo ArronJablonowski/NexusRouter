@@ -2979,3 +2979,7 @@ Added bounded private snapshot indexing/backfill, one sidebar entry per Spark co
 
 
 Spark sidebar completion: source 6d2b9f58 deployed to the commander with idle-boundary rollback/config/state backup, including routes and original uploads/cache. Installed old-chat import/status-outage check passed saved history and eight exact downloads with zero model submissions; installed new two-turn Spark chat passed sidebar-reopened follow-up, retained/new facts, one root/latest head, fresh reopen/reload and four exact downloads. Native Spark events independently confirm the intended model/provider on both successful turns. Canonical binary matches the qualified hash; pairing/configuration/Spark receiver remained unchanged. Candidate/session/token cleanup completed. Details and bounded coverage/remaining limits are in docs/validation/2026-10-15-spark-chat-sidebar.md.
+
+### Remote chat button refinement — 2026-10-15
+
+Scoped remote task/progress buttons now have compact muted surfaces, consistent spacing, visible keyboard focus, distinct cancellation styling and separate status lines. Web UI race suite, desktop/narrow Chrome geometry/interactions, source/static checks and native build passed; embedded manifest reviewed. Commander deployment pending. Evidence/limits: docs/validation/2026-10-15-chat-buttons.md.

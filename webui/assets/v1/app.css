@@ -672,3 +672,29 @@ body:has(#chat-view:not([hidden])) { height: 100vh; height: 100dvh; overflow: hi
 
 .remote-chat-row { grid-template-columns:minmax(0,1fr); }
 .remote-chat-row .chat-meta { display:block; overflow-wrap:anywhere; }
+
+/* Remote chat actions share a quiet, compact toolbar treatment. */
+.remote-task-card > h4 { margin: 1.1rem 0 .75rem; font-size: .85rem; color: var(--nx-muted); font-weight: 500; }
+.remote-chat-action, #host-new-task {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 2.25rem; padding: .45rem .8rem; margin: 0 .5rem .5rem 0;
+  border: 1px solid #345e69; border-radius: .6rem;
+  background: #0b2933; color: var(--nx-text); font-size: .85rem;
+  line-height: 1.35; font-weight: 600; vertical-align: middle;
+  transition: background .15s ease, border-color .15s ease;
+}
+.remote-chat-action:hover:not(:disabled), #host-new-task:hover:not(:disabled) { background: #123b47; border-color: #69b5c2; }
+.remote-chat-action:focus-visible, #host-new-task:focus-visible { outline: 2px solid var(--nx-accent); outline-offset: 3px; }
+.remote-chat-action:disabled { opacity: .45; cursor: not-allowed; }
+.remote-chat-danger { border-color: #82505a; color: #f3b5be; background: #291f28; }
+.remote-chat-danger:hover:not(:disabled) { background: #432630; border-color: #d98a98; }
+.remote-task-card > output, .remote-progress-card > output { display: block; margin: .15rem 0 .8rem; color: var(--nx-muted); font-size: .85rem; line-height: 1.5; }
+.remote-progress-card { margin: 1rem 0; padding-top: .9rem; border-top: 1px solid var(--nx-line); }
+.remote-progress-card > h5 { margin: 0 0 .65rem; color: var(--nx-muted); font-weight: 500; }
+.remote-progress-card > ul:empty { display: none; }
+.remote-cancel-confirmation { margin: .5rem 0; padding: .8rem; border: 1px solid #82505a; border-radius: .6rem; }
+.remote-cancel-confirmation > p { margin: 0 0 .7rem; }
+.remote-chat-action[hidden], .remote-cancel-confirmation[hidden] { display: none; }
+@media (max-width: 600px) {
+  .remote-chat-action, #host-new-task { max-width: 100%; white-space: normal; }
+}

@@ -1,0 +1,7 @@
+# Remote chat button refinement — 2026-10-15
+
+Remote task and progress controls now use compact rounded secondary buttons, consistent spacing, explicit keyboard focus, subdued disabled states and a distinct cancellation treatment. Status text occupies its own line; progress sections have a light divider. Cancellation confirmation, pagination, status refresh, following, request identity and dispatch behavior are unchanged. Styling is scoped to remote chat controls and the New remote task button.
+
+Validation on the changed source: `go test -race ./webui -count=1 -timeout=3m` passed (35.569s), including existing cancellation/uncertain-delivery behavior and Chrome sidebar/reload interactions. Browser geometry checks cover 1440px and 390px, button separation and minimum height, keyboard focus, hidden confirmation, disabled cancellation and no extra dispatch. The fixture now waits for restored download links before inspecting them rather than racing asynchronous history restoration. Desktop/narrow screenshots were inspected privately. `go run ./cmd/check`, `go vet ./webui`, native `go build -trimpath -buildvcs=false` and `git diff --check` passed. Embedded asset digest reviewed: `2541183860c0ba1fc6e913c0b7e75c16e0a4c5dc02156449b1c71b836d6aa245`.
+
+Native candidate SHA256: `0d2a0d3e489c6b92750586ef5830eb83ee773247cc4d4719235d533cca66e59e`. Commander deployment and installed checks pending. No full-suite, Firefox-specific or new model-inference claim; this is a presentation change.

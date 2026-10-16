@@ -67,12 +67,19 @@ func TestChromeRemoteSidebarReloadAndLocalSwitchDoNotDispatch(t *testing.T) {
 	defer cancel()
 	port, stop := startChromeForTest(t, ctx, chrome)
 	defer stop()
-	script := strings.Split(chromeRemoteDiscoveryCDP, "await cdp('Page.navigate'")[0] + `
+	script := strings.ReplaceAll(strings.Split(chromeRemoteDiscoveryCDP, "await cdp('Page.navigate'")[0], "result.exceptionDetails.text", "JSON.stringify(result.exceptionDetails)") + `
  await cdp('Page.navigate',{url:origin+'/app/chats'});await eventually('document.querySelectorAll("#chat-list>li").length===2&&!!document.querySelector("[data-remote-chat]")','Shared sidebar missing Spark/local rows');
  await evaluate('document.querySelector("[data-remote-chat]").click()');await eventually('document.querySelector("#host-receipt").textContent.includes("FINAL_FACT")&&document.querySelectorAll("#host-receipt .chat-file-card").length===2','Sidebar reopen lost saved history/files');
  await eventually('document.querySelector("[data-remote-chat]")?.getAttribute("aria-current")==="true"&&document.querySelector("#chat-title").textContent==="Saved Spark conversation"','Spark selection/title missing');
  await cdp('Page.reload');await eventually('document.querySelector("#host-receipt").textContent.includes("FINAL_FACT")&&document.querySelectorAll("#host-receipt .chat-file-card").length===2','Reload lost Spark history/files');
- if(!await evaluate('document.querySelector("#host-receipt a").href.includes("/remote-files/spark/")&&document.querySelector("#host-notice").textContent.includes("Reconnect")'))throw Error('Offline history granted continuation or lost download scope');
+ await eventually('document.querySelector("#host-receipt a")?.href.includes("/remote-files/spark/")&&document.querySelector("#host-notice").textContent.includes("Reconnect")','Offline history granted continuation or lost download scope');
+ await evaluate('window.NexusRemoteEvents.attach(document.querySelector(".remote-task-card"),"spark","request-child-0001","fixture-progress","/app","fixture")');
+ for(const width of [1440,390]){
+  await cdp('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+  await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  if(process.env.NEXUS_UI_QA_SCREENSHOTS){const shot=await cdp('Page.captureScreenshot',{format:'png'});(await import('node:fs')).writeFileSync('/tmp/nexus-remote-buttons-'+width+'.png',Buffer.from(shot.data,'base64'));}
+  if(!await evaluate("(()=>{const card=document.querySelector('.remote-task-card'),buttons=[...card.querySelectorAll('button')].filter(b=>b.getClientRects().length>0),refresh=buttons[0],cancel=buttons[1],a=refresh.getBoundingClientRect(),b=cancel.getBoundingClientRect();refresh.focus();return buttons.every(button=>{const r=button.getBoundingClientRect();return r.height>=32&&r.right<=innerWidth&&r.left>=0;})&&(b.top>=a.bottom||b.left-a.right>=6)&&getComputedStyle(refresh).outlineStyle==='solid'&&getComputedStyle(card.querySelector('output')).display==='block'&&cancel.disabled&&getComputedStyle(card.querySelector('.remote-cancel-confirmation')).display==='none';})()"))throw Error('Remote controls layout '+width+' '+JSON.stringify(await evaluate("[...document.querySelectorAll('.remote-task-card button')].map(b=>({text:b.textContent,rect:b.getBoundingClientRect().toJSON(),outline:getComputedStyle(b).outlineStyle,disabled:b.disabled}))")));
+ }
  await evaluate('document.querySelector("button[data-chat-id=local-chat]").click()');await eventually('document.querySelector("#transcript").textContent.includes("LOCAL_HISTORY")&&document.querySelector("#host-receipt").hidden','Local switch retained Spark context');
  await evaluate('window.dispatchEvent(new CustomEvent("nexus-chat-preference",{detail:{id:"local-chat"}}))');await eventually('!!document.querySelector("[data-remote-chat]")&&document.querySelectorAll("#chat-list>li").length===2','Local refresh erased Spark sidebar row');
  await evaluate('document.querySelector("[data-remote-chat]").click()');await eventually('document.querySelector("#host-receipt").textContent.includes("EARLIER_FACT")','Reopen after local switch failed');

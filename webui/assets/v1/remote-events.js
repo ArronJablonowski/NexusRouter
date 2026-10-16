@@ -2,8 +2,9 @@
 window.NexusRemoteEvents=(()=>{
  function attach(parent,instance,request,task,base,csrf){
   const card=document.createElement("section"),title=document.createElement("h5"),refresh=document.createElement("button"),next=document.createElement("button"),status=document.createElement("output"),list=document.createElement("ul");
+  card.className="remote-progress-card";refresh.className=next.className="remote-chat-action";
   title.textContent="Progress: "+task;refresh.type=next.type="button";refresh.textContent="Refresh progress";next.textContent="Next progress page";next.hidden=true;status.setAttribute("role","status");status.setAttribute("aria-live","polite");status.textContent="Load lifecycle events. Result text is available from task status.";
-  const follow=document.createElement("button");follow.type="button";follow.textContent="Follow progress";
+  const follow=document.createElement("button");follow.className="remote-chat-action";follow.type="button";follow.textContent="Follow progress";
   let busy=false,cursor=0,following=false,timer=null,generation=0,until=0,head=0;
   function stop(message){following=false;generation++;if(timer!==null)clearTimeout(timer);timer=null;follow.textContent="Follow progress";if(message)status.textContent=message;}
   function visible(){return card.isConnected&&!document.hidden&&card.getClientRects().length>0;}
