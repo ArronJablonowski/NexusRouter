@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/approvals"
-	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 // DecideApproval requires a host-authenticated actor and the exact inspected
@@ -31,11 +30,11 @@ func (s *Service) DecideApproval(ctx context.Context, command approvals.Command,
 	if (approvals.Decision{ID: command.ID, Actor: actor, Time: time.Now().UTC()}).Validate() != nil {
 		return approvals.Record{}, ErrAdmission
 	}
-	db, err := telemetry.OpenApprovalControl(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openApprovalStore(ctx)
 	if err != nil {
 		return approvals.Record{}, approvals.ErrUnavailable
 	}
-	defer db.Close()
+	defer release()
 	result, err := db.DecideBoundApproval(ctx, command, actor, time.Now().UTC())
 	if err != nil {
 		for _, known := range []error{approvals.ErrInvalid, approvals.ErrConflict, context.Canceled, context.DeadlineExceeded} {

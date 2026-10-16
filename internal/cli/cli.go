@@ -96,6 +96,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "internal-file-text" {
+		return runDocumentExtract(args[1:], stdin, stdout)
+	}
 	if len(args) > 0 && args[0] == "comfy" {
 		return runComfy(args[1:], stdout, stderr)
 	}

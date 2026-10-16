@@ -22,15 +22,19 @@ type remoteTaskControlRequest struct {
 	ExpectedSubmissionID string `json:"expected_submission_id,omitempty"`
 }
 type remoteTaskControlPage struct {
-	Version         int       `json:"version"`
-	Instance        string    `json:"instance"`
-	RequestID       string    `json:"request_id"`
-	SubmissionID    string    `json:"submission_id"`
-	State           string    `json:"state"`
-	TaskIDs         []string  `json:"task_ids"`
-	CancelRequested bool      `json:"cancel_requested"`
-	ResultText      string    `json:"result_text,omitempty"`
-	ObservedAt      time.Time `json:"observed_at"`
+	Version         int                         `json:"version"`
+	RetentionFailed bool                        `json:"retention_failed,omitempty"`
+	Cached          bool                        `json:"cached,omitempty"`
+	Conversation    []remoteConversationMessage `json:"conversation,omitempty"`
+	Continuation    *remote.Task                `json:"continuation,omitempty"`
+	Instance        string                      `json:"instance"`
+	RequestID       string                      `json:"request_id"`
+	SubmissionID    string                      `json:"submission_id"`
+	State           string                      `json:"state"`
+	TaskIDs         []string                    `json:"task_ids"`
+	CancelRequested bool                        `json:"cancel_requested"`
+	ResultText      string                      `json:"result_text,omitempty"`
+	ObservedAt      time.Time                   `json:"observed_at"`
 }
 
 func remoteControlID(value string, min int) bool {
@@ -75,12 +79,28 @@ func (h *Handler) serveRemoteTaskControl(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	status, err := safeCall(func() (submissions.Status, error) {
+		if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+			if _, e := d.conversation(ctx, input.Instance, input.RequestID); e == nil {
+				observed, e := d.Client.InspectRecorded(ctx, d.Store, input.RequestID)
+				return observed.Status, e
+			}
+		}
 		return h.remoteTaskController.Status(ctx, input.Instance, input.RequestID)
 	})
 	if err == nil && !validRemoteControlStatus(status) {
 		err = remote.ErrInvalid
 	}
 	if err != nil {
+		if input.Action == "status" {
+			if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+				cacheCtx, cacheCancel := context.WithTimeout(r.Context(), time.Second)
+				defer cacheCancel()
+				if p, e := d.savedConversation(cacheCtx, input.Instance, input.RequestID); e == nil {
+					h.writeJSON(w, 200, p)
+					return true
+				}
+			}
+		}
 		h.writeError(w, r, http.StatusServiceUnavailable, "controls_unavailable")
 		return true
 	}
@@ -105,6 +125,25 @@ func (h *Handler) serveRemoteTaskControl(w http.ResponseWriter, r *http.Request)
 	page := remoteTaskControlPage{Version: 1, Instance: input.Instance, RequestID: input.RequestID, SubmissionID: status.ID, State: status.State, TaskIDs: status.TaskIDs, CancelRequested: status.CancelRequested, ObservedAt: time.Now().UTC()}
 	if status.State == "succeeded" && status.Result != nil {
 		page.ResultText = status.Result.Text
+	}
+
+	if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+		if c, e := d.conversation(ctx, input.Instance, input.RequestID); e == nil {
+			page.Conversation = c.Messages
+			if status.State == "succeeded" && status.Result != nil && !status.CancelRequested && status.Result.Text != "" {
+				page.Conversation = append(page.Conversation, remoteConversationMessage{Role: "assistant", Text: status.Result.Text, RequestID: input.RequestID, Model: c.Task.ExpectedModel, Host: input.Instance})
+				t := c.Task
+				t.Messages = nil
+				t.Execution = nil
+				t.Prompt = ""
+				page.Continuation = &t
+			}
+		}
+	}
+	if d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher); ok {
+		if _, e := d.conversation(ctx, page.Instance, page.RequestID); e == nil {
+			page.RetentionFailed = d.cacheConversation(ctx, page) != nil
+		}
 	}
 	h.writeJSON(w, http.StatusOK, page)
 	return true

@@ -77,7 +77,9 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
 	var fail atomic.Bool
 	var emptyApprovals atomic.Bool
 	var approvalStage atomic.Int32
+	var approvalReads atomic.Int32
 	var approvalWrites atomic.Int32
+	var qualityRating atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/fixture/empty-approvals":
@@ -117,9 +119,28 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
 			return
 		case "/app/api/v1/tasks/task-fixture/feedback":
 			time.Sleep(200 * time.Millisecond)
-			w.Write([]byte(`{"version":1,"task_id":"task-fixture","revision":1,"objective":[],"feedback_allowed":true}`))
+			page := FeedbackContext{Version: 1, TaskID: "task-fixture", Revision: 1, Objective: []EvidenceSummary{}, FeedbackAllowed: true, CostSummary: "Recorded task model cost estimate: $0.000000 USD."}
+			if qualityRating.Load() > 0 {
+				page.Rating = int(qualityRating.Load())
+				page.FeedbackID = "quality-feedback"
+				page.Subjective = &EvidenceSummary{Class: SubjectiveEvidence, Source: "user_feedback", Outcome: EvidenceAccepted, ReferenceCount: 1}
+			}
+			writeChromeJSON(w, page)
+			return
+		case "/app/api/v1/feedback":
+			var command FeedbackRequest
+			if json.NewDecoder(r.Body).Decode(&command) != nil || command.Validate() != nil || command.Rating != 8 || command.AttemptCost != nil || r.Header.Get("X-Darwin-CSRF") != "fixture" {
+				http.Error(w, "invalid rating", 400)
+				return
+			}
+			qualityRating.Store(int32(command.Rating))
+			writeChromeJSON(w, FeedbackReceipt{Version: 1, OperationID: "rating-operation", TaskID: "task-fixture", FeedbackID: "quality-feedback", Revision: 1, State: "recorded", Accepted: true, EvidenceClass: SubjectiveEvidence, Source: "user_feedback"})
 			return
 		case "/app/api/v1/tasks/task-fixture/approvals":
+			if approvalReads.Add(1) == 1 {
+				http.Error(w, "transient fixture read failure", http.StatusServiceUnavailable)
+				return
+			}
 			if emptyApprovals.Load() {
 				writeChromeJSON(w, ApprovalPage{Version: 1, TaskID: "task-fixture", Items: []ApprovalSummary{}})
 				return
@@ -168,6 +189,9 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
  await cdp('Page.navigate',{url:origin+'/app/chats/chat-fixture'});
  await eventually('document.querySelectorAll("#transcript .message").length===1&&document.querySelector(".chat-name")?.textContent==="A synthetic chat description"','chat failed to load');
  await eventually('!document.querySelector("#composer-text").disabled&&!document.querySelector("#feedback-panel").hidden','controls absent');
+ if(!await evaluate('document.querySelector("#attempt-cost").min==="1"&&document.querySelector("#attempt-cost").max==="10"&&document.querySelector("#feedback-rejected").hidden'))throw Error('rating UI still asks for costs or binary verdict');
+ await evaluate('document.querySelector("#attempt-cost").value="8";document.querySelector("#feedback-accepted").click()');
+ await eventually('document.querySelector("#feedback-summary").textContent.includes("8/10")','quality rating not acknowledged');
  await evaluate('window.controlFlashes=0;new MutationObserver(records=>{controlFlashes+=records.filter(r=>r.oldValue===null).length}).observe(document.querySelector("#composer-text"),{attributes:true,attributeFilter:["disabled"],attributeOldValue:true})');
  await evaluate('window.messageBefore=document.querySelector("#transcript .message");window.chatBefore=document.querySelector("[data-chat-id]")');
  await evaluate('fetch("/fixture/fail")');
@@ -187,13 +211,14 @@ func TestChromeChatRefreshFailureRetainsContent(t *testing.T) {
  if(!await evaluate('document.querySelector("#approval-dialog").hidden&&document.querySelector(".approval-message")===approvalBefore&&document.querySelector(".approval-result").textContent.includes("recorded")'))throw Error('decision was not inline, stable and logged');
  await evaluate('document.querySelector("[data-approval-action=revoke]").click()');
  await eventually('document.querySelector(".approval-result").textContent.includes("revoked")','revocation not rendered');
- await evaluate('window.fixtureMessages=Array.from({length:40},(_,i)=>({id:"synthetic-"+i,role:"assistant",text:"Synthetic scrolling message "+i+" text".repeat(80)}));window.NexusChatRender.messages(document.querySelector("#transcript"),fixtureMessages,true);document.querySelector("#transcript").style.height="300px";document.querySelector("#transcript").style.flex="none";document.querySelector("#transcript").scrollTop=350;window.savedTop=document.querySelector("#transcript").scrollTop;window.savedMessage=document.querySelector("#transcript").children[2]');
- await evaluate('window.NexusChatRender.messages(document.querySelector("#transcript"),fixtureMessages.concat([{id:"new",role:"assistant",text:"New streamed result"}]),true)');
- if(!await evaluate('Math.abs(document.querySelector("#transcript").scrollTop-savedTop)<2&&document.querySelector("#transcript").children[2]===savedMessage'))throw Error('background update moved reading position');
+ // Exercise one synchronous reconciliation against its actual scroll viewport.
+ // Separate evaluations allow the live server snapshot to replace injected data.
+ if(!await evaluate('(()=>{const root=document.querySelector("#transcript"),viewport=root.closest(".conversation-scroll");const items=Array.from({length:40},(_,i)=>({id:"synthetic-"+i,role:"assistant",text:"Synthetic scrolling message "+i+" text".repeat(80)}));window.NexusChatRender.messages(root,items,true);viewport.style.height="300px";viewport.style.flex="none";viewport.scrollTop=350;const top=viewport.scrollTop,node=root.children[2];window.NexusChatRender.messages(root,items.concat([{id:"new",role:"assistant",text:"New streamed result"}]),true);return top>0&&Math.abs(viewport.scrollTop-top)<2&&root.children[2]===node})()'))throw Error('background reconciliation moved the actual reading viewport or replaced stable nodes');
  await evaluate('window.fixtureBeforeReload=true');
  await cdp('Page.reload');
  await eventually('!window.fixtureBeforeReload&&document.readyState==="complete"','new document did not finish loading');
  await eventually('document.querySelector(".approval-result")?.textContent.includes("revoked")','recorded decision did not survive reload');
+ if(!await evaluate('document.querySelector("#feedback-summary").textContent.includes("8/10")'))throw Error('rating lost on reload');
  if(!await evaluate('document.querySelectorAll(".approval-message").length===1&&document.querySelector("[data-approval-action=allow]").hidden&&document.querySelector("[data-approval-action=deny]").hidden&&document.querySelector("[data-approval-action=revoke]").hidden'))throw Error('resolved approval offered duplicate authority');
  await evaluate('fetch("/fixture/empty-approvals")');
  await evaluate('window.fixtureBeforeReload=true');

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"encoding/base64"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"strings"
 	"testing"
 
@@ -71,5 +73,22 @@ func TestResponseContractCodexInitialAdmission(t *testing.T) {
 			t.Fatalf("format-constrained initial chat rejected: %v", err)
 		}
 		cleanup()
+	}
+}
+
+func TestResponseReminderPreservesUploadFrame(t *testing.T) {
+	inputs := []attachments.Input{{Name: "image.jpg", Image: base64.StdEncoding.EncodeToString([]byte{255, 216, 255, 1})}, {Name: "notes.md", Text: "Return only compact JSON."}}
+	r := Request{Prompt: attachments.Encode("Describe this image.", inputs)}
+	if responseContract(r).Active() {
+		t.Fatal("file content became a format instruction")
+	}
+	r.Prompt = attachments.Encode("Return only compact JSON.", inputs)
+	messages, err := prepareTaskContext(context.Background(), &r, nil)
+	if err != nil || len(messages) != 1 {
+		t.Fatal(err)
+	}
+	text, files := attachments.Decode(messages[0].Content)
+	if len(files) != 2 || files[0].Image != inputs[0].Image || !strings.Contains(text, "Return only compact JSON.") {
+		t.Fatal("format reminder corrupted attachments")
 	}
 }

@@ -82,9 +82,12 @@
             <div><p class="eyebrow">Conversation</p><h2 id="chat-title">New chat</h2></div>
             <output id="chat-state" class="state-pill"></output>
           </header>
+          <div class="conversation-scroll" tabindex="0" role="region" aria-label="Conversation and generated files">
           <div id="transcript-state" class="notice" role="status">Choose a session to inspect its committed history.</div>
+          <details id="host-receipt" hidden open></details>
           <ol id="transcript" class="transcript" aria-label="Committed chat transcript"></ol>
           <button id="load-more-messages" class="secondary transcript-more" type="button" hidden>Load more messages</button>
+          <section id="chat-files" class="chat-files" aria-labelledby="chat-files-title" hidden><h3 id="chat-files-title">Files</h3><p id="chat-file-status" role="status" hidden></p><ul id="chat-file-list" class="chat-file-list" aria-label="Uploaded and generated files"></ul></section>
           <div id="provisional" class="provisional-stack" aria-label="Provisional assistant output" hidden></div>
           <output id="stream-announcement" class="visually-hidden" aria-live="polite"></output>
           <div id="approval-panel" class="approval-messages" hidden>
@@ -104,30 +107,36 @@
             </div>
           </section>
           <section id="feedback-panel" class="feedback-panel" aria-labelledby="feedback-title" hidden>
-            <h3 id="feedback-title">Outcome evidence</h3>
-            <p class="help">Your assessment is subjective evidence about the final attempt. It does not approve a tool or prove that every step was correct.</p>
+            <h3 id="feedback-title">Rate the result</h3>
+            <p class="help">How well was this content generated? Your rating helps choose models for similar creative work. It does not approve tool calls.</p>
             <div id="feedback-summary" class="evidence-summary"></div>
-            <label id="attempt-cost-label" for="attempt-cost">Observed final-attempt cost</label>
-            <input id="attempt-cost" type="number" min="0" step="any" inputmode="decimal" aria-describedby="attempt-cost-help">
-            <p id="attempt-cost-help" class="help">Enter a nonnegative observed cost. Zero is valid; leave it blank when the cost is unknown.</p>
-            <div class="button-row" role="group" aria-label="Record outcome evidence">
-              <button id="feedback-accepted" class="secondary" type="button">Record accepted</button>
-              <button id="feedback-rejected" class="secondary" type="button">Record rejected</button>
+            <label id="attempt-cost-label" for="attempt-cost">Quality rating (1–10)</label>
+            <input id="attempt-cost" type="number" min="1" max="10" step="1" inputmode="decimal" aria-describedby="attempt-cost-help">
+            <p id="attempt-cost-help" class="help">1 = very poor · 10 = excellent. NexusRouter calculates available model costs automatically; no cost input is needed.</p>
+            <div class="button-row" role="group" aria-label="Save content quality rating">
+              <button id="feedback-accepted" class="secondary" type="button">Save rating</button>
+              <button id="feedback-rejected" class="secondary" type="button" hidden>Record rejected</button>
             </div>
           </section>
+          </div>
+          <div class="composer-dock">
           <form id="composer" class="composer" novalidate>
             <label id="composer-label" for="composer-text">Start a new chat</label>
-            <textarea aria-autocomplete="list" aria-controls="host-options" aria-expanded="false" id="composer-text" rows="3" maxlength="1048576" aria-describedby="composer-help composer-error"></textarea>
+            <textarea aria-autocomplete="list" aria-controls="host-options" aria-expanded="false" id="composer-text" placeholder="Message NexusRouter…" rows="2" maxlength="1048576" aria-describedby="composer-help composer-error"></textarea>
             <div id="host-options" class="host-options" role="listbox" aria-label="Choose host or model" hidden></div>
             <div id="host-routing" hidden><p id="host-notice" role="status"></p><select id="host-model" aria-label="Assigned model" hidden></select><button id="host-new-task" type="button" class="secondary">New remote task</button></div>
-            <details id="host-receipt" hidden open></details>
             <div class="composer-meta">
               <span id="composer-help" class="help">Enter sends. Shift+Enter adds a new line.</span>
               <output id="composer-count" class="count">0</output>
             </div>
+            <input id="chat-upload-input" type="file" multiple hidden aria-label="Choose files to attach">
+            <ul id="chat-upload-list" class="chat-upload-list" aria-label="Files to send" hidden></ul>
+            <p id="chat-upload-status" role="status" class="help" hidden></p>
+            <details class="upload-help"><summary>Supported files and limits</summary><p>Text, code, data, PDF, Word (.doc/.docx), PNG, JPEG and GIF. Up to 4 files, 8 MB combined. PDFs: up to 40 pages. Extracted text: up to 64 KB per file; model context limits apply. Images need a vision-capable local or OpenAI-compatible model and are optimized for analysis. Originals are preserved. Scanned PDFs use local English OCR (up to 10 OCR pages); recognition can contain errors.</p></details>
             <div id="composer-error" class="field-error" role="alert" hidden></div>
             <div class="button-row">
-              <button id="send-message" type="submit">Start chat</button>
+              <button id="chat-upload-button" class="secondary" type="button" aria-label="Attach files">＋ Attach</button>
+              <button id="send-message" aria-label="Send message" type="submit">Start chat</button>
               <button id="new-chat" class="secondary" type="button" hidden>New chat</button>
             </div>
           </form>
@@ -135,6 +144,7 @@
             <output id="mutation-state" role="status" aria-live="polite"></output>
             <button id="reconcile" class="secondary" type="button" hidden>Check current status</button>
             <button id="acknowledge-unresolved" class="danger" type="button" hidden>Acknowledge unresolved outcome</button>
+          </div>
           </div>
         </section>
 
@@ -257,10 +267,30 @@
           <div><p class="eyebrow">Operator controls</p><h1 id="settings-title">Settings</h1></div>
           <button id="refresh-settings" class="secondary" type="button">Refresh</button>
         </header>
+        <section class="settings-card cleanup-card" aria-labelledby="cleanup-title">
+          <h2 id="cleanup-title">Storage cleanup</h2>
+          <p>Keep the three newest verified deployment backups. Registered QA builds become eligible after seven days. Chat history, uploads and reports are preserved; files in use are skipped.</p>
+          <form id="cleanup-schedule-form">
+            <label class="setting-toggle"><span><strong>Automatic cleanup</strong><small>Enable or disable scheduled cleanup. Saved changes take effect immediately without restarting NexusRouter. Manual cleanup remains available.</small></span><span class="switch"><input id="cleanup-auto-enabled" type="checkbox" role="switch" disabled><span aria-hidden="true"></span></span></label>
+            <div class="cleanup-schedule-fields">
+              <label>Frequency<select id="cleanup-frequency" disabled><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
+              <label id="cleanup-weekday-field" hidden>Day<select id="cleanup-weekday" disabled><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></label>
+              <label>Time<input id="cleanup-time" type="time" required disabled></label>
+            </div>
+            <p id="cleanup-timezone">Schedule uses the commander's local time.</p>
+            <div class="settings-actions"><button id="cleanup-schedule-save" type="submit" disabled>Save cleanup schedule</button><button id="cleanup-schedule-refresh" type="button" class="secondary">Reload schedule</button></div>
+            <p id="cleanup-schedule-status" role="status" aria-live="polite">Loading automatic cleanup schedule…</p>
+          </form>
+          <p id="cleanup-last" role="status">Loading last cleanup…</p>
+          <div class="settings-actions"><button id="cleanup-refresh" type="button" class="secondary">Refresh last run</button><button id="cleanup-preview" type="button" class="secondary">Preview cleanup</button><button id="cleanup-run" type="button" disabled>Run cleanup</button></div>
+          <p id="cleanup-status" role="status" aria-live="polite">Preview the eligible files before running cleanup.</p>
+          <ul id="cleanup-items" aria-label="Files eligible for cleanup"></ul>
+          <p id="cleanup-retained"></p>
+        </section>
         <div class="settings-layout">
           <form id="tool-settings-form" class="settings-card" novalidate>
             <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
-            <p class="settings-intro">Choose specialist locality and whether eligible models may use NexusRouter's narrowly scoped tools. Saved changes take effect after the NexusRouter daemon restarts.</p>
+            <p class="settings-intro">Choose specialist locality and whether eligible models may use NexusRouter's narrowly scoped tools. Automatic tool approval takes effect when saved. Other changes take effect after the NexusRouter daemon restarts.</p>
             <label class="setting-toggle"><span><strong>Model collaboration</strong><small>Let models exchange timestamped messages and collect paired-host collaboration on the commanding host. Private messages stay within local inference. Does not start recipients automatically. Restart required after saving.</small></span><span class="switch"><input id="collaboration-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
             <h3>Skills</h3>
 <label class="setting-toggle"><span><strong>Use skills</strong><small>Enable the skill system and use eligible active skills from the configured store.</small></span><span class="switch"><input id="skills-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
@@ -275,6 +305,10 @@
             <label class="setting-toggle" for="tools-enabled">
               <span><strong>Allow model tool use</strong><small>On by default, with read-only workspace access scoped to the launch directory unless you configure another root. Benchmark hosts may attach their own separately scoped tools.</small></span>
               <span class="switch"><input id="tools-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
+            </label>
+            <label class="setting-toggle" for="auto-approve-tools">
+              <span><strong>Auto-approve all tool calls</strong><small>Off by default. When on, permitted tools can act without asking you, including creating files and submitting jobs. Existing access limits and disabled tools stay unchanged. Decisions are logged. Takes effect immediately when saved, including calls waiting for approval. Turning this off does not undo calls already approved.</small></span>
+              <span class="switch"><input id="auto-approve-tools" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
             </label>
             <label class="setting-toggle" for="delegate-read-tools">
               <span><strong>Delegated read access</strong><small>Let the configured local worker inherit read-only access within the approved root.</small></span>
@@ -305,7 +339,7 @@
           </form>
           <aside class="settings-card" aria-labelledby="active-settings-title">
             <p class="eyebrow">Running daemon</p><h2 id="active-settings-title">Active policy</h2>
-            <p class="settings-intro">These values remain active until the daemon restarts.</p>
+            <p class="settings-intro">Automatic tool approval updates when saved. Other values remain active until the daemon restarts.</p>
             <dl id="active-settings" class="settings-summary"></dl>
             <div class="settings-advisory"><strong>Safety boundary</strong><p>Tool use and cloud specialists remain disabled by default. This setting cannot enable unrestricted shell commands, write access, or access beyond the configured directory. Benchmark tools retain their host-defined schemas and scopes.</p></div>
           </aside>
@@ -677,9 +711,12 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/routing-remote.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/skills.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/stats.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/chat-uploads.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/chat-render.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/chat-files.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/chat-descriptions.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/host-mentions.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/remote-chats.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/collaboration.js" defer></script>
 <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>

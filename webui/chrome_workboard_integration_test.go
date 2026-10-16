@@ -277,6 +277,9 @@ func chromeWorkboardColumns(boardID string) []Column {
 
 func chromeTestBinary(t *testing.T) string {
 	t.Helper()
+	if os.Getenv("NEXUS_TEST_BROWSER") == "firefox" {
+		return firefoxTestBinary(t)
+	}
 	if configured := os.Getenv("DARWIN_CHROME"); configured != "" {
 		if filepath.IsAbs(configured) {
 			return configured
@@ -305,6 +308,9 @@ func chromeTestBinary(t *testing.T) string {
 
 func startChromeForTest(t *testing.T, ctx context.Context, binary string) (int, func()) {
 	t.Helper()
+	if os.Getenv("NEXUS_TEST_BROWSER") == "firefox" {
+		return startFirefoxForTest(t, ctx, binary)
+	}
 	profile := t.TempDir()
 	command := exec.CommandContext(ctx, binary,
 		"--headless=new", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0",

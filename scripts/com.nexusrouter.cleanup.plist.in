@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.nexusrouter.cleanup</string>
+<key>ProgramArguments</key><array>
+<string>/usr/bin/python3</string><string>-B</string>
+<string>__NEXUS_HOME__/tools/maintenance/cleanup-nexus-home.py</string>
+<string>--home</string><string>__NEXUS_HOME__</string><string>--apply</string>
+</array>
+<key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>30</integer></dict>
+<key>ProcessType</key><string>Background</string>
+<key>Nice</key><integer>10</integer>
+<key>LowPriorityIO</key><true/>
+<key>StandardOutPath</key><string>__NEXUS_HOME__/tools/maintenance/scheduler.log</string>
+<key>StandardErrorPath</key><string>__NEXUS_HOME__/tools/maintenance/scheduler-error.log</string>
+</dict></plist>

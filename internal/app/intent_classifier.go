@@ -331,12 +331,24 @@ func classifierInput(r Request, secrets []string) (classification.Input, string,
 		if len(item.ToolCalls) != 0 || item.ToolCallID != "" {
 			return classification.Input{}, "", false
 		}
-		messages = append(messages, message{Role: item.Role, Content: redact(item.Content, secrets)})
+		content := redact(item.Content, secrets)
+		if item.Role == "user" {
+			var err error
+			content, err = uploadTextView(item.Content, secrets)
+			if err != nil {
+				return classification.Input{}, "", false
+			}
+		}
+		messages = append(messages, message{Role: item.Role, Content: content})
+	}
+	prompt, err := uploadTextView(r.Prompt, secrets)
+	if err != nil {
+		return classification.Input{}, "", false
 	}
 	body, err := json.Marshal(struct {
 		Prompt   string    `json:"prompt,omitempty"`
 		Messages []message `json:"messages,omitempty"`
-	}{Prompt: redact(r.Prompt, secrets), Messages: messages})
+	}{Prompt: prompt, Messages: messages})
 	if err != nil || len(body) == 0 || len(body) > classification.MaxClassifierInputBytes {
 		return classification.Input{}, "", false
 	}

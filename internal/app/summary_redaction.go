@@ -16,6 +16,12 @@ func redactSummaryMessages(messages []providers.Message, secrets []string) ([]pr
 	for i := range copy.Recent {
 		m := &copy.Recent[i]
 		m.Content = redact(m.Content, secrets)
+		if messages[i].Role == "user" {
+			m.Content, err = redactUploadContent(messages[i].Content, secrets)
+			if err != nil {
+				return nil, err
+			}
+		}
 		m.ToolCallID = redact(m.ToolCallID, secrets)
 		for j := range m.ToolCalls {
 			call := &m.ToolCalls[j]
