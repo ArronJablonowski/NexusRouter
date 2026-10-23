@@ -145,6 +145,7 @@ func TestFirefoxWebUI(t *testing.T) {
 		run  func(*testing.T)
 	}{
 		{"AllPages", TestChromeSharedStyleAcrossPages},
+		{"ChatActivity", TestChromeChatActivityLocalAndSparkLifecycle},
 		{"Uploads", TestChromeChatUploadsSelectionRecoveryAndSubmission},
 		{"DownloadsComposer", TestChromeChatFilesPreviewDownloadAndReload},
 		{"ComfyUI", TestChromeComfyWorkflowControls},

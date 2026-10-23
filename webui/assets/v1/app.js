@@ -203,7 +203,7 @@
 			if (queuedSubmissionID !== submissionID) return;
 			const status = validSubmissionStatus(body, submissionID);
 			if (!status) throw new Error("invalid submission status");
-			queuedSubmissionCanCancel = status.canCancel;
+			queuedSubmissionCanCancel = status.canCancel; window.NexusChatActivity?.set(status.state);
 			if (status.chatID) {
 				queuedSubmissionID = "";
 				queuedSubmissionCanCancel = false;
@@ -226,7 +226,7 @@
 			if (++submissionPollCount < maxSubmissionPolls) submissionPollTimer = window.setTimeout(() => observeSubmission(submissionID, false, false), 2000);
 		}).catch(() => {
 			if (queuedSubmissionID === submissionID) {
-				showMutation("Submission status could not be read. Check current status before acting.", true, false);
+				window.NexusChatActivity?.connection("unknown"); showMutation("Submission status could not be read. Check current status before acting.", true, false);
 				updateControls();
 				if (++submissionPollCount < maxSubmissionPolls) submissionPollTimer = window.setTimeout(() => observeSubmission(submissionID, false, false), 2000);
 			}
@@ -301,7 +301,7 @@
 		}
 		const request = Object.freeze({...payload, idempotency_key: key});
 		const intent = Object.freeze({path, body: JSON.stringify(request), key});
-		pendingIntent = intent;
+		pendingIntent = intent; if(["submit","resume"].includes(payload.action))window.NexusChatActivity?.set("sending");
 		setBusy(true);
 		showMutation("Request in progress…", false);
 		window.NexusLive.authorizedFetch(base + path, {
@@ -319,7 +319,7 @@
 					if (failure && failure.operationID) pendingIntent = Object.freeze({...intent, operationID: failure.operationID});
 					throw new Error("ambiguous response");
 				}
-				pendingIntent = null;
+				pendingIntent = null; if(["submit","resume"].includes(payload.action))window.NexusChatActivity?.set("");
 				showMutation(failure ? failure.message : "The request was rejected.", response.status === 409, false);
 				setBusy(false);
 				if (activeApproval && intent.path.includes("/approvals/")) approvalClose.textContent = "Close without deciding";
@@ -333,7 +333,7 @@
 			onCommitted(body);
 		}).catch(() => {
 			if (!pendingIntent || pendingIntent.key !== intent.key) return;
-			showMutation("Outcome unknown. Check current status before taking another action.", true, true);
+			if(["submit","resume"].includes(payload.action))window.NexusChatActivity?.set("unknown"); showMutation("Outcome unknown. Check current status before taking another action.", true, true);
 			setBusy(true);
 		});
 	}
@@ -468,7 +468,7 @@
 			}
 		});
 	}
-	function setTaskState(value) { const state = stateLabel(value); chatState.textContent = state; chatState.className = "state-pill state-" + state.replaceAll(" ", "-"); if (!pendingIntent && ["completed", "failed", "canceled"].includes(value) && /^Submission /.test(mutationState.textContent)) showMutation("Task " + state + ".", false, false); }
+	function setTaskState(value,taskID=selectedTaskID) { if(!taskID||taskID===selectedTaskID)window.NexusChatActivity?.set(value); const state = stateLabel(value); chatState.textContent = state; chatState.className = "state-pill state-" + state.replaceAll(" ", "-"); if (!pendingIntent && ["completed", "failed", "canceled"].includes(value) && /^Submission /.test(mutationState.textContent)) showMutation("Task " + state + ".", false, false); }
 	function validEvidence(item, expectedClass) {
 		const sources = {objective: ["deterministic", "tool_result"], subjective: ["user_feedback"], advisory: ["llm_judge"]};
 		return item && typeof item === "object" && item.class === expectedClass && sources[expectedClass].includes(item.source) &&
@@ -504,7 +504,7 @@
 			if (selectedTaskID !== taskID) return;
 			const controls = validControls(body);
 			if (!controls || controls.taskID !== taskID) throw new Error("invalid task controls");
-			taskContextUnavailable = false;
+			taskContextUnavailable = false; window.NexusChatActivity?.controls(controls);
 			const changed = JSON.stringify(selectedControls) !== JSON.stringify(controls);
 			if (changed) { selectedControls = controls; loadApprovals(); } updateControls();
 		}).catch(() => { if (selectedTaskID === taskID) { taskContextUnavailable = true; updateControls(); } });
@@ -595,7 +595,7 @@
 				typeof body.has_more !== "boolean" || typeof body.next_cursor !== "string" || body.next_cursor.length > 512 || body.has_more !== Boolean(body.next_cursor)) throw new Error("invalid approvals");
 			const items = body.items.map(item => validApproval(item, task.taskID));
 			if (items.some(item => !item || item.taskID !== task.taskID)) throw new Error("invalid approval");
-			const keep=new Set(items.map(renderApproval));
+			window.NexusChatActivity?.approval(items.some(item=>item.state==="pending")); const keep=new Set(items.map(renderApproval));
    for(const row of [...approvalList.children])if(!keep.has(row))row.remove();
 			if (body.has_more) showNotice(approvalState, "Showing the first " + String(items.length) + " approvals.", false);
 			else approvalState.hidden = true;
@@ -617,7 +617,7 @@
 		});
 	}
 	function appendProvisional(taskID, text) {
-		if (!presentationID.test(taskID) || typeof text !== "string" || !text) return;
+		if (!presentationID.test(taskID) || typeof text !== "string" || !text) return; window.NexusChatActivity?.set("writing");
 		let item = provisionalTasks.get(taskID);
 		if (!item) {
 			if (provisionalTasks.size >= maxProvisionalTasks || provisionalTextSize >= maxProvisionalText) return;
@@ -673,7 +673,7 @@
 		const committedStreamError = payload.durability === "committed" && Number.isSafeInteger(payload.revision) && payload.revision > eventRevision && typeof payload.cursor === "string" && payload.cursor;
 		if (payload.kind === "stream.error" && ((payload.durability === "provisional" && payload.revision === 0) || committedStreamError)) {
 			clearAllProvisional();
-			showNotice(transcriptState, "Live updates need attention.", true);
+			window.NexusChatActivity?.connection("unknown"); showNotice(transcriptState, "Live updates need attention.", true);
 			if (committedStreamError) eventRevision = payload.revision;
 			return;
 		}
@@ -690,14 +690,14 @@
 		} else if (payload.kind === "chat.final" && payload.data.message) {
 			clearProvisionalTask(payload.data.task_id);
 			appendMessage(payload.data.message);
-			setTaskState(payload.data.state);
+			setTaskState(payload.data.state,payload.data.task_id);
 			eventRevision = payload.revision;
 		} else if (payload.kind === "lifecycle.event" && typeof payload.data.state === "string") {
-			setTaskState(payload.data.state);
+			setTaskState(payload.data.state,payload.data.task_id);
 			eventRevision = payload.revision;
 		} else if (payload.kind === "task.terminal" && typeof payload.data.state === "string") {
 			clearProvisionalTask(payload.data.task_id);
-			setTaskState(payload.data.state);
+			setTaskState(payload.data.state,payload.data.task_id);
 			eventRevision = payload.revision;
 			if (payload.data.task_id === selectedTaskID && payload.data.state !== "completed") loadTaskContext(selectedTaskID);
 			if (payload.data.state === "completed") loadHistory(selectedChat, "", true, false);
@@ -736,7 +736,7 @@
 		for (const eventName of ["event", "chat.snapshot", "chat.delta", "chat.final", "lifecycle.event", "model.changed", "tool.changed", "route.changed", "worker.changed", "error.changed", "task.terminal", "approval.changed", "feedback.changed", "stream.error"]) source.addEventListener(eventName, receive);
 		source.onerror = () => {
 			clearAllProvisional();
-			connection.textContent = "Reconnecting…";
+			connection.textContent = "Reconnecting…"; window.NexusChatActivity?.connection();
 		};
 	}
 	function selectChat(chatID, state) {
@@ -745,7 +745,7 @@
 			source.close();
 			source = null;
 		}
-		selectedChat = chatID; window.NexusChatFiles.select(chatID);
+		selectedChat = chatID; window.NexusChatActivity?.reset(); window.NexusChatFiles.select(chatID);
 		approvalDialog.hidden = true;
 		activeApproval = null;
 		approvalOpener = null;
@@ -785,7 +785,7 @@
 			source.close();
 			source = null;
 		}
-		selectedChat = ""; window.NexusChatFiles.select("");
+		selectedChat = ""; window.NexusChatActivity?.reset(); window.NexusChatFiles.select("");
 		approvalDialog.hidden = true;
 		activeApproval = null;
 		approvalOpener = null;
@@ -875,7 +875,7 @@
 			mutate("/api/v1/submissions/" + encodeURIComponent(submissionID) + "/cancel", {
 				version: 1, action: "cancel_submission", submission_id: submissionID
 			}, body => {
-				if (["queued", "running"].includes(body.state)) {
+				window.NexusChatActivity?.set(body.state); if (["queued", "running"].includes(body.state)) {
 					showMutation(body.requested ? "Cancellation requested; submission is still " + stateLabel(body.state) + "." : "Submission remains " + stateLabel(body.state) + ".", true, false);
 					observeSubmission(submissionID, true, submissionShouldNavigate);
 				} else {

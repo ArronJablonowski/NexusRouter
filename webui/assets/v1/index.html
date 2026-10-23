@@ -120,6 +120,7 @@
           </section>
           </div>
           <div class="composer-dock">
+          <div id="chat-activity" class="chat-activity" role="status" aria-live="polite" aria-atomic="true" hidden><span class="chat-activity-orb" aria-hidden="true"></span><span id="chat-activity-label"></span></div>
           <form id="composer" class="composer" novalidate>
             <label id="composer-label" for="composer-text">Start a new chat</label>
             <textarea aria-autocomplete="list" aria-controls="host-options" aria-expanded="false" id="composer-text" placeholder="Message NexusRouter…" rows="2" maxlength="1048576" aria-describedby="composer-help composer-error"></textarea>
@@ -683,6 +684,7 @@
     </section>
   </div>
   <script src="__DARWIN_BASE_PATH__/assets/v1/live.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/chat-activity.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/operation-contract.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/inspector.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-client.js" defer></script>
