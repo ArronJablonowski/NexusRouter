@@ -1,6 +1,8 @@
 package webuiapp
 
 import (
+	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,6 +11,9 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
+	"image"
+	"image/png"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -39,10 +44,11 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	}
 	roots := x509.NewCertPool()
 	roots.AddCert(cert)
-	var calls, cancellations atomic.Int32
+	var calls, cancellations, imagePosts atomic.Int32
+	var vision atomic.Bool
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if (r.Method != "GET" && !(r.Method == "POST" && (r.URL.Path == "/v1/remote/tasks/request-existing-0001/cancel" || r.URL.Path == "/v1/remote/tasks/request-browser-0001"))) || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
+		if (r.Method != "GET" && !(r.Method == "POST" && (r.URL.Path == "/v1/remote/tasks/request-existing-0001/cancel" || (r.URL.Path == "/v1/remote/tasks/request-browser-0001" || r.URL.Path == "/v1/remote/tasks/request-image-00001")))) || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
 			http.Error(w, "denied", 403)
 			return
 		}
@@ -51,8 +57,24 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/remote/tasks/request-browser-0001":
 			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-browser", State: "queued"})
+		case "/v1/remote/tasks/request-image-00001":
+			var task remote.Task
+			decoder := json.NewDecoder(r.Body)
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&task) != nil || !remote.HasImageInputs(task) {
+				t.Error("image transport frame missing")
+				http.Error(w, "invalid", 400)
+				return
+			}
+			imagePosts.Add(1)
+			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "image-submission", State: "queued"})
 		case "/v1/remote/info":
-			json.NewEncoder(w).Encode(remote.Info{Version: 1, Instance: "node-a", Available: true})
+			zero := 0.0
+			caps := []string{"chat"}
+			if vision.Load() {
+				caps = append(caps, "vision")
+			}
+			json.NewEncoder(w).Encode(remote.Info{Version: 1, Instance: "node-a", Available: true, Models: []remote.Model{{ID: "model-a", Model: "actual", Local: true, EstimatedCost: &zero, Capabilities: caps}}})
 		case "/v1/remote/tasks":
 			json.NewEncoder(w).Encode(remote.TaskPage{Version: 1, Instance: "node-a", After: r.Header.Get("X-Nexus-After-Request"), Next: "request-existing-0001", Tasks: []remote.TaskSummary{{RequestID: "request-existing-0001", State: "running", TaskIDs: []string{"task-1"}}}})
 		case "/v1/remote/tasks/request-existing-0001":
@@ -94,11 +116,18 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := mutationHandlerFixture(t, MutationServices{})
+	cookie, csrf := authenticateBrowser(t, h)
+	authorized := func(target, body string) *http.Request {
+		r := browserRequest(http.MethodPost, target, body)
+		r.AddCookie(cookie)
+		r.Header.Set("X-Darwin-CSRF", csrf)
+		return r
+	}
 	h.remoteTrustFile = string(trust)
 	h.remoteInspector = &remote.Client{Trust: trust, Credentials: remote.Credentials{CertificateFile: certPath, KeyFile: keyPath, CAFile: certPath}}
 	inspect := func(view string, want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-inspection", `{"version":1,"instance":"node-a","view":"`+view+`"}`)
+		r := authorized("/app/api/v1/remote-inspection", `{"version":1,"instance":"node-a","view":"`+view+`"}`)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
@@ -118,7 +147,7 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 			body += `,"expected_submission_id":"submission-a"`
 		}
 		body += `}`
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-task-control", body)
+		r := authorized("/app/api/v1/remote-task-control", body)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
@@ -141,7 +170,7 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	}
 	events := func(want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-task-events", `{"version":1,"instance":"node-a","request_id":"request-existing-0001","task_id":"task-1","after":0}`)
+		r := authorized("/app/api/v1/remote-task-events", `{"version":1,"instance":"node-a","request_id":"request-existing-0001","task_id":"task-1","after":0}`)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
@@ -163,23 +192,76 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.remoteDispatcher = &RecordedRemoteDispatcher{Client: h.remoteInspector.(*remote.Client), Store: routeStore}
+	h.remoteDispatcher = &RecordedRemoteDispatcher{Client: h.remoteInspector.(*remote.Client), Store: routeStore, UploadDirectory: filepath.Join(dir, "uploads"), PrepareUploads: func(_ context.Context, prompt string, files []attachments.File) (string, error) {
+		if files[0].Name == "photo.png" {
+			return attachments.Encode(prompt, []attachments.Input{{Name: "photo.png", Image: "/9j/AQ=="}}), nil
+		}
+		return attachments.Encode(prompt, []attachments.Input{{Name: files[0].Name, Text: string(files[0].Data)}}), nil
+	}}
 	dispatch := func(body string, want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-dispatch", body)
+		r := authorized("/app/api/v1/remote-dispatch", body)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
 			t.Fatalf("dispatch %d want %d: %s", w.Code, want, w.Body.String())
 		}
 	}
-	body := browserDispatchBody(t)
+	var input remoteDispatchRequest
+	json.Unmarshal([]byte(browserDispatchBody(t)), &input)
+	input.Files = []attachments.File{{Name: "notes.txt", Data: []byte("original reference 31842")}}
+	raw, _ := json.Marshal(input)
+	body := string(raw)
 	dispatch(body, 200)
+	filesPath := "/app/api/v1/remote-files/node-a/request-browser-0001"
+	get := func(path string, want int) *httptest.ResponseRecorder {
+		t.Helper()
+		r := authorized(path, "")
+		r.Method = "GET"
+		r.Body = http.NoBody
+		r.ContentLength = 0
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("file response %d want %d %s", w.Code, want, w.Body.String())
+		}
+		return w
+	}
+	page := get(filesPath, 200)
+	var originals struct {
+		Files []struct {
+			ID string `json:"id"`
+		}
+	}
+	json.Unmarshal(page.Body.Bytes(), &originals)
+	if len(originals.Files) != 1 {
+		t.Fatal(page.Body.String())
+	}
+	originalURL := filesPath + "/" + originals.Files[0].ID + "/download"
+	download := get(originalURL, 200)
+	if !bytes.Equal(download.Body.Bytes(), input.Files[0].Data) || download.Header().Get("Cache-Control") != "no-store" || download.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("unsafe or changed download")
+	}
+	get(strings.Replace(originalURL, "request-browser-0001", "request-other-00001", 1), 404)
+	unauth := httptest.NewRecorder()
+	h.ServeHTTP(unauth, browserRequest("GET", originalURL, ""))
+	if unauth.Code != 401 {
+		t.Fatal("unauthenticated download")
+	}
+	changed := input
+	changed.Files = []attachments.File{{Name: "notes.txt", Data: []byte("changed original")}}
+	changedRaw, _ := json.Marshal(changed)
+	dispatch(string(changedRaw), 422)
+	changed.Files = nil
+	changedRaw, _ = json.Marshal(changed)
+	dispatch(string(changedRaw), 422)
+	// Reopen store through the original GET, retaining request-bound bytes.
+	get(originalURL, 200)
 	binding, err := routeStore.Lookup("request-browser-0001")
 	if err != nil || binding.Destination != "node-a" || binding.CallerFingerprint != remote.Fingerprint(cert) {
 		t.Fatal("missing bound dispatch", binding, err)
 	}
-	dispatch(strings.Replace(body, "test task", "changed task", 1), 503)
+	dispatch(strings.Replace(body, "test task", "changed task", 1), 422)
 	if calls.Load() != 9 {
 		t.Fatal("changed task dispatched", calls.Load())
 	}
@@ -187,7 +269,7 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	h.remoteAutomatic = &RecordedRemoteAutomatic{Client: h.remoteInspector.(*remote.Client), Store: routeStore, EvidenceRoot: filepath.Join(dir, "outcomes")}
 	recorded := func(want int) {
 		t.Helper()
-		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-recorded-status", `{"version":1,"request_id":"request-browser-0001"}`)
+		r := authorized("/app/api/v1/remote-recorded-status", `{"version":1,"request_id":"request-browser-0001"}`)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != want {
@@ -198,7 +280,8 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 10 {
 		t.Fatal("saved status did not use pinned mTLS", calls.Load())
 	}
-	if _, err = trust.Revoke("node-a", registry.Digest()); err != nil {
+	revoked, err := trust.Revoke("node-a", registry.Digest())
+	if err != nil {
 		t.Fatal(err)
 	}
 	dispatch(body, 503)
@@ -210,4 +293,35 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 10 || cancellations.Load() != 1 {
 		t.Fatal("revoked peer contacted")
 	}
+	if err = trust.Replace(registry, revoked.Digest()); err != nil {
+		t.Fatal(err)
+	}
+	var picture bytes.Buffer
+	png.Encode(&picture, image.NewRGBA(image.Rect(0, 0, 3, 3)))
+	input.RequestID = "request-image-00001"
+	input.Files = []attachments.File{{Name: "photo.png", Data: picture.Bytes()}}
+	imageBody, _ := json.Marshal(input)
+	dispatch(string(imageBody), 422)
+	if imagePosts.Load() != 0 {
+		t.Fatal("text-only model received images")
+	}
+	vision.Store(true)
+	dispatch(string(imageBody), 200)
+	if imagePosts.Load() != 1 {
+		t.Fatal("vision task not dispatched exactly once")
+	}
+	imagePath := "/app/api/v1/remote-files/node-a/request-image-00001"
+	json.Unmarshal(get(imagePath, 200).Body.Bytes(), &originals)
+	if len(originals.Files) != 1 {
+		t.Fatal("image original absent")
+	}
+	imageURL := imagePath + "/" + originals.Files[0].ID
+	preview := get(imageURL+"/preview", 200)
+	if preview.Header().Get("Content-Type") != "image/png" || !bytes.Equal(preview.Body.Bytes(), picture.Bytes()) {
+		t.Fatal("image preview changed original")
+	}
+	if !bytes.Equal(get(imageURL+"/download", 200).Body.Bytes(), picture.Bytes()) {
+		t.Fatal("image download changed original")
+	}
+	get(strings.Replace(originalURL, "/download", "/preview", 1), 415)
 }

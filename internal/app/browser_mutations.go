@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
@@ -55,13 +56,34 @@ func (b *BrowserMutations) Chat(ctx context.Context, subject string, request con
 		return receipt, nil
 	}
 	model := request.ModelID
+	if model == "" && request.Action == contract.ChatResume {
+		model, err = b.inheritedChatModel(ctx, request)
+		if err != nil {
+			return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "task", request.TaskID, err)
+		}
+	}
 	if model == "" {
 		model = b.service.settings.WebUI.DefaultModel
 		if model == "" {
 			model = "auto"
 		}
 	}
-	input := Request{ModelID: model, Prompt: request.Text, DisableFallback: request.ModelID != "" && request.ModelID != "auto"}
+	inputs, inputErr := prepareChatInputs(ctx, request.Files)
+	if inputErr != nil {
+		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, inputErr))
+	}
+	if !b.service.chatImageModelAllowed(model, inputs) {
+		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, attachments.ErrFile))
+	}
+	if err = b.service.retainChatInputs(ctx, record.OperationID, request.Files); err != nil {
+		return contract.ChatMutationReceipt{}, b.reject(ctx, subject, record, "", "", errors.Join(ErrAdmission, err))
+	}
+	input := Request{ModelID: model, Prompt: attachments.Encode(request.Text, inputs), DisableFallback: request.ModelID != "" && request.ModelID != "auto" || request.Action == contract.ChatResume}
+	for _, file := range inputs {
+		if file.Image != "" {
+			input.DisableFallback = true
+		}
+	}
 	var status submissions.Status
 	if request.Action == contract.ChatSubmit {
 		status, err = b.service.Submit(ctx, record.OperationID, input)
@@ -244,86 +266,8 @@ func (b *BrowserMutations) Steer(ctx context.Context, subject string, request co
 	return receipt, b.commit(ctx, subject, record, receipt)
 }
 
-func (b *BrowserMutations) Feedback(ctx context.Context, subject string, request contract.FeedbackRequest) (contract.FeedbackReceipt, error) {
-	if b == nil || ctx == nil || request.Validate() != nil || !validBrowserSubject(subject) {
-		return contract.FeedbackReceipt{}, ErrAdmission
-	}
-	record, replay, err := b.begin(ctx, subject, string(request.Action), request.IdempotencyKey, request)
-	if err != nil {
-		return contract.FeedbackReceipt{}, err
-	}
-	if replay {
-		var receipt contract.FeedbackReceipt
-		if decodeReceipt(record.Response, &receipt) != nil || receipt.OperationID != record.OperationID {
-			return contract.FeedbackReceipt{}, ErrBrowserMutation
-		}
-		return receipt, nil
-	}
-	snapshot, err := InspectTask(ctx, b.service.settings.Telemetry.Database, request.TaskID)
-	if err != nil || snapshot.State != "completed" || snapshot.UncertainEffects || snapshot.InterruptedTurn || len(snapshot.Pending) != 0 {
-		return contract.FeedbackReceipt{}, b.reject(ctx, subject, record, "task", request.TaskID, ErrAdmission)
-	}
-	db, err := telemetry.Open(ctx, b.service.settings.Telemetry.Database)
-	if err != nil {
-		return contract.FeedbackReceipt{}, ErrBrowserMutation
-	}
-	defer db.Close()
-	history, err := db.BrowserFeedbackHistory(ctx, request.TaskID)
-	if err != nil {
-		return contract.FeedbackReceipt{}, ErrBrowserMutation
-	}
-	expected := int64(0)
-	supersedes := ""
-	cost := float64(0)
-	if request.Action == contract.FeedbackRecord {
-		cost = *request.AttemptCost
-	}
-	if request.Action == contract.FeedbackRevise {
-		expected = *request.ExpectedRevision
-		if len(history) < int(expected) || history[expected-1].ID != request.FeedbackID {
-			return contract.FeedbackReceipt{}, b.reject(ctx, subject, record, "feedback", request.FeedbackID, browserops.ErrConflict)
-		}
-		supersedes = request.FeedbackID
-		cost = history[expected-1].AttemptCost
-	}
-	feedbackID := browserFeedbackID(record.OperationID)
-	entry := telemetry.BrowserFeedback{Version: 1, ID: feedbackID, TaskID: request.TaskID, Supersedes: supersedes, Accepted: request.Accepted, AttemptCost: cost, CreatedAt: time.Now().UTC()}
-	if err = db.AppendBrowserFeedback(ctx, entry, expected); err != nil {
-		if errors.Is(err, telemetry.ErrBrowserOperationConflict) {
-			return contract.FeedbackReceipt{}, b.reject(ctx, subject, record, "task", request.TaskID, browserops.ErrConflict)
-		}
-		return contract.FeedbackReceipt{}, err
-	}
-	history, err = db.BrowserFeedbackHistory(ctx, request.TaskID)
-	if err != nil || len(history) == 0 {
-		return contract.FeedbackReceipt{}, ErrBrowserMutation
-	}
-	// A later revision may commit before this operation journals its receipt.
-	// Recover the exact durable entry rather than claiming the current head.
-	var current telemetry.BrowserFeedback
-	var revision int64
-	for i, item := range history {
-		if item.ID == feedbackID {
-			current, revision = item, int64(i+1)
-			break
-		}
-	}
-	if revision == 0 || current.Accepted != request.Accepted {
-		return contract.FeedbackReceipt{}, ErrBrowserMutation
-	}
-	state := "recorded"
-	if request.Action == contract.FeedbackRevise {
-		state = "revised"
-	}
-	receipt := contract.FeedbackReceipt{Version: 1, OperationID: record.OperationID, TaskID: request.TaskID, FeedbackID: current.ID, Revision: revision, State: state, Accepted: request.Accepted, EvidenceClass: contract.SubjectiveEvidence, Source: "user_feedback"}
-	if receipt.Validate() != nil {
-		return contract.FeedbackReceipt{}, ErrBrowserMutation
-	}
-	return receipt, b.commit(ctx, subject, record, receipt)
-}
-
 func (b *BrowserMutations) Approvals(ctx context.Context, task, after string, limit int) (contract.ApprovalPage, error) {
-	page, err := ListApprovals(ctx, b.service.settings.Telemetry.Database, approvals.ListOptions{TaskID: task, AfterCallID: after, Limit: limit})
+	page, err := b.service.ListApprovals(ctx, approvals.ListOptions{TaskID: task, AfterCallID: after, Limit: limit})
 	if err != nil {
 		return contract.ApprovalPage{}, err
 	}
@@ -441,7 +385,7 @@ func (b *BrowserMutations) DecideApproval(ctx context.Context, subject string, r
 		}
 		return receipt, nil
 	}
-	current, err := InspectApproval(ctx, b.service.settings.Telemetry.Database, request.TaskID, request.ApprovalID)
+	current, err := b.service.InspectApproval(ctx, request.TaskID, request.ApprovalID)
 	if err != nil {
 		return contract.ApprovalDecisionReceipt{}, b.reject(ctx, subject, record, "approval", request.ApprovalID, err)
 	}
@@ -472,11 +416,16 @@ func (b *BrowserMutations) DecideApproval(ctx context.Context, subject string, r
 			decided = decision.Time
 		}
 	}
-	resultSummary, err := b.approvalSummary(ctx, result)
-	if err != nil || decided.IsZero() {
+	// Execution may already have consumed the approval and cleared the pending
+	// tool. Acknowledgement depends only on the durable decision, not a preview.
+	if result.Validate() != nil || decided.IsZero() {
 		return contract.ApprovalDecisionReceipt{}, ErrBrowserMutation
 	}
-	receipt := contract.ApprovalDecisionReceipt{Version: 1, OperationID: record.OperationID, TaskID: request.TaskID, ApprovalID: request.ApprovalID, State: resultSummary.State, Revision: resultSummary.Revision, DecidedAt: decided}
+	revision := int64(len(result.Decisions) + 1)
+	if result.State == approvals.Consumed {
+		revision++
+	}
+	receipt := contract.ApprovalDecisionReceipt{Version: 1, OperationID: record.OperationID, TaskID: request.TaskID, ApprovalID: request.ApprovalID, State: result.State, Revision: revision, DecidedAt: decided}
 	if receipt.Validate() != nil {
 		return contract.ApprovalDecisionReceipt{}, ErrBrowserMutation
 	}
@@ -496,6 +445,12 @@ func (b *BrowserMutations) approvalSummary(ctx context.Context, record approvals
 		behavior = string(runtime.BehaviorNonIdempotentWrite)
 	}
 	prompt := fmt.Sprintf("Allow the requested %s operation by %s?", strings.ReplaceAll(behavior, "_", " "), record.Request.ToolName)
+	for _, decision := range record.Decisions {
+		if decision.Actor == "auto_approval_setting" {
+			prompt = "Automatically approved by your setting. " + prompt
+			break
+		}
+	}
 	prompt = redact(prompt, memorySecrets(b.service.settings, b.service.secret))
 	scopeSummary := redact(record.Request.Scope, memorySecrets(b.service.settings, b.service.secret))
 	if len(scopeSummary) > contract.MaxApprovalScopeBytes {
@@ -550,6 +505,9 @@ type candidateDecisionApprovalArguments struct {
 }
 
 func (b *BrowserMutations) approvalProposal(ctx context.Context, record approvals.Record) (*contract.ApprovalProposal, error) {
+	if record.Request.ToolName == "create_file" {
+		return b.fileCreateApprovalProposal(ctx, record)
+	}
 	if record.Request.ToolName == "comfy_submit" || record.Request.ToolName == "comfy_cancel_pending" {
 		return b.comfyApprovalProposal(ctx, record)
 	}
@@ -559,7 +517,7 @@ func (b *BrowserMutations) approvalProposal(ctx context.Context, record approval
 	if b == nil || b.service == nil || ctx == nil {
 		return nil, ErrBrowserMutation
 	}
-	snapshot, err := InspectTask(ctx, b.service.settings.Telemetry.Database, record.Request.TaskID)
+	snapshot, err := b.service.approvalTaskSnapshot(ctx, record.Request.TaskID)
 	if err != nil {
 		return nil, ErrBrowserMutation
 	}
@@ -691,12 +649,19 @@ func (b *BrowserMutations) FeedbackContext(ctx context.Context, task string) (co
 			}
 		}
 	}
+	preview := telemetry.BrowserFeedback{Accepted: true}
+	preview.AttemptCost, preview.CostStatus = creativeTaskCost(ctx, db, task)
+	out.CostSummary = creativeCostSummary(preview)
 	browserHistory, browserErr := db.BrowserFeedbackHistory(ctx, task)
 	if browserErr != nil {
 		return contract.FeedbackContext{}, ErrBrowserMutation
 	}
 	if len(browserHistory) > 0 {
 		current := browserHistory[len(browserHistory)-1]
+		out.Rating = current.Rating
+		if current.Rating > 0 {
+			out.CostSummary = creativeCostSummary(current)
+		}
 		out.Revision = int64(len(browserHistory))
 		out.FeedbackID = current.ID
 		outcome := contract.EvidenceRejected

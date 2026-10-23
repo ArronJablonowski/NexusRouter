@@ -177,7 +177,10 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 			runErr = errors.Join(runErr, r.eventDelivery.Err())
 		}()
 	}
-	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled) && r.RemoteExecution == nil && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
+	// Browser-queued creation waits for a durable decision through the trusted
+	// presenter. A synchronous reviewer cannot approve background work. Other
+	// queued write capabilities retain their existing admission restriction.
+	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled) && r.RemoteExecution == nil && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "" && (s.toolPresenter == nil || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled)) {
 		return Result{}, ErrAdmission
 	}
 	if s.settings.ComfyUI.Enabled && r.RemoteExecution == nil && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "" && s.toolPresenter == nil) {
@@ -596,6 +599,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		if observationErr != nil {
 			return Result{}, errors.New("cannot read routing observations")
 		}
+
 		observationKeys[key] = key
 		if len(observations.Fitness) == 0 && len(observations.Advisory) == 0 {
 			if domain, profile, ok := cfg.Routing.EvidenceSource(key.Domain, key.Profile); ok {
@@ -607,6 +611,16 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 				}
 				observationKeys[key] = source
 			}
+		}
+		if kind := creativeRequestKind(r); kind != "general" {
+			ratings, ratingErr := db.CreativeOpinions(ctx, key, kind)
+			if ratingErr != nil {
+				return Result{}, errors.New("cannot read creative ratings")
+			}
+			for i := range ratings {
+				ratings[i].Key = observationKeys[key]
+			}
+			observations.Advisory = append(observations.Advisory, ratings...)
 		}
 		observationSets[key] = observations
 		validity, verr := db.OutputValidity(ctx, key, r.Validation)
@@ -656,6 +670,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		set, e := db.ObservationSet(ctx, key, cfg.Evaluation.Judge)
 		if e != nil {
 			return Result{}, ErrAdmission
+		}
+		if kind := creativeRequestKind(r); kind != "general" {
+			ratings, ratingErr := db.CreativeOpinions(ctx, key, kind)
+			if ratingErr != nil {
+				return Result{}, ErrAdmission
+			}
+			set.Advisory = append(set.Advisory, ratings...)
 		}
 		set.Fitness = append(set.Fitness, remote.Observations.Fitness...)
 		set.Advisory = append(set.Advisory, remote.Observations.Advisory...)

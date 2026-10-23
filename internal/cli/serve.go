@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/ArronJablonowski/NexusRouter/internal/gridcollab"
 	"github.com/ArronJablonowski/NexusRouter/internal/gridroute"
+	"github.com/ArronJablonowski/NexusRouter/internal/maintenance"
 	"io"
 	"log"
 	"net"
@@ -15,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -36,7 +38,6 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/skills"
-	"github.com/ArronJablonowski/NexusRouter/tools"
 	"github.com/ArronJablonowski/NexusRouter/webui"
 	"github.com/ArronJablonowski/NexusRouter/workers"
 )
@@ -82,14 +83,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "NEXUS_API_TOKEN (or legacy DARWIN_API_TOKEN) must contain at least 32 characters")
 		return 1
 	}
+	liveApproval := &browserLiveApproval{settings: s}
 	var service *app.Service
-	if s.ComfyUI.Enabled && s.WebUI.Enabled {
-		service, err = app.NewServiceWithToolControls(s, os.Getenv, nil, nil, nil, nil, nil, nil, func(ctx context.Context, p tools.ApprovalPrompt) error {
-			if p.Request.ToolName != "comfy_submit" && p.Request.ToolName != "comfy_cancel_pending" {
-				return tools.ErrDenied
-			}
-			return nil
-		})
+	if s.WebUI.Enabled {
+		service, err = app.NewServiceWithToolControls(s, os.Getenv, nil, nil, nil, nil, nil, nil, liveApproval.present)
 	} else {
 		service, err = app.NewService(s, os.Getenv)
 	}
@@ -242,7 +239,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return report, nil
 	}
 	if s.WebUI.Enabled {
-		activeToolSettings := webui.ToolAccessSettings{CollaborationEnabled: s.Tools.CollaborationEnabled, CommanderModel: s.WebUI.DefaultModel, MacMemoryPercent: s.Hardware.MacMemoryPercent, MacSwapGrowthGB: s.Hardware.MacSwapGrowthGB, DNSLogging: s.Telemetry.DNSLogging, RemoteAdvertisement: s.RemoteAdvertisement, SkillsEnabled: s.Skills.Enabled, SkillsAutoDraft: s.Skills.AutoDraft, SkillsRoot: s.Skills.Root, SkillsScope: s.Skills.Scope, ToolsEnabled: s.Tools.Enabled, DelegateReadTools: s.Workers.DelegateReadTools, ReadRoot: s.Tools.ReadRoot, SpecialistsAllowCloud: s.WebUI.SpecialistsAllowCloud}
+		activeToolSettings := webui.ToolAccessSettings{AutoApprove: s.Tools.AutoApprove, CollaborationEnabled: s.Tools.CollaborationEnabled, CommanderModel: s.WebUI.DefaultModel, MacMemoryPercent: s.Hardware.MacMemoryPercent, MacSwapGrowthGB: s.Hardware.MacSwapGrowthGB, DNSLogging: s.Telemetry.DNSLogging, RemoteAdvertisement: s.RemoteAdvertisement, SkillsEnabled: s.Skills.Enabled, SkillsAutoDraft: s.Skills.AutoDraft, SkillsRoot: s.Skills.Root, SkillsScope: s.Skills.Scope, ToolsEnabled: s.Tools.Enabled, DelegateReadTools: s.Workers.DelegateReadTools, ReadRoot: s.Tools.ReadRoot, SpecialistsAllowCloud: s.WebUI.SpecialistsAllowCloud}
 		var settingsMu sync.Mutex
 		settingsProjection := func(ctx context.Context) (webui.SettingsInspection, error) {
 			if err := ctx.Err(); err != nil {
@@ -254,7 +251,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			if readErr != nil {
 				return webui.SettingsInspection{}, readErr
 			}
-			savedSettings := webui.ToolAccessSettings{CollaborationEnabled: saved.CollaborationEnabled, CommanderModel: saved.CommanderModel, MacMemoryPercent: saved.MacMemoryPercent, MacSwapGrowthGB: saved.MacSwapGrowthGB, DNSLogging: saved.DNSLogging, RemoteAdvertisement: saved.RemoteAdvertisement, SkillsEnabled: saved.SkillsEnabled, SkillsAutoDraft: saved.SkillsAutoDraft, SkillsRoot: saved.SkillsRoot, SkillsScope: saved.SkillsScope, ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot, SpecialistsAllowCloud: saved.SpecialistsAllowCloud}
+			savedSettings := webui.ToolAccessSettings{AutoApprove: saved.AutoApprove, CollaborationEnabled: saved.CollaborationEnabled, CommanderModel: saved.CommanderModel, MacMemoryPercent: saved.MacMemoryPercent, MacSwapGrowthGB: saved.MacSwapGrowthGB, DNSLogging: saved.DNSLogging, RemoteAdvertisement: saved.RemoteAdvertisement, SkillsEnabled: saved.SkillsEnabled, SkillsAutoDraft: saved.SkillsAutoDraft, SkillsRoot: saved.SkillsRoot, SkillsScope: saved.SkillsScope, ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot, SpecialistsAllowCloud: saved.SpecialistsAllowCloud}
 			return webui.SettingsInspection{Version: webui.ContractVersion, Digest: digest, Active: activeToolSettings, Saved: savedSettings, RestartRequired: activeToolSettings != savedSettings}, nil
 		}
 		updateSettings := func(ctx context.Context, request webui.SettingsUpdateRequest) (webui.SettingsInspection, error) {
@@ -263,13 +260,20 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 			settingsMu.Lock()
 			defer settingsMu.Unlock()
-			next := config.ToolAccess{CollaborationEnabled: request.Settings.CollaborationEnabled, CommanderModel: request.Settings.CommanderModel, MacMemoryPercent: request.Settings.MacMemoryPercent, MacSwapGrowthGB: request.Settings.MacSwapGrowthGB, DNSLogging: request.Settings.DNSLogging, RemoteAdvertisement: request.Settings.RemoteAdvertisement, SkillsEnabled: request.Settings.SkillsEnabled, SkillsAutoDraft: request.Settings.SkillsAutoDraft, SkillsRoot: request.Settings.SkillsRoot, SkillsScope: request.Settings.SkillsScope, Enabled: request.Settings.ToolsEnabled, DelegateReadTools: request.Settings.DelegateReadTools, ReadRoot: request.Settings.ReadRoot, SpecialistsAllowCloud: request.Settings.SpecialistsAllowCloud}
+			next := config.ToolAccess{AutoApprove: request.Settings.AutoApprove, CollaborationEnabled: request.Settings.CollaborationEnabled, CommanderModel: request.Settings.CommanderModel, MacMemoryPercent: request.Settings.MacMemoryPercent, MacSwapGrowthGB: request.Settings.MacSwapGrowthGB, DNSLogging: request.Settings.DNSLogging, RemoteAdvertisement: request.Settings.RemoteAdvertisement, SkillsEnabled: request.Settings.SkillsEnabled, SkillsAutoDraft: request.Settings.SkillsAutoDraft, SkillsRoot: request.Settings.SkillsRoot, SkillsScope: request.Settings.SkillsScope, Enabled: request.Settings.ToolsEnabled, DelegateReadTools: request.Settings.DelegateReadTools, ReadRoot: request.Settings.ReadRoot, SpecialistsAllowCloud: request.Settings.SpecialistsAllowCloud}
 			if !request.HasCollaborationSetting() {
 				current, _, err := config.ReadProjectToolAccess(*path)
 				if err != nil {
 					return webui.SettingsInspection{}, err
 				}
 				next.CollaborationEnabled = current.CollaborationEnabled
+			}
+			if !request.HasAutoApproveSetting() {
+				current, _, err := config.ReadProjectToolAccess(*path)
+				if err != nil {
+					return webui.SettingsInspection{}, err
+				}
+				next.AutoApprove = current.AutoApprove
 			}
 			saved, digest, updateErr := config.UpdateProjectToolAccess(*path, request.ExpectedDigest, next)
 			if errors.Is(updateErr, config.ErrConfigConflict) {
@@ -278,7 +282,9 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			if updateErr != nil {
 				return webui.SettingsInspection{}, updateErr
 			}
-			savedSettings := webui.ToolAccessSettings{CollaborationEnabled: saved.CollaborationEnabled, CommanderModel: saved.CommanderModel, MacMemoryPercent: saved.MacMemoryPercent, MacSwapGrowthGB: saved.MacSwapGrowthGB, DNSLogging: saved.DNSLogging, RemoteAdvertisement: saved.RemoteAdvertisement, SkillsEnabled: saved.SkillsEnabled, SkillsAutoDraft: saved.SkillsAutoDraft, SkillsRoot: saved.SkillsRoot, SkillsScope: saved.SkillsScope, ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot, SpecialistsAllowCloud: saved.SpecialistsAllowCloud}
+			liveApproval.set(saved.AutoApprove)
+			activeToolSettings.AutoApprove = saved.AutoApprove
+			savedSettings := webui.ToolAccessSettings{AutoApprove: saved.AutoApprove, CollaborationEnabled: saved.CollaborationEnabled, CommanderModel: saved.CommanderModel, MacMemoryPercent: saved.MacMemoryPercent, MacSwapGrowthGB: saved.MacSwapGrowthGB, DNSLogging: saved.DNSLogging, RemoteAdvertisement: saved.RemoteAdvertisement, SkillsEnabled: saved.SkillsEnabled, SkillsAutoDraft: saved.SkillsAutoDraft, SkillsRoot: saved.SkillsRoot, SkillsScope: saved.SkillsScope, ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot, SpecialistsAllowCloud: saved.SpecialistsAllowCloud}
 			return webui.SettingsInspection{Version: webui.ContractVersion, Digest: digest, Active: activeToolSettings, Saved: savedSettings, RestartRequired: activeToolSettings != savedSettings}, nil
 		}
 		operationStore, operationErr := browserops.Open(ctx, s.Telemetry.Database)
@@ -337,7 +343,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 					fmt.Fprintln(stderr, "cannot initialize remote dispatch evidence")
 					return 1
 				}
-				remoteDispatcher = &webuiapp.RecordedRemoteDispatcher{Client: client, Store: store}
+				remoteDispatcher = &webuiapp.RecordedRemoteDispatcher{Client: client, Store: store, UploadDirectory: dir + ".uploads", PrepareUploads: service.PrepareRemoteUploads}
 				if root := s.WebUI.RemoteAutomaticEvidenceDirectory; root != "" {
 					if err := remote.PrepareOutcomeEvidence(root); err != nil {
 						fmt.Fprintln(stderr, "cannot initialize automatic remote evidence")
@@ -385,12 +391,32 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return 1
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{Comfy: comfyService, RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{ChatPreference: service.ChatPreference,
+		browserHandler, err = webuiapp.New(webuiapp.Options{Comfy: comfyService, RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{Cleanup: localCleanupControls(), CleanupSchedule: localCleanupScheduleControls(), ChatPreference: service.ChatPreference,
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
 			Operations: browserMutations.Operations, Submission: browserMutations.Submission,
 			UpdateSettings: updateSettings,
+			RegisterModel: func(ctx context.Context, input webuiapp.ModelRegistration) (string, error) {
+				report, _ := healthReport(ctx)
+				page, err := service.BrowserModels(ctx, report)
+				if err != nil {
+					return "", err
+				}
+				for _, m := range page.Models {
+					if m.ID == input.CatalogID && !m.Configured && m.Locality == "cloud" {
+						for _, t := range s.Models {
+							if t.ID == input.TemplateID && t.Provider == m.Provider && t.Locality == "cloud" {
+								if m.ContextTokens != nil && int64(input.ContextTokens) > *m.ContextTokens {
+									return "", config.ErrConfigWrite
+								}
+								return config.RegisterCloudModel(*path, input.ExpectedDigest, t.ID, m.ID, m.Model, input.ContextTokens)
+							}
+						}
+					}
+				}
+				return "", config.ErrConfigWrite
+			},
 			ModelUse: func(ctx context.Context, host, model string, enabled *bool) (any, error) {
 				if enabled == nil {
 					return config.ReadModelUse(s.Telemetry.Database)
@@ -418,7 +444,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				}
 				return config.UpdateModelUse(s.Telemetry.Database, host, model, *enabled)
 			},
-		}, Reads: webuiapp.ReadServices{ChatPreference: service.ReadChatPreference,
+		}, Reads: webuiapp.ReadServices{ChatFiles: service.ChatFiles, ChatFile: service.ChatFile, ChatPreference: service.ReadChatPreference,
 			JobTasks: service.ListJobTasks, Submissions: service.ListSubmissions, Tasks: service.ListTasks, Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
 				return db.ReadCommittedEventPage(ctx, options)
@@ -505,16 +531,16 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return app.ListSkillGenerations(ctx, s.Telemetry.Database, scope, after, limit)
 		},
 		ApprovalExecution: func(ctx context.Context, task, id string) (approvals.ExecutionStatus, error) {
-			return app.ApprovalExecutionStatus(ctx, s.Telemetry.Database, task, id)
+			return service.ApprovalExecutionStatus(ctx, task, id)
 		},
 		DecideApproval: func(ctx context.Context, command approvals.Command) (approvals.Record, error) {
 			return service.DecideApproval(ctx, command, "api_operator")
 		},
 		Approval: func(ctx context.Context, task, id string) (approvals.Record, error) {
-			return app.InspectApproval(ctx, s.Telemetry.Database, task, id)
+			return service.InspectApproval(ctx, task, id)
 		},
 		Approvals: func(ctx context.Context, opts approvals.ListOptions) (approvals.Page, error) {
-			return app.ListApprovals(ctx, s.Telemetry.Database, opts)
+			return service.ListApprovals(ctx, opts)
 		},
 		Metrics:              service.Metrics,
 		Submit:               service.Submit,
@@ -764,4 +790,20 @@ func serveHTTP(ctx context.Context, listener net.Listener, handler http.Handler,
 		}
 		return err
 	}
+}
+
+func localCleanupControls() func(context.Context, string, string) (maintenance.Report, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return (maintenance.Service{Home: filepath.Join(home, ".NexusRouter")}).Invoke
+}
+
+func localCleanupScheduleControls() func(context.Context, *maintenance.ScheduleUpdate) (maintenance.ScheduleReport, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return (maintenance.Service{Home: filepath.Join(home, ".NexusRouter")}).Schedule
 }

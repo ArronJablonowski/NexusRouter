@@ -45,6 +45,9 @@ type ApprovalProposal struct {
 }
 
 func (p ApprovalProposal) Validate() error {
+	if p.Kind == "file_create" {
+		return p.validateFileCreate()
+	}
 	if p.Kind == "comfy_workflow" || p.Kind == "comfy_cancel" {
 		if p.Version != 1 || len(p.Arguments) == 0 || len(p.Arguments) > 64<<10 || RejectDuplicateJSONFields(p.Arguments) != nil {
 			return ErrContract
@@ -276,6 +279,8 @@ func (s EvidenceSummary) Validate() error {
 }
 
 type FeedbackContext struct {
+	Rating          int               `json:"rating,omitempty"`
+	CostSummary     string            `json:"cost_summary,omitempty"`
 	Version         int               `json:"version"`
 	TaskID          string            `json:"task_id"`
 	Revision        int64             `json:"revision"`
@@ -288,7 +293,7 @@ type FeedbackContext struct {
 }
 
 func (c FeedbackContext) Validate() error {
-	if c.Version != ContractVersion || !validID(c.TaskID) || c.Revision < 1 || c.Objective == nil ||
+	if c.Rating < 0 || c.Rating > 10 || len(c.CostSummary) > 256 || c.Version != ContractVersion || !validID(c.TaskID) || c.Revision < 1 || c.Objective == nil ||
 		len(c.Objective) > MaxEvidenceSummaries || !optionalID(c.FeedbackID) || !optionalID(c.DenialCode) ||
 		(c.FeedbackID != "") != (c.Subjective != nil) || c.FeedbackAllowed == (c.DenialCode != "") {
 		return ErrContract
@@ -376,10 +381,10 @@ func (s ApprovalSummary) Validate() error {
 	default:
 		return ErrContract
 	}
-	proposalTool := s.ToolName == "comfy_submit" || s.ToolName == "comfy_cancel_pending" || s.ToolName == "workboard_propose_criteria" || s.ToolName == "workboard_request_candidate_decision"
+	proposalTool := s.ToolName == "create_file" || s.ToolName == "comfy_submit" || s.ToolName == "comfy_cancel_pending" || s.ToolName == "workboard_propose_criteria" || s.ToolName == "workboard_request_candidate_decision"
 	if proposalTool && (s.State == "pending" || s.State == "approved") {
 		if s.Proposal == nil || s.Proposal.Validate() != nil ||
-			s.ToolName == "comfy_submit" && s.Proposal.Kind != "comfy_workflow" || s.ToolName == "comfy_cancel_pending" && s.Proposal.Kind != "comfy_cancel" || s.ToolName == "workboard_propose_criteria" && s.Proposal.Kind != "criteria_change" ||
+			s.ToolName == "create_file" && s.Proposal.Kind != "file_create" || s.ToolName == "comfy_submit" && s.Proposal.Kind != "comfy_workflow" || s.ToolName == "comfy_cancel_pending" && s.Proposal.Kind != "comfy_cancel" || s.ToolName == "workboard_propose_criteria" && s.Proposal.Kind != "criteria_change" ||
 			s.ToolName == "workboard_request_candidate_decision" && s.Proposal.Kind != "candidate_decision" {
 			return ErrContract
 		}

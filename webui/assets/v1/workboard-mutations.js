@@ -90,7 +90,7 @@
 		try {
 			while (true) {
 				const limit = Math.min(25, 100 - items.length), query = new URLSearchParams({limit: String(limit)}); if (after) query.set("after", after);
-				const response = await fetch(base + "/api/v1/operations?" + query.toString(), {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}});
+				const response = await window.NexusLive.authorizedFetch(base + "/api/v1/operations?" + query.toString(), {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}});
 				if (!response.ok) throw new Error("operation scan unavailable"); const body = await response.json();
 				if (!validPage(body, limit)) throw new Error("invalid operation page");
 				for (const raw of body.items) { const item = validOperation(raw); if (!item || ids.has(item.id)) throw new Error("invalid operation"); ids.add(item.id); items.push(item); }
@@ -110,7 +110,7 @@
 	}
 	async function bootstrap() {
 		try {
-			const response = await fetch(base + "/api/v1/session/csrf", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", "Accept": "application/json"}, body: JSON.stringify({version: 1})});
+			const response = await window.NexusLive.authorizedFetch(base + "/api/v1/session/csrf", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", "Accept": "application/json"}, body: JSON.stringify({version: 1})});
 			const body = await response.json(); if (!response.ok || !exactKeys(body, ["version", "csrf_token", "expires_at"], []) || body.version !== 1 || typeof body.csrf_token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(body.csrf_token) || !validTime(body.expires_at) || Date.parse(body.expires_at) <= Date.now()) throw new Error("csrf unavailable");
 			csrfToken = body.csrf_token; await scanOperations();
 		} catch (_) { operationsReady = true; operationReadFailed = true; show("The workboard mutation session could not be established. Actions remain blocked.", true); }
@@ -223,7 +223,7 @@
 		if (positioned && !window.NexusWorkboards.previewPosition(intent.capture)) { pendingIntent = null; inFlight = false; show("The card position preview could not be validated. Refresh and try again.", true); return; }
 		if (direct) show(positioned ? "Pending position preview — not saved. Submitting one exact card position request…" : action === "acceptance.accept" || action === "acceptance.reject" ? "Submitting one exact candidate decision…" : "Submitting one exact card control request…", false); else formStatus(forms[action], "Submitting one exact request…", false); updateControls();
 		try {
-			const response = await fetch(base + built.path, {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", "Accept": "application/json", "X-Darwin-CSRF": csrfToken}, body: intent.encoded});
+			const response = await window.NexusLive.authorizedFetch(base + built.path, {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", "Accept": "application/json", "X-Darwin-CSRF": csrfToken}, body: intent.encoded});
 			let body = null; try { body = await response.json(); } catch (_) {}
 			const resolution = client.mutationResolution(response.status, response.ok && client.receiptMatches(body, intent));
 			if (resolution === "committed") { pendingIntent = null; inFlight = false; if (!direct) close(); if (action === "acceptance.accept" || action === "acceptance.reject") closeReview(true); window.NexusWorkboards.refresh(); const message = action === "card.pause_request" ? "Pause request committed. The worker has not necessarily paused yet; authoritative state is refreshing." : action === "card.resume_request" ? "Resume request committed. The worker remains paused until it acknowledges the exact request; authoritative state is refreshing." : action === "card.cancel_request" ? "Cancellation request committed. Cancellation is not final until verified stop finalization; authoritative state is refreshing." : action === "acceptance.accept" ? "Acceptance committed. The card is Done; dependent cards may have been unlocked. Authoritative state is refreshing." : action === "acceptance.reject" ? "Rejection committed. The candidate remains in history and the card returned to Ready for another attempt. Authoritative state is refreshing." : "Committed receipt validated. Authoritative workboard state is refreshing."; show(message, false); return; }

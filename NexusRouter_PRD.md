@@ -1727,3 +1727,27 @@ export continues to require the separate explicit paired history permission;
 ordinary inspection, inference privacy and tool authority must remain unchanged.
 See `docs/model-collaboration.md` and `docs/progress.md` for verified scope,
 historical capture limits and deployment gaps.
+
+## Chat-generated output attachments
+
+The authenticated Web UI must present NexusRouter-generated outputs in the conversation with inline raster images and downloadable file cards, retained across refresh/reopening. Attachment access must derive from confirmed chat-owned generation, not model-provided paths or links. Downloads must retain original generated content and chat authorization, and must not execute generated active documents in the application origin. Collection/refresh must not replay generation or broaden filesystem/remote-job authority. The initial implemented scope is approved UTF-8 creation/revision and chat-owned ComfyUI image outputs; storage limits, uncaptured-upstream recovery, binary generation and richer previews remain explicit gaps in docs/chat-files.md and docs/progress.md.
+
+## User-supplied chat attachments
+
+The Web UI chat composer must accept user file selection and drag/drop for text/code/data, searchable/scanned PDFs, legacy Word `.doc`, Word `.docx` and common raster images. Files must travel with the exact authenticated chat request, remain untrusted data, retain original downloadable bytes, and be available to inference through extracted document text or real multimodal provider fields. Selection/removal, rejection recovery, context/size limits, chat binding and reload behavior must be visible and tested. Image requests must not silently fall back to transports that cannot receive images. File follow-ups must preserve the source chat model. Initial limits and unsupported variants are specified in docs/chat-uploads.md; passing fixtures alone does not establish production completion.
+
+Scanned PDF uploads must support bounded local English OCR, preserve mixed searchable/scanned page order, and label recognition uncertainty. Legacy Word extraction must produce text without running macros or granting tool authority. Missing reader dependencies, cancellation, resource limits and parser failures must reject before inference and preserve a recoverable draft; temporary document data and owned helper descendants must be cleaned up. Platform prerequisites and unverified operating-system paths must be recorded honestly.
+
+
+### Chat reliability and paired continuation supplement — 2026-10-15
+
+Running browser chats must discover tool approval proposals even if persistence follows the first empty observation. Approval observation must not replay a decision or tool effect. Live service approval controls should share validated storage while retaining identity and atomic authority checks.
+
+Private direct paired-host chats may continue from a confirmed successful, immutable original request. The commander owns bounded persisted history, pins host/model/caller/privacy/bounds, retains original downloads across turns and restores the conversation on reload. Failed or uncertain work must remain inspectable without implicit resend; unsupported or oversized history fails closed. Existing jobs without snapshots do not gain fabricated history.
+
+Cloud catalog entries may be configured through an existing provider template without exposing credentials. Additions require fresh catalog/template binding, optimistic configuration comparison, complete validation, disabled-first publication, an idle restart and explicit enablement. Catalog presence does not verify access; inherited routing estimates must not be described as actual billing. New provider/credential setup remains outside this control.
+
+
+### Paired chat sidebar supplement — 2026-10-15
+
+Snapshot-backed paired chats must appear in the regular chat sidebar and reopen the latest recorded conversation turn without resubmission. History and original uploads must survive reload and storage reopening. Previously retained snapshots require bounded index backfill. Local chat refresh and switching must preserve remote entries while clearing remote routing state when a local conversation is selected. Confirmed final messages may be cached locally for read-only recovery when a paired host is unavailable; cached state cannot authorize continuation or cancellation. Retention/capacity failures must be reported honestly.

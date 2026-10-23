@@ -111,7 +111,7 @@ func TestMetricsSurviveServiceRestartWithoutExecution(t *testing.T) {
 		}
 	}
 	var after metrics.Snapshot
-	if json.Unmarshal(body, &after) != nil || after.Validate() != nil || !reflect.DeepEqual(before.Groups, after.Groups) {
+	if json.Unmarshal(body, &after) != nil || after.Validate() != nil || !reflect.DeepEqual(durableMetricGroups(t, before.Groups), durableMetricGroups(t, after.Groups)) {
 		t.Fatal("restart changed stored metrics", before, after)
 	}
 	want := map[string]map[string]int64{
@@ -139,4 +139,30 @@ func TestMetricsSurviveServiceRestartWithoutExecution(t *testing.T) {
 	if err != nil || history.State != "completed" {
 		t.Fatal("original task changed", history, err)
 	}
+}
+
+// Queue age can cross a bucket boundary while a service is reopened. Its
+// population must remain one; all other groups are durable and compared exactly.
+func durableMetricGroups(t *testing.T, groups []metrics.Group) []metrics.Group {
+	t.Helper()
+	var durable []metrics.Group
+	found := false
+	for _, group := range groups {
+		if group.Name != "queue_age" {
+			durable = append(durable, group)
+			continue
+		}
+		found = true
+		var total int64
+		for _, count := range group.Counts {
+			total += count.Value
+		}
+		if !group.Available || total != 1 {
+			t.Fatal("queued metrics population changed", group)
+		}
+	}
+	if !found {
+		t.Fatal("queue age metrics missing")
+	}
+	return durable
 }

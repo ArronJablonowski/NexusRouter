@@ -4,7 +4,8 @@
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
 	if (!window.NexusRoutes || !window.NexusRoutes.settings(relative)) return;
 	const view = document.querySelector("#settings-view"), chat = document.querySelector("#chat-view"), workboards = document.querySelector("#workboard-view"), models = document.querySelector("#models-view");
-	const collaboration=document.querySelector("#collaboration-enabled");
+	const autoApprove=document.querySelector("#auto-approve-tools");
+ const collaboration=document.querySelector("#collaboration-enabled");
  const form = document.querySelector("#tool-settings-form"), tools = document.querySelector("#tools-enabled"), delegated = document.querySelector("#delegate-read-tools"), specialistsAllowCloud = document.querySelector("#specialists-allow-cloud");
 	const root = document.querySelector("#tools-read-root"), validation = document.querySelector("#settings-validation"), status = document.querySelector("#settings-status");
 	const save = document.querySelector("#save-settings"), reset = document.querySelector("#reset-settings"), refresh = document.querySelector("#refresh-settings");
@@ -19,13 +20,13 @@
 	let csrf = "", projection = null, loading = false;
 	chat.hidden = true; workboards.hidden = true; models.hidden = true; view.hidden = false;
 	function validAccess(value) {
-		return value && (value.collaboration_enabled===undefined || typeof value.collaboration_enabled==="boolean") && (value.mac_memory_percent===undefined || Number.isFinite(value.mac_memory_percent)&&value.mac_memory_percent>=0&&value.mac_memory_percent<=100) && (value.mac_swap_growth_gb===undefined || Number.isFinite(value.mac_swap_growth_gb)&&value.mac_swap_growth_gb>=0&&value.mac_swap_growth_gb<=1024) && [undefined,"","managed","full"].includes(value.dns_logging) && validAdvertisement(value.remote_advertisement) && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
+		return value && (value.auto_approve===undefined || typeof value.auto_approve==="boolean") && (value.collaboration_enabled===undefined || typeof value.collaboration_enabled==="boolean") && (value.mac_memory_percent===undefined || Number.isFinite(value.mac_memory_percent)&&value.mac_memory_percent>=0&&value.mac_memory_percent<=100) && (value.mac_swap_growth_gb===undefined || Number.isFinite(value.mac_swap_growth_gb)&&value.mac_swap_growth_gb>=0&&value.mac_swap_growth_gb<=1024) && [undefined,"","managed","full"].includes(value.dns_logging) && validAdvertisement(value.remote_advertisement) && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
 	}
 	function validProjection(value) {
 		return value && value.version === 1 && digestPattern.test(value.digest) && validAccess(value.active) && validAccess(value.saved) && typeof value.restart_required === "boolean" && value.restart_required === (JSON.stringify(value.active) !== JSON.stringify(value.saved));
 	}
 	function setStatus(message, failed) { status.textContent = message; status.classList.toggle("error", Boolean(failed)); }
-	function setBusy(value) { loading = value; [macMemory,macSwap,dnsLogging,skillsEnabled,skillsDraft,skillsRoot,skillsScope,advertiseEnabled,advertiseInterface,advertiseName,advertiseSSH].forEach(n=>n.disabled=value); save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
+	function setBusy(value) { loading = value; [autoApprove,macMemory,macSwap,dnsLogging,skillsEnabled,skillsDraft,skillsRoot,skillsScope,advertiseEnabled,advertiseInterface,advertiseName,advertiseSSH].forEach(n=>n.disabled=value); save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
 	function syncDependency() {
 		if (!tools.checked) delegated.checked = false;
 		delegated.disabled = loading || !tools.checked;
@@ -42,19 +43,19 @@
  dnsStatus.textContent=value.active.dns_logging==="full"?"Managed logging enabled. Full capture: administrator setup required; not verified active.":value.active.dns_logging==="managed"?"Managed logging enabled. Daily DNS JSONL files are stored beside the runtime database; see Logging for coverage.":"DNS logging is off.";
  advertiseEnabled.checked=value.saved.remote_advertisement.enabled;advertiseInterface.value=value.saved.remote_advertisement.interface;advertiseName.value=value.saved.remote_advertisement.name;advertiseSSH.value=value.saved.remote_advertisement.ssh_port||"";
  skillsEnabled.checked=value.saved.skills_enabled;skillsDraft.checked=value.saved.skills_auto_draft;skillsRoot.value=value.saved.skills_root;skillsScope.value=value.saved.skills_scope;
-		collaboration.checked = value.saved.collaboration_enabled===true; tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
+		autoApprove.checked = value.saved.auto_approve===true; collaboration.checked = value.saved.collaboration_enabled===true; tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
 		badge.hidden = !value.restart_required; activeSummary.replaceChildren();
 		addSummary("Skill usage",value.active.skills_enabled?"Enabled":"Disabled");addSummary("Skill creation",value.active.skills_enabled&&value.active.skills_auto_draft?"Allowed":"Disabled");
- addSummary("Model collaboration",value.active.collaboration_enabled ? "Enabled" : "Disabled"); addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
+ addSummary("Automatic tool approval",value.active.auto_approve?"On":"Off"); addSummary("Model collaboration",value.active.collaboration_enabled ? "Enabled" : "Disabled"); addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
 		addSummary("Delegated reads", value.active.delegate_read_tools ? "Enabled" : "Disabled");
 		addSummary("Specialist models", value.active.specialists_allow_cloud ? "Local and cloud" : "Local only");
 		addSummary("Remote advertisement in loaded config",value.active.remote_advertisement.enabled?"Enabled (remote host status not checked)":"Disabled");
  addSummary("Advertised interface",value.active.remote_advertisement.interface||"Not configured");addSummary("Advertised TLS name",value.active.remote_advertisement.name||"Not configured");addSummary("SSH port hint",value.active.remote_advertisement.ssh_port?String(value.active.remote_advertisement.ssh_port):"None");
  addSummary("Read root", value.active.read_root || "Not configured");
 		syncDependency(); validation.hidden = true;
-		setStatus(value.restart_required ? "Settings are saved. Restart the owning service to activate them; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
+		setStatus(value.restart_required ? "Settings are saved. Automatic tool approval is active now. Restart the owning service to activate the remaining changes; remote advertisement requires a remote-host restart." : "Saved settings match the running daemon.", false);
 	}
-	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="collaboration_enabled"?(projection.saved[key]===true):key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]));}
+	function dirty(){return projection && Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==((key==="collaboration_enabled"||key==="auto_approve")?(projection.saved[key]===true):key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]));}
  function load() {
   if(dirty()){setStatus("Your unsaved edits are preserved. Use Reset changes before refreshing saved settings.",false);return Promise.resolve();}
 		setBusy(true); setStatus("Loading settings…", false);
@@ -65,7 +66,7 @@
 			setStatus("Settings could not be loaded. Previously loaded values and edits are preserved.", true);
 		}).finally(() => setBusy(false));
 	}
-	function formValue() { return {...(projection?.saved.commander_model!==undefined?{commander_model:projection.saved.commander_model}:{}),mac_memory_percent:Number(macMemory.value),mac_swap_growth_gb:Number(macSwap.value),dns_logging:dnsLogging.value,remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),collaboration_enabled:collaboration.checked, tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
+	function formValue() { return {...(projection?.saved.commander_model!==undefined?{commander_model:projection.saved.commander_model}:{}),mac_memory_percent:Number(macMemory.value),mac_swap_growth_gb:Number(macSwap.value),dns_logging:dnsLogging.value,remote_advertisement:{enabled:advertiseEnabled.checked,interface:advertiseInterface.value.trim(),name:advertiseName.value.trim(),ssh_port:advertiseSSH.value.trim()===""?0:Number(advertiseSSH.value)},skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),auto_approve:autoApprove.checked,collaboration_enabled:collaboration.checked, tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
 	function validate(value) {
 		let message = "";
 		if (!validAdvertisement(value.remote_advertisement)) message = "Use a valid interface, lowercase TLS name, and optional SSH port from 1 to 65535. Interface and TLS name are required when discovery is enabled.";
@@ -98,7 +99,7 @@
    const value=await response.json();if(!validProjection(value))throw Error();
    if(value.digest===projection.digest&&JSON.stringify(value.active)===JSON.stringify(projection.active))return;
    // Keep the original digest while a draft is dirty, so save still detects conflicts.
-   if(Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==(key==="collaboration_enabled"?(projection.saved[key]===true):key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]))){setStatus("Settings changed elsewhere. Your unsaved edits are preserved; use Reset or Refresh to load current settings.",false);return;}
+   if(Object.entries(formValue()).some(([key,value])=>value&&typeof value==="object"?Object.entries(value).some(([k,v])=>v!==projection.saved[key][k]):value!==((key==="collaboration_enabled"||key==="auto_approve")?(projection.saved[key]===true):key==="dns_logging"?(projection.saved[key]||""):key==="mac_memory_percent"?(projection.saved[key]||100):key==="mac_swap_growth_gb"?(projection.saved[key]||4):projection.saved[key]))){setStatus("Settings changed elsewhere. Your unsaved edits are preserved; use Reset or Refresh to load current settings.",false);return;}
    render(value);
   }catch{setStatus("Live settings check unavailable. Your edits are preserved; reconnecting automatically.",true);return false;}
   finally{liveSettingsBusy=false;}
@@ -136,4 +137,68 @@
   buttons.forEach(b=>b.disabled=!select.value);if(select.value)await action('status');else status.textContent='No paired host grants runner control. Enable runner permission in the host trust configuration.';
  }catch{status.textContent='Runner connections could not be loaded.';buttons.forEach(b=>b.disabled=true);}}
  load();
+})();
+
+
+(() => {
+ const base=document.body.dataset.basePath||'';
+ if(!window.NexusRoutes?.settings(window.location.pathname.slice(base.length)))return;
+ const last=document.querySelector('#cleanup-last'),status=document.querySelector('#cleanup-status'),items=document.querySelector('#cleanup-items'),retained=document.querySelector('#cleanup-retained');
+ const refresh=document.querySelector('#cleanup-refresh'),preview=document.querySelector('#cleanup-preview'),run=document.querySelector('#cleanup-run');
+ let busy=false,token='',count=0,lastKnown=false;
+ function validRun(v){return v===null||(v&&typeof v.time==='string'&&Array.isArray(v.deleted)&&v.deleted.every(p=>typeof p==='string')&&Number.isInteger(v.errors)&&v.errors>=0);}
+ function clearPreview(){token='';count=0;items.replaceChildren();retained.textContent='';run.disabled=true;}
+ function render(value){
+  if(value?.version!==1||!validRun(value.last_run)||!validRun(value.result))throw Error();
+  const v=value.last_run;
+  last.textContent=v?('Last run: '+new Date(v.time).toLocaleString()+' · '+v.deleted.length+' item(s) removed'+(!v.complete?' · Still running, interrupted, or completion unrecorded.':'')+(v.errors?' · Stopped after an error; inspect before retrying.':'')):'No cleanup run recorded yet.';
+  lastKnown=true;
+  if(value.preview){const p=value.preview;
+   if(!/^[a-f0-9]{64}$/.test(p.token)||!Array.isArray(p.items)||!Array.isArray(p.retained)||!Number.isInteger(p.skipped)||p.items.some(x=>!x||typeof x.path!=='string'||!['backup','qa'].includes(x.kind))||p.retained.some(x=>typeof x!=='string'))throw Error();
+   items.replaceChildren();for(const x of p.items){const li=document.createElement('li');li.textContent=(x.kind==='backup'?'Backup: ':'QA build: ')+x.path;li.style.overflowWrap='anywhere';items.append(li);}
+   retained.textContent=p.retained.length+' deployment backup(s) retained. '+p.skipped+' item(s) or groups skipped by safety checks.';
+   token=p.token;count=p.items.length;
+   status.textContent=count+' item(s) eligible. '+(count?'Run cleanup removes only files that still match this preview.':'Nothing needs to be deleted.');
+  }
+  if(value.result){clearPreview();status.textContent=value.result.errors?'Cleanup stopped after an error. Refresh last run and preview again before retrying.':'Cleanup finished: '+value.result.deleted.length+' item(s) removed.';}
+ }
+ async function action(name){if(busy)return;busy=true;[refresh,preview,run].forEach(b=>b.disabled=true);
+  const oldToken=token;if(name!=='run')clearPreview();status.textContent=name==='run'?'Running cleanup…':'Checking cleanup…';
+  try{let options={credentials:'same-origin',cache:'no-store'};
+   if(name!=='status'){
+    const session=await window.NexusLive.fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!session.ok)throw Error();const csrf=await session.json();
+    options={...options,method:'POST',headers:{'Content-Type':'application/json','X-Darwin-CSRF':csrf.csrf_token},body:JSON.stringify({version:1,action:name,token:name==='run'?oldToken:''})};
+   }
+   const response=await window.NexusLive.fetch(base+'/api/v1/cleanup',options,60000);
+   if(response.status===409){clearPreview();status.textContent='The eligible files changed. Preview cleanup again before running it.';return;}
+   if(!response.ok)throw Error();render(await response.json());if(name==='status')status.textContent='Preview the eligible files before running cleanup.';
+  }catch{clearPreview();if(!lastKnown)last.textContent='Last cleanup unavailable.';status.textContent=name==='run'?'Cleanup outcome unavailable. Refresh last run before trying again. Cleanup is never retried automatically.':'Cleanup unavailable. Check that the qualified cleanup utility is installed and no other cleanup is running.';}
+  finally{busy=false;refresh.disabled=false;preview.disabled=false;run.disabled=!token||!count;}
+ }
+ refresh.addEventListener('click',()=>action('status'));preview.addEventListener('click',()=>action('preview'));run.addEventListener('click',()=>action('run'));action('status');
+})();
+
+
+(() => {
+ const base=document.body.dataset.basePath||'';
+ if(!window.NexusRoutes?.settings(window.location.pathname.slice(base.length)))return;
+ const form=document.querySelector('#cleanup-schedule-form'),enabled=document.querySelector('#cleanup-auto-enabled'),frequency=document.querySelector('#cleanup-frequency'),day=document.querySelector('#cleanup-weekday'),time=document.querySelector('#cleanup-time'),dayField=document.querySelector('#cleanup-weekday-field'),zone=document.querySelector('#cleanup-timezone'),status=document.querySelector('#cleanup-schedule-status'),save=document.querySelector('#cleanup-schedule-save'),refresh=document.querySelector('#cleanup-schedule-refresh');
+ let projection=null,busy=false;
+ const controls=[enabled,frequency,day,time,save,refresh];
+ function dependency(){dayField.hidden=frequency.value!=='weekly';}
+ function valid(s){return s&&typeof s.enabled==='boolean'&&Number.isInteger(s.hour)&&s.hour>=0&&s.hour<24&&Number.isInteger(s.minute)&&s.minute>=0&&s.minute<60&&(s.weekday===null||(Number.isInteger(s.weekday)&&s.weekday>=0&&s.weekday<7))&&typeof s.loaded==='boolean'&&typeof s.running==='boolean'&&['ready','needs_attention','needs_recovery'].includes(s.state)&&typeof s.timezone==='string'&&/^[0-9a-f]{64}$/.test(s.digest);}
+ function render(value){if(value?.version!==1||!valid(value.schedule))throw Error();projection=value.schedule;const s=projection;
+  enabled.checked=s.enabled;frequency.value=s.weekday===null?'daily':'weekly';day.value=String(s.weekday??0);time.value=String(s.hour).padStart(2,'0')+':'+String(s.minute).padStart(2,'0');dependency();
+  zone.textContent='Local time on this commander ('+s.timezone+'). Daylight-saving changes follow the system calendar.';
+  status.textContent=value.recovered?'The previous schedule was recovered. Review it and save your desired change again.':s.state==='needs_recovery'?'A schedule update was interrupted. Save to recover the previous schedule first.':s.state==='needs_attention'?'Saved schedule and scheduler state differ. Save to reconcile them.':s.running?'Cleanup is running. Wait for it to finish before changing its schedule.':s.enabled?'Automatic cleanup is on. Changes take effect as soon as they are saved.':'Automatic cleanup is off. Manual cleanup remains available.';
+ }
+ async function request(update){if(busy)return;busy=true;controls.forEach(x=>x.disabled=true);status.textContent=update?'Applying cleanup schedule…':'Loading cleanup schedule…';
+  try{let options={credentials:'same-origin',cache:'no-store'};
+   if(update){const r=await window.NexusLive.fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!r.ok)throw Error();const csrf=await r.json();options={...options,method:'POST',headers:{'Content-Type':'application/json','X-Darwin-CSRF':csrf.csrf_token},body:JSON.stringify(update)};}
+   const r=await window.NexusLive.fetch(base+'/api/v1/cleanup-schedule',options,60000);if(r.status===409){status.textContent='The schedule changed elsewhere. Your edits are preserved; reload the schedule before saving again.';return;}if(!r.ok)throw Error();render(await r.json());
+  }catch{status.textContent=update?'The schedule change could not be confirmed. Your edits are preserved. Reload the schedule before trying again; no automatic retry is made.':'Automatic cleanup scheduling is unavailable. Check the installed utility and local scheduler.';}
+  finally{busy=false;controls.forEach(x=>x.disabled=!projection);save.disabled=!projection||projection.running;refresh.disabled=false;dependency();}
+ }
+ form.addEventListener('submit',event=>{event.preventDefault();if(!projection||busy)return;if(!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(time.value)){status.textContent='Choose a valid cleanup time.';return;}const [hour,minute]=time.value.split(':').map(Number);request({version:1,expected_digest:projection.digest,settings:{enabled:enabled.checked,hour,minute,weekday:frequency.value==='weekly'?Number(day.value):null}});});
+ frequency.addEventListener('change',dependency);refresh.addEventListener('click',()=>request(null));request(null);
 })();

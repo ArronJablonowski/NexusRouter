@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"io"
 	"math"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 const (
 	ContractVersion       = 1
 	MaxRequestBytes       = 1 << 20
+	MaxUploadRequestBytes = 12 << 20
 	MaxEventBytes         = 1 << 20
 	MaxCursorBytes        = 512
 	MaxIDBytes            = 128
@@ -53,18 +55,22 @@ const (
 )
 
 type ChatRequest struct {
-	Version          int        `json:"version"`
-	Action           ChatAction `json:"action"`
-	IdempotencyKey   string     `json:"idempotency_key"`
-	ChatID           string     `json:"chat_id,omitempty"`
-	TaskID           string     `json:"task_id,omitempty"`
-	SubmissionID     string     `json:"submission_id,omitempty"`
-	ModelID          string     `json:"model_id,omitempty"`
-	Text             string     `json:"text,omitempty"`
-	ExpectedRevision *int64     `json:"expected_revision,omitempty"`
+	Files            []attachments.File `json:"files,omitempty"`
+	Version          int                `json:"version"`
+	Action           ChatAction         `json:"action"`
+	IdempotencyKey   string             `json:"idempotency_key"`
+	ChatID           string             `json:"chat_id,omitempty"`
+	TaskID           string             `json:"task_id,omitempty"`
+	SubmissionID     string             `json:"submission_id,omitempty"`
+	ModelID          string             `json:"model_id,omitempty"`
+	Text             string             `json:"text,omitempty"`
+	ExpectedRevision *int64             `json:"expected_revision,omitempty"`
 }
 
 func (r ChatRequest) Validate() error {
+	if attachments.Validate(r.Files) != nil || len(r.Files) > 0 && r.Action != ChatSubmit && r.Action != ChatResume {
+		return ErrContract
+	}
 	if r.Version != ContractVersion || !validKey(r.IdempotencyKey) ||
 		!optionalID(r.ChatID) || !optionalID(r.TaskID) || !optionalID(r.SubmissionID) || !optionalModelID(r.ModelID) ||
 		!optionalRevision(r.ExpectedRevision) || !boundedText(r.Text, MaxRequestBytes, true) {
@@ -93,6 +99,9 @@ func (r ChatRequest) Validate() error {
 		}
 	default:
 		return ErrContract
+	}
+	if len(r.Files) > 0 {
+		return encodedWithin(r, MaxUploadRequestBytes)
 	}
 	return encodedWithin(r, MaxRequestBytes)
 }
@@ -135,6 +144,7 @@ const (
 )
 
 type FeedbackRequest struct {
+	Rating           int            `json:"rating,omitempty"`
 	Version          int            `json:"version"`
 	IdempotencyKey   string         `json:"idempotency_key"`
 	TaskID           string         `json:"task_id"`
@@ -146,14 +156,14 @@ type FeedbackRequest struct {
 }
 
 func (r FeedbackRequest) Validate() error {
-	if r.Version != ContractVersion || !validKey(r.IdempotencyKey) || !validID(r.TaskID) ||
+	if r.Rating < 0 || r.Rating > 10 || (r.Rating > 0 && (r.AttemptCost != nil || r.Accepted != (r.Rating >= 6))) || r.Version != ContractVersion || !validKey(r.IdempotencyKey) || !validID(r.TaskID) ||
 		!optionalID(r.FeedbackID) || (r.AttemptCost != nil && (math.IsNaN(*r.AttemptCost) || math.IsInf(*r.AttemptCost, 0) || *r.AttemptCost < 0)) ||
 		!optionalRevision(r.ExpectedRevision) {
 		return ErrContract
 	}
 	switch r.Action {
 	case FeedbackRecord:
-		if r.FeedbackID != "" || r.ExpectedRevision != nil || r.AttemptCost == nil {
+		if r.FeedbackID != "" || r.ExpectedRevision != nil || (r.AttemptCost == nil && r.Rating == 0) {
 			return ErrContract
 		}
 	case FeedbackRevise:
@@ -823,6 +833,9 @@ var operationSpecs = []OperationSpec{
 	{Operation: "feedback.inspect", Method: "GET", BrowserPath: "/app/api/v1/tasks/{task}/feedback", ServicePrimitive: "new browser-safe objective and subjective evidence projection", Security: SessionRead},
 	{Operation: "approval.list", Method: "GET", BrowserPath: "/app/api/v1/tasks/{task}/approvals", ServicePrimitive: "GET /v1/tasks/{task}/approvals", Security: SessionRead, PrimitiveExists: true},
 	{Operation: "approval.decide", Method: "POST", BrowserPath: "/app/api/v1/tasks/{task}/approvals/{approval}/decision", ServicePrimitive: "new revision facade over existing approval command", Security: SessionCSRFMutation, Mutation: true},
+	{Operation: "chat.files", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/files", ServicePrimitive: "confirmed chat-scoped output snapshots", Security: SessionRead},
+	{Operation: "chat.file.download", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/files/{file}/download", ServicePrimitive: "immutable chat-bound file download", Security: SessionRead},
+	{Operation: "chat.file.preview", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/files/{file}/preview", ServicePrimitive: "allowlisted raster preview", Security: SessionRead},
 	{Operation: "model.list", Method: "GET", BrowserPath: "/app/api/v1/models", ServicePrimitive: "GET /v1/routing/models redacted catalog", Security: SessionRead, PrimitiveExists: true},
 	{Operation: "route.inspect", Method: "GET", BrowserPath: "/app/api/v1/tasks/{task}/route", ServicePrimitive: "GET /v1/tasks/{task}/route", Security: SessionRead, PrimitiveExists: true},
 	{Operation: "usage.inspect", Method: "GET", BrowserPath: "/app/api/v1/tasks/{task}/usage", ServicePrimitive: "bounded routed and auxiliary usage inspection projection", Security: SessionRead, PrimitiveExists: true},
@@ -939,5 +952,29 @@ func encodedWithin(value any, max int) error {
 	if err != nil || len(body) > max {
 		return ErrContract
 	}
+	return nil
+}
+
+// A present rating must be a score, not an omitted legacy field. In particular,
+// null/zero cannot silently turn a rated request into legacy cost feedback.
+func (r *FeedbackRequest) UnmarshalJSON(raw []byte) error {
+	type wire FeedbackRequest
+	var value wire
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&value); err != nil {
+		return err
+	}
+	if d.Decode(new(any)) != io.EOF {
+		return ErrContract
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return ErrContract
+	}
+	if _, present := fields["rating"]; present && (value.Rating < 1 || value.Rating > 10) {
+		return ErrContract
+	}
+	*r = FeedbackRequest(value)
 	return nil
 }

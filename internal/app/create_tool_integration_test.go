@@ -109,6 +109,16 @@ func TestCreateToolHTTPApprovalAndDurableEffect(t *testing.T) {
 			if !allowed && (!os.IsNotExist(fileErr) || reviewed.ID == "") {
 				t.Fatal("denied create produced file", runErr, fileErr)
 			}
+			files, filePageErr := svc.ChatFiles(ctx, result.TaskID)
+			if filePageErr != nil || len(files.Files) != map[bool]int{true: 1, false: 0}[allowed] {
+				t.Fatal("generated chat files after approval", files, filePageErr)
+			}
+			if allowed {
+				_, snapshot, err := svc.ChatFile(ctx, result.TaskID, files.Files[0].ID)
+				if err != nil || string(snapshot) != string(body) {
+					t.Fatal("approved creation snapshot mismatch", err)
+				}
+			}
 			db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
 			if err != nil {
 				t.Fatal(err)

@@ -808,6 +808,14 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 	if json.Unmarshal(data, &redacted) != nil {
 		return errors.New("cannot redact event")
 	}
+	for i, message := range e.Data.Messages {
+		if message.Role == "user" {
+			redacted.Messages[i].Content, err = redactUploadContent(message.Content, j.secrets)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	e.Data = redacted
 	if plan != nil && (finish || j.runtimeHostAdmission != nil || plan.Validate() != nil || !selectionValueClean(*plan, j.secrets) ||
 		e.Kind != runtime.ContextCompacted || !reflect.DeepEqual(e.Data.Compaction, plan.Compaction) ||

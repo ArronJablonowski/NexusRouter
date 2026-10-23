@@ -10,7 +10,7 @@ import (
 )
 
 func (b *BrowserMutations) comfyApprovalProposal(ctx context.Context, record approvals.Record) (*contract.ApprovalProposal, error) {
-	snapshot, e := InspectTask(ctx, b.service.settings.Telemetry.Database, record.Request.TaskID)
+	snapshot, e := b.service.approvalTaskSnapshot(ctx, record.Request.TaskID)
 	if e != nil {
 		return nil, e
 	}

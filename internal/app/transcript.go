@@ -92,8 +92,15 @@ func (s *Service) ChatHistory(ctx context.Context, chat string, options contract
 		if (message.Role != "user" && message.Role != "assistant") || message.Content == "" {
 			continue
 		}
+		content := redact(message.Content, secrets)
+		if message.Role == "user" {
+			content, err = uploadTextView(message.Content, secrets)
+			if err != nil {
+				return contract.HistoryPage{}, err
+			}
+		}
 		digest := sha256.Sum256([]byte(head.TaskID + "\x00" + strconv.Itoa(index) + "\x00" + strconv.FormatInt(snapshot.MessageSequences[index], 10)))
-		messages = append(messages, contract.HistoryMessage{ID: "msg_" + hex.EncodeToString(digest[:12]), Role: message.Role, Text: redact(message.Content, secrets), Revision: int64(len(messages) + 1), SourceRevision: snapshot.MessageSequences[index]})
+		messages = append(messages, contract.HistoryMessage{ID: "msg_" + hex.EncodeToString(digest[:12]), Role: message.Role, Text: content, Revision: int64(len(messages) + 1), SourceRevision: snapshot.MessageSequences[index]})
 	}
 	if offset > len(messages) {
 		return contract.HistoryPage{}, ErrAdmission

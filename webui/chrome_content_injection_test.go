@@ -116,7 +116,7 @@ if (result.executed !== undefined || result.injected || result.count !== 2) thro
 for(const width of [1440,1024,390,319]) {
  await cdp('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
  if(!await evaluate('document.documentElement.scrollWidth<=innerWidth+1'))throw Error('chat horizontal overflow at '+width);
- if(!await evaluate('document.querySelector("#transcript").getBoundingClientRect().height>=250'))throw Error('transcript collapsed at '+width);
+ if(!await evaluate('document.querySelector(".conversation-scroll").getBoundingClientRect().height>=250'))throw Error('conversation viewport collapsed at '+width);
 }
 await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
 await cdp('Page.navigate', {url:origin + '/app/workboards/board-xss'});

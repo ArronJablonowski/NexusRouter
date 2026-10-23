@@ -11,7 +11,7 @@ window.NexusRemoteDiscovery=(()=>{
    busy=true;scan.disabled=true;results.replaceChildren();status.textContent='Looking for nearby instances…';const current=generation;
    const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),5000);
    try{
-    const response=await fetch(base+'/api/v1/remote-discovery',{method:'POST',credentials:'same-origin',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json','X-Darwin-CSRF':csrf},body:JSON.stringify({version:1})});
+    const response=await window.NexusLive.authorizedFetch(base+'/api/v1/remote-discovery',{method:'POST',credentials:'same-origin',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json','X-Darwin-CSRF':csrf},body:JSON.stringify({version:1})});
     if(!response.ok)throw Error();const page=await response.json();
     if(!page||page.version!==1||!Array.isArray(page.candidates)||page.candidates.length>64||page.candidates.some(c=>!valid(c)))throw Error();
     if(current!==generation||!enabled)return;

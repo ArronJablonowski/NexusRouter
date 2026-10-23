@@ -15,6 +15,8 @@ import (
 )
 
 type ReadServices struct {
+	ChatFiles       func(context.Context, string) (contract.ChatFilePage, error)
+	ChatFile        func(context.Context, string, string) (contract.ChatFile, []byte, error)
 	ChatPreference  func(context.Context, string) (sessions.ChatPreference, error)
 	JobTasks        func(context.Context, sessions.TaskListOptions) (sessions.TaskPage, error)
 	Submissions     func(context.Context, submissions.ListOptions) (submissions.Page, error)

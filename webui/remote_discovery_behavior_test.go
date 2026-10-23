@@ -11,7 +11,7 @@ func TestRemoteDiscoveryBrowserExplicitScanAndExpiry(t *testing.T) {
  let posts=[],selected=[],release;const now=Date.now();let clock=now;
  let candidate={version:1,verified:false,instance:'node-a',endpoint:'https://192.168.1.20:8443',server_name:'node-a.local',claimed_certificate_sha256:'a'.repeat(64),ssh_port:22,expires_at:new Date(now+30000).toISOString()};
  const fetch=async(url,opts)=>{posts.push({url,opts});await new Promise(r=>release=r);return {ok:true,json:async()=>({version:1,candidates:[candidate]})}};
- const window={};vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch,AbortController,setTimeout,clearTimeout,Date:{now:()=>clock,parse:Date.parse}});
+ const window={};window.NexusLive={...window.NexusLive,authorizedFetch:(...args)=>fetch(...args)};vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch,AbortController,setTimeout,clearTimeout,Date:{now:()=>clock,parse:Date.parse}});
  const tick=()=>new Promise(r=>setImmediate(r));
  (async()=>{
  const view=window.NexusRemoteDiscovery.mount('/console','csrf',c=>selected.push(c));const scan=nodes.get('#remote-discover'),results=nodes.get('#remote-discovery-results');

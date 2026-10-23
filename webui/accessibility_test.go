@@ -79,9 +79,9 @@ func TestEmbeddedShellTextContrastMeetsWCAGAA(t *testing.T) {
 		{"advisory evidence", "#7f8ba3", "#17223a"},
 		{"warning text", "#ffcf70", "#0b1020"},
 		{"error text", "#ffb6b6", "#0b1020"},
-		{"secondary button", "#e8edf8", "#1b2943"},
-		{"primary button", "#08130f", "#73e6b1"},
-		{"danger button", "#fff", "#5d2730"},
+		{"secondary button", "#e0f3f7", "#0b2933"},
+		{"send button", "#042129", "#64e1e7"},
+		{"danger button", "#f3b5be", "#291f28"},
 	}
 	for _, pair := range pairs {
 		if !strings.Contains(css, pair.foreground) || !strings.Contains(css, pair.background) {
@@ -91,11 +91,11 @@ func TestEmbeddedShellTextContrastMeetsWCAGAA(t *testing.T) {
 			t.Fatalf("%s contrast %.2f is below WCAG AA 4.5:1", pair.name, ratio)
 		}
 	}
-	if !strings.Contains(css, "#66799b") {
+	if !strings.Contains(css, "#578390") {
 		t.Fatal("form control boundary color is not tracked")
 	}
-	for _, background := range []string{"#0d1628", "#111a2d"} {
-		if ratio := contrastRatio("#66799b", background); ratio < 3 {
+	for _, background := range []string{"#03141e", "#061c26"} {
+		if ratio := contrastRatio("#578390", background); ratio < 3 {
 			t.Fatalf("form control boundary contrast %.2f is below WCAG non-text 3:1", ratio)
 		}
 	}
