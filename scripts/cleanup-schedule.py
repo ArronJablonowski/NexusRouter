@@ -50,6 +50,11 @@ class Scheduler:
         if not self.agent.is_file() or self.agent.is_symlink() or s.st_uid != os.getuid() or s.st_mode & 0o022 or s.st_size > 16384:
             raise ValueError('unsafe cleanup LaunchAgent')
         raw = self.agent.read_bytes()
+        return raw, self.validate_agent(raw)
+
+    def validate_agent(self, raw):
+        if len(raw) > 16384:
+            raise ValueError("invalid scheduler recovery record")
         value = plistlib.loads(raw)
         expected = ['/usr/bin/python3', '-B', str(self.state / 'cleanup-nexus-home.py'), '--home', str(self.root), '--apply']
         allowed = {'Label', 'ProgramArguments', 'StartCalendarInterval', 'ProcessType', 'Nice', 'LowPriorityIO', 'StandardOutPath', 'StandardErrorPath', 'Disabled'}
@@ -63,7 +68,7 @@ class Scheduler:
         self.validate({'enabled': not value.get('Disabled', False), 'hour': cal['Hour'], 'minute': cal['Minute'], 'weekday': cal.get('Weekday')})
         if value.get('StandardOutPath') != str(self.state / 'scheduler.log') or value.get('StandardErrorPath') != str(self.state / 'scheduler-error.log'):
             raise ValueError('unrecognized cleanup log path')
-        return raw, value
+        return value
 
     @staticmethod
     def validate(settings):
@@ -115,11 +120,15 @@ class Scheduler:
             self.command('bootout', self.job)
 
     def restore(self, transaction):
-        raw = base64.b64decode(transaction['previous'], validate=True)
-        value = plistlib.loads(raw)
-        # The transaction can only restore our own validated executable/calendar.
-        if value.get('Label') != LABEL or len(raw) > 16384:
+        if (not isinstance(transaction, dict) or set(transaction) != {'previous', 'loaded', 'disabled'}
+                or type(transaction['loaded']) is not bool or type(transaction['disabled']) is not bool
+                or not isinstance(transaction['previous'], str) or len(transaction['previous']) > 21848):
             raise ValueError('invalid scheduler recovery record')
+        raw = base64.b64decode(transaction['previous'], validate=True)
+        # Validate the entire restore target before changing scheduler or disk state.
+        self.validate_agent(raw)
+        if self.observed()[1]:
+            raise RuntimeError('cleanup is running; schedule unchanged')
         self.command('disable', self.job)
         self.unload()
         self.write_agent(raw)

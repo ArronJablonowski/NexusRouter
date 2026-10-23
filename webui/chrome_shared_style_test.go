@@ -38,6 +38,7 @@ const pages=await evaluate('[...document.querySelectorAll(".rail a")].map(a=>({v
 for(const page of pages){
  await cdp('Page.navigate',{url:page.url});
  await eventually('document.querySelector("[data-view='+page.view+']")?.getAttribute("aria-current")==="page"','Page not selected '+page.view);
+ if(page.view==='settings')await eventually('document.querySelector("#cleanup-last").textContent==="Last cleanup unavailable."','cleanup loading state never settled');
  for(const width of [1440,1024,768,390,320]){
   await cdp('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
   await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});

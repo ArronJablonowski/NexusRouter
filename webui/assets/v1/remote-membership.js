@@ -31,7 +31,7 @@ window.NexusRemoteMembership = (() => {
   async function load() {
    if (busy) return;
    lock(true);
-   try { const response=await fetch(base+"/api/v1/remote-membership",{credentials:"same-origin",cache:"no-store",headers:{Accept:"application/json"}}); if(!response.ok)throw Error(); render(await response.json()); }
+   try { const response=await window.NexusLive.authorizedFetch(base+"/api/v1/remote-membership",{credentials:"same-origin",cache:"no-store",headers:{Accept:"application/json"}}); if(!response.ok)throw Error(); render(await response.json()); }
    catch { page=null; discovery.setEnabled(false); form.hidden=true; peers.replaceChildren(); message("Membership could not be loaded. Check the browser session and configured private registry."); }
    finally { lock(false); }
   }
@@ -39,7 +39,7 @@ window.NexusRemoteMembership = (() => {
    if (busy || !page || !page.enabled) return;
    lock(true);
    try {
-    const response=await fetch(base+"/api/v1/remote-membership",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,expected_digest:page.digest,...fields})});
+    const response=await window.NexusLive.authorizedFetch(base+"/api/v1/remote-membership",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,expected_digest:page.digest,...fields})});
     if (!response.ok) throw Error(response.status===409?"conflict":"unknown");
     render(await response.json()); if(fields.action==="pair"){editor.clear();verified.checked=false;}
    } catch(error) {

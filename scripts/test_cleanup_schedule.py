@@ -121,6 +121,38 @@ class ScheduleTests(unittest.TestCase):
         self.assertTrue(self.s.pending.exists())
         self.assertTrue(self.apply(self.settings(False))['recovered'])
 
+    def test_invalid_recovery_never_changes_scheduler_or_agent(self):
+        valid = {'previous': base64.b64encode(self.original).decode(), 'loaded': True, 'disabled': False}
+        bad_agent = plistlib.loads(self.original)
+        bad_agent['ProgramArguments'] = ['/bin/echo', 'invalid']
+        bad_calendar = plistlib.loads(self.original)
+        bad_calendar['StartCalendarInterval'] = {'Hour': 25, 'Minute': 0}
+        cases = [{**valid, 'previous': base64.b64encode(plistlib.dumps(value)).decode()}
+                 for value in [bad_agent, bad_calendar]]
+        cases += [{**valid, 'loaded': 1}, {**valid, 'disabled': 'false'},
+                  {**valid, 'unknown': True}, {**valid, 'previous': '!'}]
+        for transaction in cases:
+            with self.subTest(transaction=transaction):
+                self.os.calls.clear()
+                m.c.atomic_json(self.s.pending, transaction)
+                with self.assertRaises(ValueError):
+                    self.apply(self.settings(False))
+                self.assertEqual(self.agent.read_bytes(), self.original)
+                self.assertTrue(self.os.loaded)
+                self.assertFalse(self.os.disabled)
+                self.assertTrue(all(x[1] in ['print', 'print-disabled'] for x in self.os.calls))
+                self.assertTrue(self.s.pending.exists())
+
+    def test_running_cleanup_recovery_has_no_mutations(self):
+        m.c.atomic_json(self.s.pending, {'previous': base64.b64encode(self.original).decode(), 'loaded': True, 'disabled': False})
+        self.os.running = True
+        with self.assertRaises(RuntimeError):
+            self.apply(self.settings(False))
+        self.assertEqual(self.agent.read_bytes(), self.original)
+        self.assertFalse(self.os.disabled)
+        self.assertTrue(self.s.pending.exists())
+        self.assertTrue(all(x[1] in ['print', 'print-disabled'] for x in self.os.calls))
+
     def test_running_cleanup_never_stopped(self):
         self.os.running = True
         with self.assertRaises(RuntimeError):

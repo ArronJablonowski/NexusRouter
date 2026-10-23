@@ -146,9 +146,10 @@ func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	// Reviewed live local cleanup schedule: explicit saved on/off, daily/weekly calendar, CSRF and conflict/recovery controls.
 	// Reviewed cleanup settings: authenticated last-run read, preview-bound explicit cleanup, no mutation replay.
+	// Reviewed dispatch-time CSRF refresh, exact mutation body/no replay and settled cleanup error state.
 	// Reviewed UI QA fixes: stronger field boundaries and revisioned same-origin CSS refresh.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "1e98edf09aba89c2aeaf9fd22f8fd5428059de056da875f5dd142517feed97bc" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "99428e599d568671e1f3e1ba78de56b6dbfd0ed99023020f4b5d82d6224052c2" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/comfy.js", "assets/v1/status.js", "assets/v1/cron.js", "assets/v1/remote-models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/chat-uploads.js", "assets/v1/chat-render.js", "assets/v1/chat-files.js", "assets/v1/chat-descriptions.js", "assets/v1/host-mentions.js", "assets/v1/remote-chats.js", "assets/v1/collaboration.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -459,7 +460,7 @@ func TestWorkboardRouteDoesNotStartChatOrInspectorRequests(t *testing.T) {
 	body := string(script)
 	guard := strings.Index(body, `const workboardRoute = window.NexusRoutes.workboards(relativePath)`)
 	chat := strings.Index(body, `loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals()`)
-	csrf := strings.Index(body, `fetch(base + "/api/v1/session/csrf"`)
+	csrf := strings.Index(body, `window.NexusLive.authorizedFetch(base + "/api/v1/session/csrf"`)
 	if guard < 0 || !strings.Contains(body[guard:chat], `if (!comfyRoute && !collaborationRoute && !dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute)`) || chat < guard || csrf < chat {
 		t.Fatal("workboard route does not guard unrelated startup requests")
 	}
@@ -692,7 +693,7 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 	}
 	body := string(script)
 	for _, required := range []string{
-		`fetch(base + "/api/v1/session/csrf"`, `method: "POST"`, `const limit = Math.min(25, 100 - items.length)`, `items.length >= 100`,
+		`window.NexusLive.authorizedFetch(base + "/api/v1/session/csrf"`, `method: "POST"`, `const limit = Math.min(25, 100 - items.length)`, `items.length >= 100`,
 		`window.crypto.getRandomValues(bytes)`, `client.freezeIntent(path, body)`, `const resolution = client.mutationResolution`,
 		`!csrfToken || !operationsReady || operationReadFailed || inFlight || Boolean(pendingIntent) || unresolved.length > 0`,
 		`new Set([400, 401, 403, 404, 409, 422])`, `response.status === 401 || response.status === 403`,
@@ -718,7 +719,7 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 			t.Fatalf("workboard mutation safety guard missing %q", required)
 		}
 	}
-	if strings.Count(body, `fetch(base + built.path`) != 1 {
+	if strings.Count(body, `window.NexusLive.authorizedFetch(base + built.path`) != 1 {
 		t.Fatal("workboard intent has an automatic replay path")
 	}
 	for _, forbidden := range []string{"localStorage", "sessionStorage", "innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"} {

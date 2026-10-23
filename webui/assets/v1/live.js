@@ -21,13 +21,26 @@ window.NexusLive = (() => {
   return ()=>{job.active=false;clearTimeout(job.timer);if(jobs.get(name)===job)jobs.delete(name);};
  }
  function wake(){for(const job of jobs.values()){clearTimeout(job.timer);if(visible())schedule(job,100);}}
+ // Refresh immediately before dispatch; never replay a mutation after failure.
+ async function authorizedFetch(url,options={}){
+  const headers=new Headers(options.headers);
+  if(!headers.has("X-Darwin-CSRF"))return fetch(url,options);
+  const target=new URL(url,window.location.href),base=document.body.dataset.basePath||"";
+  if(target.origin!==window.location.origin||!target.pathname.startsWith(base+"/api/v1/")||options.method!=="POST")throw Error("Invalid authorized request");
+  const grant=await request(base+"/api/v1/session/csrf",{method:"POST",credentials:"same-origin",cache:"no-store",signal:options.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({version:1})});
+  if(!grant.ok)throw Error("Session authorization unavailable");
+  const value=await grant.json();
+  if(value.version!==1||typeof value.csrf_token!=="string"||! /^[A-Za-z0-9_-]{1,128}$/.test(value.csrf_token))throw Error("Invalid session authorization");
+  headers.set("X-Darwin-CSRF",value.csrf_token);
+  return fetch(url,{...options,headers});
+ }
  async function request(url,options={},timeoutMs=12000){
   if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1000||timeoutMs>60000)throw Error("Invalid reconciliation deadline");
   const controller=new AbortController(),abort=()=>controller.abort();
   const signal=options.signal;if(signal){signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();}
   const timeout=setTimeout(abort,timeoutMs);
   try{
-   const response=await fetch(url,{...options,signal:controller.signal}),limit=8*1024*1024;
+   const response=await authorizedFetch(url,{...options,signal:controller.signal}),limit=8*1024*1024;
    // Bound bytes while streaming, including decoded/compressed responses whose
    // Content-Length is absent or smaller than their delivered body.
    if(Number(response.headers.get("Content-Length"))>limit){controller.abort();throw Error("Live response too large");}
@@ -60,7 +73,7 @@ window.NexusLive = (() => {
   });
   watch("inspector",()=>window.NexusInspector.loadGlobals());watch("chat-reconnect",reconnect);
  }
- return Object.freeze({watch,wake,fetch:request,chats});
+ return Object.freeze({watch,wake,fetch:request,authorizedFetch,chats});
 })();
 
 // Styles can be replaced atomically without reloading the document or forms.

@@ -52,7 +52,7 @@
 	function textBytes(value) { try { return new TextEncoder().encode(value).length; } catch (_) { return maxText + 1; } }
 	function showNotice(node, message, failed) { node.textContent = message; node.classList.toggle("error", Boolean(failed)); node.hidden = false; }
 	function requestJSON(path) {
-		return fetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
+		return window.NexusLive.authorizedFetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
 			if (!response.ok) throw new Error("request unavailable");
 			return response.json();
 		});
@@ -304,7 +304,7 @@
 		pendingIntent = intent;
 		setBusy(true);
 		showMutation("Request in progress…", false);
-		fetch(base + path, {
+		window.NexusLive.authorizedFetch(base + path, {
 			method: "POST", credentials: "same-origin", cache: "no-store",
 			headers: {"Accept": "application/json", "Content-Type": "application/json", ...window.NexusSession.csrfHeader()},
 			body: intent.body
@@ -978,7 +978,7 @@
 	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
  window.NexusLive.watch('chat-approvals',loadApprovals,{interval:2000,ready:()=>Boolean(selectedChat&&selectedControls&&(approvalNeedsRefresh||selectedControls.canCancel)&&!approvalLoading)});
  window.NexusLive.chats({base,list,stateLabel,renderChat,ready:()=>!loadingPage&&!window.NexusChatDescriptions.busy(),busy:value=>{loadingPage=value;if(!value&&reloadChats){reloadChats=false;loadChats("",true);}},total:()=>chatTotal,added:()=>{chatTotal++;},max:maxChats,done:()=>{window.NexusChatDescriptions.order(list);chatCount.textContent=String(chatTotal);if(chatTotal)listState.hidden=true;},reconnect:()=>{if(selectedChat&&(!source||source.readyState===2))return loadHistory(selectedChat,"",true,true);}});
-	fetch(base + "/api/v1/session/csrf", {
+	window.NexusLive.authorizedFetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
 		body: JSON.stringify({version: 1}), cache: "no-store"
 	}).then(response => {
