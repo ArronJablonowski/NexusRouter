@@ -3028,3 +3028,20 @@ The untouched full baseline failed release/API/application tests and was stopped
 Added a subtle pulsing status cue pinned above the composer for local and Spark conversations. It distinguishes sending, queued, working, streamed replies, approval waits and unconfirmed connectivity, and clears on terminal states/new chats. Restores from existing status after reload, preserves reduced motion and polite screen-reader announcements, and reveals no internal reasoning. Selected-request ownership prevents old Spark jobs from lighting up a new chat; late terminal observations cannot reactivate the indicator. Queued cancellation is covered before a chat exists. No new dispatch, polling loop, persistence or model/service changes.
 
 Broad Chrome/Firefox and web-handler race regression passed before final ownership/terminal refinements; final focused Chrome/Firefox lifecycle, behavior and asset checks plus full handler race tests, formatting/static checks and native build passed. Test startup-readiness handling was corrected without weakening controls. Desktop, phone and landscape layouts and reduced motion verified with loopback HTTP/SSE fixtures; no fresh real-model/Spark inference, Safari, physical-phone or installed-service qualification. Installed application remains unchanged; source/GitHub checkpoint only. Details: docs/validation/2026-10-22-chat-activity.md.
+
+## 2026-10-25 — Optional Telegram text connector (no account connected)
+
+Implemented a disabled-by-default daemon connector with numeric-user/private-chat
+admission, a fixed bounded Bot API transport, local-only explicit model selection,
+private durable intake/conversation state, isolated task history, and conservative
+outbound receipts that stop uncertain resends. Telegram cannot inherit host tools,
+ComfyUI, coding harnesses, approval bypasses, memory or procedural skills. Host
+resource reservations remain shared. See [Telegram behavior and recovery](telegram.md).
+
+This is an initial text-only integration, not complete remote/mobile feature
+parity. Files, images, voice, streaming, tool approval buttons, Web UI history,
+parallel chats and a Settings toggle are not implemented. No bot credential,
+account connection, real message, deployment or daemon restart was performed.
+Live Telegram validation is intentionally outstanding. Validation evidence is
+recorded in `docs/validation/2026-10-25-telegram.md`; broader existing application
+fixture failures from the prior QA campaign remain outside this scoped change.

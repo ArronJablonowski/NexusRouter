@@ -9,6 +9,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/internal/gridcollab"
 	"github.com/ArronJablonowski/NexusRouter/internal/gridroute"
 	"github.com/ArronJablonowski/NexusRouter/internal/maintenance"
+	"github.com/ArronJablonowski/NexusRouter/internal/telegrambridge"
 	"io"
 	"log"
 	"net"
@@ -183,6 +184,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		}
 	}
 	var dispatcher *app.Dispatcher
+	var telegramWorker *telegrambridge.Worker
 	var learner *app.ConfiguredLearning
 	var outcomeSupervisor *app.ConfiguredOutcomeSupervision
 	var exporter *app.MetricsExporter
@@ -226,6 +228,9 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return health.Report{}, err
 		}
 		report.Checks = append(report.Checks, remoteReviews.health())
+		if telegramWorker != nil {
+			report.Checks = append(report.Checks, telegramWorker.Health())
+		}
 		report.Status, report.Ready = health.Outcome(report.Checks)
 		if err := report.Validate(); err != nil {
 			return health.Report{}, err
@@ -654,6 +659,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer dispatcher.Close()
+	telegramWorker, telegramErr := telegrambridge.Start(ctx, s, os.Getenv, *instance, func(message string) { log.Print(message) })
+	if telegramErr != nil {
+		fmt.Fprintln(stderr, "cannot initialize Telegram connector (disabled unless explicitly configured)")
+		return 1
+	}
+	defer telegramWorker.Close()
 	if remoteUsageClient != nil {
 		usageCtx, stopUsage := context.WithCancel(ctx)
 		usageDone := make(chan struct{})

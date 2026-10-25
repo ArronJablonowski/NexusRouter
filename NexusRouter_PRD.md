@@ -1751,3 +1751,16 @@ Cloud catalog entries may be configured through an existing provider template wi
 ### Paired chat sidebar supplement — 2026-10-15
 
 Snapshot-backed paired chats must appear in the regular chat sidebar and reopen the latest recorded conversation turn without resubmission. History and original uploads must survive reload and storage reopening. Previously retained snapshots require bounded index backfill. Local chat refresh and switching must preserve remote entries while clearing remote routing state when a local conversation is selected. Confirmed final messages may be cached locally for read-only recovery when a paired host is unavailable; cached state cannot authorize continuation or cancellation. Retention/capacity failures must be reported honestly.
+
+### Optional Telegram text-chat connector (2026-10-25 extension)
+
+Telegram chat is an explicit opt-in daemon integration, disabled by default and
+not connected to an account during implementation. The initial scope is private
+text conversations for numeric allowlisted users, one configured local model,
+durable conversation context and intake, and failure recovery that never blindly
+resends uncertain outbound messages. Telegram must not expose existing commander
+history, host tools, credentials, memory, or approval bypasses. Host resource
+safety limits continue to apply. Live account setup and deployment require a
+separate operator action. Attachments, media, streaming, Web UI synchronization,
+remote tool controls and concurrent Telegram conversations are later scope; see
+`docs/telegram.md` for the implemented contract and verification gaps.

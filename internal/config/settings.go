@@ -23,6 +23,7 @@ import (
 )
 
 type Settings struct {
+	Telegram                 Telegram                   `yaml:"telegram,omitempty" json:"telegram,omitzero"`
 	ComfyUI                  ComfyUI                    `yaml:"comfyui,omitempty" json:"comfyui,omitzero"`
 	VLLM                     VLLMSettings               `yaml:"vllm" json:"vllm"`
 	RemoteAdvertisement      remoteconfig.Advertisement `yaml:"remote_advertisement" json:"remote_advertisement"`
@@ -311,6 +312,9 @@ func Duration(value string) (time.Duration, error) {
 }
 
 func (s Settings) Validate() error {
+	if err := s.validateTelegram(); err != nil {
+		return err
+	}
 	if !s.ComfyUI.Validate() {
 		return errors.New("invalid ComfyUI configuration")
 	}
@@ -680,6 +684,12 @@ func validReasoningEffort(value string) bool {
 // RedactedJSON deliberately hides provider endpoints and local filesystem paths.
 // Credentials are never resolved into Settings in the first place.
 func (s Settings) RedactedJSON() ([]byte, error) {
+	if s.Telegram.StateDirectory != "" {
+		s.Telegram.StateDirectory = "[REDACTED]"
+	}
+	if len(s.Telegram.AllowedUsers) > 0 {
+		s.Telegram.AllowedUsers = []int64{}
+	}
 	if s.ComfyUI.Endpoint != "" {
 		s.ComfyUI.Endpoint = "[REDACTED]"
 	}
