@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+const maxSnapshotBlobBytes = 8 << 20
+const maxSnapshotTotalBytes = 64 << 20
+
 // snapshot materializes only regular blobs from the exact commit tree. Unlike
 // git archive/checkout it does not apply export attributes, filters or hooks.
 // Symlinks and gitlinks are deliberately unsupported release inputs.
@@ -39,7 +42,7 @@ func snapshot(ctx context.Context, source, commit, destination string, env []str
 		cmd.Dir = source
 		cmd.Env = env
 		cmd.WaitDelay = 2 * time.Second
-		var body boundedOutput
+		body := boundedOutput{limit: min(maxSnapshotBlobBytes, maxSnapshotTotalBytes-total)}
 		cmd.Stdout = &body
 		cmd.Stderr = &boundedOutput{}
 		err = processaudit.Run(cmd)
@@ -48,7 +51,7 @@ func snapshot(ctx context.Context, source, commit, destination string, env []str
 			return ErrInvalid
 		}
 		total += body.Len()
-		if total > 64<<20 {
+		if total > maxSnapshotTotalBytes {
 			return ErrInvalid
 		}
 		target := filepath.Join(destination, filepath.FromSlash(name))

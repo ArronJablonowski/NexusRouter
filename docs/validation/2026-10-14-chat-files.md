@@ -1,0 +1,29 @@
+# Chat-generated files and images — 2026-10-14
+
+Implemented private immutable chat-bound snapshots, confirmed creation/revision/ComfyUI source collection, same-origin authenticated raster previews and forced downloads. Web UI renders generated image/file cards below the conversation and updates without resending work; files survive refresh and chat reselection, and switching chats clears previous cards. Reviewed embedded asset manifest updated.
+
+## Verified
+
+- Race-enabled storage: concurrent repeated collection produces one record; conflicting content cannot overwrite; restart retains exact bytes; wrong-chat access, unsafe filenames, symlink store and quota overflow are rejected.
+- Application ownership: only confirmed creation/revision and original ComfyUI submissions attach outputs. Uncertain writes, read/inspect results, assistant links and unrelated chat/jobs cannot authorize downloads. Replacement preimages/recovery paths are omitted. Comfy outage retains cached snapshots.
+- Actual approved tool loops: approved creation becomes an exact file attachment; denied creation does not. Queued browser approval remains required before Comfy submission, and its resulting image becomes an exact downloadable chat snapshot without duplicate dispatch.
+- Real Spark: explicit live test generated one32×32 green PNG via the approved NexusRouter tool path. Collected its actual ComfyUI output into a chat snapshot, decoded/checked dimensions and center pixel, downloaded exact bytes and verified saved access with the connector disabled. The local coordinator model endpoint was a deterministic fixture; this test did not claim real-LLM prompt qualification.
+- Real Chrome: production embedded assets display the previously generated Spark car PNG inline plus a document card; downloading the document preserves exact bytes and does not execute its script text. Refresh preserves preview/focus, reload restores cards, mobile has no horizontal overflow and changing chats removes old files. API responses in this browser test were fixtures; authorization and actual collection are separately tested at production service/BFF boundaries.
+- Full internal/webuiapp and chatfiles race suites passed; targeted app chat/history/Comfy/creation/transcript and CLI serve/browser/Comfy race checks passed. Web UI browser/schema suite exposed an invalid new regex and source-length guard, both corrected and affected checks rerun. One remote-routing keyboard disclosure test failed in the first broad run and passed in the next full run and focused current/unchanged-parent runs; this timing issue is not attributed to or fixed by attachments. No assertion was weakened.
+
+Final source checks passed: go vet ./internal/chatfiles ./internal/app ./internal/webuiapp ./internal/cli ./webui; go run ./cmd/check; node --check for app/chat-files assets; native and Linux ARM64 cmd/nexus builds; git diff --check. Final boundary suites passed (chatfiles2.179s, webuiapp6.002s), relevant Web UI/schema/assets/Chrome checks5.731s and final collection/approved-loop tests14.651s. CLI targeted race checks2.187s. Deployment verification completed below. This is scoped validation, not full `make check`. Existing broader delegation baseline failures remain outside this change. Linear project access still requires connector reauthentication; local PRD and user requirements were used. Private screenshots, live PNG, test logs and generated state are outside Git in `/Users/aj_lab/.NexusRouter/resources/chat-files-qa-2026-10-14`.
+
+Limits and recovery gaps are documented in [the feature guide](../chat-files.md). No complete MVP claim.
+
+## Deployment
+
+Clean application source `22d68eb6` was pushed to `codex/chat-files`, then rebuilt and installed on commander and Spark at checked idle boundaries. Configuration, model services, permissions and approvals were preserved. Rollback snapshots include previous executables/configuration/state:
+
+- Commander: `/Users/aj_lab/.NexusRouter/bin/backups/20261014T193540Z-22d68eb6`
+- Spark: `/home/arron_spark/.local/share/nexusrouter/deployment-backups/20261014T193541Z-22d68eb6`
+
+Installed hashes match verified native/ARM64 builds; Spark SHA256 `507538dff7cbe3af2c82d4ae23df153db1a0a1035ef5e72b9bb4b9a7b97a8389`. Spark router active with zero automatic restarts; Ollama PID2187152 and ComfyUI PID2421 were unchanged. Commander startup again exceeded the first short probe; a later read-only check confirmed attachment routes reject anonymous requests with401. Real authenticated Chrome loaded deployed chat-file assets and chat shell, and the service rejected an unknown test chat. The temporary verification session was logged out and owned browser removed. No production chat history or write permissions were modified for deployment verification.
+
+Normal file creation/replacement remains disabled in the existing commander configuration; this feature does not silently enable filesystem writes. Chat-owned ComfyUI images are supported by the existing enabled connector. The richer output/approval paths were verified with isolated production service/BFF tests and the actual Spark image, rather than manufacturing attachments in an unrelated user chat. Existing CLI-generated car images are not automatically reassigned to a chat.
+
+Review: draft PR3, stacked on collaboration PR2. Documentation follow-up commits do not change installed application bytes.

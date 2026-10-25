@@ -4,7 +4,7 @@ window.NexusRemoteAutomatic=(()=>{
   const card=document.createElement("section"),title=document.createElement("h3"),notice=document.createElement("output"),body=document.createElement("div"),another=document.createElement("button");
   title.textContent="Automatically choose a remote model and harness";notice.setAttribute("role","status");notice.setAttribute("aria-live","polite");another.type="button";another.textContent="Start another independent automatic request";another.hidden=true;
   let busy=false;
-  async function post(path,payload){const response=await fetch(base+"/api/v1/"+path,{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify(payload)});if(!response.ok)throw Error();return response.json();}
+  async function post(path,payload){const response=await window.NexusLive.authorizedFetch(base+"/api/v1/"+path,{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify(payload)});if(!response.ok)throw Error();return response.json();}
   function valid(p,key){return p&&p.version===1&&p.request_id===key&&typeof p.instance==="string"&&/^[A-Za-z0-9_-]{1,64}$/.test(p.instance)&&typeof p.submission_id==="string"&&p.submission_id;}
   function recover(key,original){
    body.replaceChildren();another.hidden=false;

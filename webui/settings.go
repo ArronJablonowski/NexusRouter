@@ -17,6 +17,7 @@ var settingsDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 const MaxSettingsRootBytes = 4096
 
 type ToolAccessSettings struct {
+	AutoApprove           bool                       `json:"auto_approve"`
 	CollaborationEnabled  bool                       `json:"collaboration_enabled"`
 	MacMemoryPercent      float64                    `json:"mac_memory_percent"`
 	MacSwapGrowthGB       float64                    `json:"mac_swap_growth_gb"`
@@ -81,6 +82,7 @@ func (s SettingsInspection) Validate() error {
 }
 
 type SettingsUpdateRequest struct {
+	autoApproveSpecified   bool
 	collaborationSpecified bool
 	Version                int                `json:"version"`
 	ExpectedDigest         string             `json:"expected_digest"`
@@ -117,10 +119,19 @@ func (r *SettingsUpdateRequest) UnmarshalJSON(raw []byte) error {
 	if present && string(bytes.TrimSpace(field)) != "true" && string(bytes.TrimSpace(field)) != "false" {
 		return ErrContract
 	}
+	auto, autoPresent := envelope.Settings["auto_approve"]
+	if autoPresent && string(bytes.TrimSpace(auto)) != "true" && string(bytes.TrimSpace(auto)) != "false" {
+		return ErrContract
+	}
 	*r = SettingsUpdateRequest(value)
+	r.autoApproveSpecified = autoPresent
 	r.collaborationSpecified = present
 	return nil
 }
 func (r SettingsUpdateRequest) HasCollaborationSetting() bool {
 	return r.collaborationSpecified || r.Settings.CollaborationEnabled
+}
+
+func (r SettingsUpdateRequest) HasAutoApproveSetting() bool {
+	return r.autoApproveSpecified || r.Settings.AutoApprove
 }

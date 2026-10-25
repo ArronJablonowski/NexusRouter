@@ -139,6 +139,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		h.writeError(writer, request, http.StatusNotFound, "not_found")
 		return
 	}
+	if h.serveChatFiles(writer, request) {
+		return
+	}
 	if h.serveComfy(writer, request) {
 		return
 	}
@@ -154,6 +157,12 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	if h.serveRemoteAutomatic(writer, request) {
+		return
+	}
+	if h.serveRemoteChats(writer, request) {
+		return
+	}
+	if h.serveRemoteFiles(writer, request) {
 		return
 	}
 	if h.serveRemoteDispatch(writer, request) {

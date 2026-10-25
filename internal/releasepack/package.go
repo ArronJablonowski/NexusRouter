@@ -56,6 +56,7 @@ func validate(o Options) error {
 type boundedOutput struct {
 	buffer   bytes.Buffer
 	overflow bool
+	limit    int
 }
 
 func (b *boundedOutput) Len() int       { return b.buffer.Len() }
@@ -63,7 +64,11 @@ func (b *boundedOutput) String() string { return b.buffer.String() }
 func (b *boundedOutput) Bytes() []byte  { return b.buffer.Bytes() }
 
 func (b *boundedOutput) Write(p []byte) (int, error) {
-	if b.Len()+len(p) > 1<<20 {
+	limit := b.limit
+	if limit <= 0 {
+		limit = 1 << 20
+	}
+	if b.Len()+len(p) > limit {
 		b.overflow = true
 		return 0, ErrInvalid
 	}

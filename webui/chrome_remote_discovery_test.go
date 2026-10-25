@@ -110,15 +110,46 @@ func TestChromeRemoteDiscoveryPairingHandoff(t *testing.T) {
 
 const chromeRemoteDiscoveryCDP = `
 const port = process.argv[1], origin = process.argv[2];
-const targets = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
-const target = targets.find(item => item.type === 'page');
-if (!target) throw new Error('Chrome did not expose a page target');
-const socket = new WebSocket(target.webSocketDebuggerUrl), pending = new Map(); let sequence = 0;
-await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, {once:true}); socket.addEventListener('error', reject, {once:true}); });
-socket.addEventListener('message', event => { const message = JSON.parse(event.data); if (!message.id) return; const waiter = pending.get(message.id); if (!waiter) return; pending.delete(message.id); message.error ? waiter.reject(new Error(message.error.message)) : waiter.resolve(message.result); });
-function cdp(method, params = {}) { const id = ++sequence; return new Promise((resolve, reject) => { pending.set(id, {resolve, reject}); socket.send(JSON.stringify({id, method, params})); }); }
-async function evaluate(expression) { const result = await cdp('Runtime.evaluate', {expression, returnByValue:true, awaitPromise:true}); if (result.exceptionDetails) throw new Error(result.exceptionDetails.text); return result.result.value; }
-async function eventually(expression, label) { const deadline = Date.now() + 5000; let last; while (Date.now() < deadline) { try { last = await evaluate(expression); if (last) return; } catch (_) {} await new Promise(resolve => setTimeout(resolve, 20)); } throw new Error(label + ' (last value: ' + JSON.stringify(last) + ')'); }
+const firefox=process.env.NEXUS_TEST_BROWSER==='firefox';
+const target=firefox?{webSocketDebuggerUrl:'ws://127.0.0.1:'+port+'/session'}:(await (await fetch('http://127.0.0.1:'+port+'/json/list')).json()).find(item=>item.type==='page');
+if(!target)throw Error('Browser did not expose a page target');
+const socket=new WebSocket(target.webSocketDebuggerUrl),pending=new Map();let sequence=0,context;
+await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
+socket.addEventListener('message',event=>{const m=JSON.parse(event.data),w=pending.get(m.id);if(!w)return;pending.delete(m.id);m.error?w.reject(Error(m.message||m.error.message||m.error)):w.resolve(m.result);});
+function protocol(method,params={}){const id=++sequence;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});socket.send(JSON.stringify({id,method,params}));});}
+if(firefox){await protocol('session.new',{capabilities:{alwaysMatch:{acceptInsecureCerts:false}}});context=(await protocol('browsingContext.create',{type:'tab',background:false})).context;await protocol('browsingContext.activate',{context});}
+async function cdp(method,p={}){
+ if(!firefox)return protocol(method,p);
+ // CDP domain enable calls only register observation; the BiDi session is already active.
+ if(['Runtime.enable','Page.enable','Network.enable','DOM.enable'].includes(method))return {};
+ if(method==='Page.navigate')return protocol('browsingContext.navigate',{context,url:p.url,wait:'complete'});
+ if(method==='Page.reload'){if(p.ignoreCache)await protocol('network.setCacheBehavior',{cacheBehavior:'bypass',contexts:[context]});try{return await protocol('browsingContext.reload',{context,wait:'complete'});}finally{if(p.ignoreCache)await protocol('network.setCacheBehavior',{cacheBehavior:'default',contexts:[context]});}}
+ if(method==='Runtime.evaluate'){
+  const r=await protocol('script.evaluate',{target:{context},expression:'(async()=>JSON.stringify(await (0,eval)('+JSON.stringify(p.expression)+')))()',awaitPromise:true});
+  if(r.type==='exception')return {exceptionDetails:{text:r.exceptionDetails.text}};
+  return {result:{value:r.result.type==='string'?JSON.parse(r.result.value):undefined}};
+ }
+ if(method==='Emulation.setDeviceMetricsOverride')return protocol('browsingContext.setViewport',{context,viewport:{width:p.width,height:p.height},devicePixelRatio:p.deviceScaleFactor||1});
+ if(method==='Emulation.setEmulatedMedia'){if(!await evaluate('matchMedia("(prefers-reduced-motion: reduce)").matches'))throw Error('Firefox reduced-motion preference missing');return {};}
+ if(method==='Network.setCookie'){const u=new URL(p.url);await protocol('storage.setCookie',{cookie:{name:p.name,value:{type:'string',value:p.value},domain:u.hostname,path:'/',httpOnly:!!p.httpOnly,secure:u.protocol==='https:',sameSite:'strict'}});return {success:true};}
+ if(method==='Page.addScriptToEvaluateOnNewDocument')return protocol('script.addPreloadScript',{functionDeclaration:'()=>{'+p.source+'}'});
+ if(method==='Page.captureScreenshot')return protocol('browsingContext.captureScreenshot',{context,origin:'viewport',format:{type:'image/png'}});
+ if(method==='Browser.setDownloadBehavior')return protocol('browser.setDownloadBehavior',{downloadBehavior:{type:'allowed',destinationFolder:p.downloadPath}});
+ if(method==='Input.dispatchKeyEvent'){
+  if(p.type==='char')return {}; // BiDi keyDown already generates the text input event.
+  await protocol('browsingContext.activate',{context});
+  if(p.key==='Tab'&&p.type==='keyDown'){
+   // Tab probes begin in page content, not Firefox's URL bar after a previous traversal.
+   await protocol('input.performActions',{context,actions:[{type:'pointer',id:'focus-page',parameters:{pointerType:'mouse'},actions:[{type:'pointerMove',x:1,y:1},{type:'pointerDown',button:0},{type:'pointerUp',button:0}]}]});
+  }
+  const keys={Tab:'\uE004',Enter:'\uE007',Escape:'\uE00C'};return protocol('input.performActions',{context,actions:[{type:'key',id:'keyboard',actions:[{type:p.type==='keyUp'?'keyUp':'keyDown',value:keys[p.key]||p.key}]}]});}
+ if(method==='DOM.getDocument')return {root:{nodeId:'document'}};
+ if(method==='DOM.querySelector'){const r=await protocol('browsingContext.locateNodes',{context,locator:{type:'css',value:p.selector},maxNodeCount:1});if(!r.nodes.length)throw Error('Missing file picker');return {nodeId:r.nodes[0].sharedId};}
+ if(method==='DOM.setFileInputFiles')return protocol('input.setFiles',{context,element:{sharedId:p.nodeId},files:p.files});
+ throw Error('Unimplemented Firefox test command '+method);
+}
+async function evaluate(expression){const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.text);return r.result.value;}
+async function eventually(expression,label){const deadline=Date.now()+5000;let last;while(Date.now()<deadline){try{last=await evaluate(expression);if(last)return;}catch(_){}await new Promise(r=>setTimeout(r,20));}throw Error(label+' (last value: '+JSON.stringify(last)+')');}
 await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
 await cdp('Emulation.setDeviceMetricsOverride', {width:760,height:900,deviceScaleFactor:1,mobile:false});
 const cookie = await cdp('Network.setCookie', {name:'darwin_session', value:'valid', url:origin + '/app/'});

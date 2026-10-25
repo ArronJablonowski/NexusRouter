@@ -48,11 +48,16 @@ func TestDispatcherQueuedRestartExecutesIdempotentSubmissionOnce(t *testing.T) {
 	}))
 	defer provider.Close()
 	cfg := config.Defaults()
+	// These dispatch fixtures use byte-sized synthetic RAM profiles, not a
+	// backend-managed model residency estimator. Keep that assumption explicit.
+	managed := false
+	cfg.Hardware.BackendManagedMemory = &managed
+	cfg.Hardware.MacMemoryPercent = cfg.Hardware.MaxRAM
 	cfg.Workers.Max = 1
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "dispatch.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 32768, Capabilities: []string{"chat"}}}
 	s, err := NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -124,12 +129,17 @@ func TestDispatcherQueuedFollowUpWaitsForRunningSource(t *testing.T) {
 	}))
 	defer func() { cancel(); provider.Close() }()
 	cfg := config.Defaults()
+	// These dispatch fixtures use byte-sized synthetic RAM profiles, not a
+	// backend-managed model residency estimator. Keep that assumption explicit.
+	managed := false
+	cfg.Hardware.BackendManagedMemory = &managed
+	cfg.Hardware.MacMemoryPercent = cfg.Hardware.MaxRAM
 	cfg.Workers.Max = 2
 	cfg.Hardware.Concurrent = "2"
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "follow-up.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 8192, Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 32768, Capabilities: []string{"chat"}}}
 	s, err := NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -205,11 +215,16 @@ func TestDispatcherCancellationStopsBlockedProvider(t *testing.T) {
 	}))
 	defer func() { cancel(); provider.Close() }()
 	cfg := config.Defaults()
+	// These dispatch fixtures use byte-sized synthetic RAM profiles, not a
+	// backend-managed model residency estimator. Keep that assumption explicit.
+	managed := false
+	cfg.Hardware.BackendManagedMemory = &managed
+	cfg.Hardware.MacMemoryPercent = cfg.Hardware.MaxRAM
 	cfg.Workers.Max = 1
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "cancel.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 32768, Capabilities: []string{"chat"}}}
 	s, err := NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +295,7 @@ func TestDispatcherCancelBeforeExecutionSlotHasNoInventedTask(t *testing.T) {
 	defer provider.Close()
 	s.settings.Mode = "local_only"
 	s.settings.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	s.settings.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
+	s.settings.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 32768, Capabilities: []string{"chat"}}}
 	s.settings.Workers.Max = 1
 	configured, err := NewService(s.settings, nil)
 	if err != nil {
@@ -327,13 +342,18 @@ func TestDispatcherHonorsConfiguredExecutionDeadline(t *testing.T) {
 	}))
 	defer provider.Close()
 	cfg := config.Defaults()
+	// These dispatch fixtures use byte-sized synthetic RAM profiles, not a
+	// backend-managed model residency estimator. Keep that assumption explicit.
+	managed := false
+	cfg.Hardware.BackendManagedMemory = &managed
+	cfg.Hardware.MacMemoryPercent = cfg.Hardware.MaxRAM
 	cfg.Mode = "local_only"
 	cfg.Workers.Max = 1
 	cfg.Daemon.ExecutionTimeout = "100ms"
 	cfg.Tools.Enabled = false
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "deadline.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL, RequestTimeout: "30m"}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 8192, Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 32768, Capabilities: []string{"chat"}}}
 	s, err := NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)

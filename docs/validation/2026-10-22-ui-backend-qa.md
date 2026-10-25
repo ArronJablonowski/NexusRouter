@@ -1,0 +1,40 @@
+# Web UI and backend QA — 2026-10-22
+
+## Source and scope
+
+Base: `969b1da7218f82ef0376f6b7f5f88afe9255b710`; fixes and regression coverage are in the associated development commit. Final validation ran against a frozen source tree in an isolated checkout. Tests used disposable profiles, loopback providers, synthetic files/databases and a separate owned scheduler job. No production model inference, user-file cleanup, service deployment or campaign modification was performed. Linear could not be read because its connection requires reauthentication; the checked-in PRD and repository requirements were used.
+
+## Reproduced defects and fixes
+
+| Finding | Reproduction and cause | Verified fix |
+| --- | --- | --- |
+| Chat and Settings actions can lose authorization after other controls are used | The browser authority store retains eight CSRF grants, while older controls cache their initial grant. Ten real grant rotations caused a Settings save to fail with no mutation. | Refresh the grant immediately before protected dispatch, including older chat, workboard, ComfyUI and remote controls. Restrict token-bearing requests to the current origin and application API. Preserve exact bodies/idempotency keys, deadlines and single-dispatch behavior. Keep the backend grant cap unchanged. A real authenticated browser test now saves exactly once after ten rotations. |
+| Cleanup recovery can mutate the scheduler before rejecting invalid recovery input | A pending record with the correct label but invalid executable caused `disable`, `bootout` and replacement of the plist before full validation failed. A valid recovery record could also disable an already-running job before discovering that it must not unload it. | Validate the complete bounded transaction, boolean states, decoded agent executable/calendar/log paths and current running state before any mutation. Retain the recovery record on failure. Regressions require unchanged original bytes and scheduler state for invalid records and running jobs; normal activation, rollback, interrupted recovery and native owned-job lifecycle remain covered. |
+| Release packaging rejects a checked-in asset | The 1,107,714-byte shipped logo exceeded the generic 1 MiB command-output capture limit during Git snapshot materialization. The real trust-record CLI integration test failed before packaging. | Give regular committed source blobs an explicit 8 MiB limit while retaining the 1 MiB metadata/command limit and 64 MiB aggregate snapshot limit. Keep path, symlink, gitlink, replacement and timeout restrictions. A binary larger than 1 MiB copies byte-for-byte, an oversized blob is rejected, and the real CLI end-to-end test passes. |
+| Settings says cleanup is still loading after a failed initial read | Firefox error-state screenshot review showed “Loading last cleanup…” alongside the final unavailable message when all API reads returned 503. | Settle the initial last-run message to “Last cleanup unavailable.” Preserve any previously known last-run evidence. Both browser layout suites assert that the loading state settles on failure. |
+
+## Verification-harness corrections
+
+- The HTTP integration resource fixture omitted `SwapUsed`, which built-in backend-managed admission requires. Added an explicitly known synthetic zero; production resource safeguards were not weakened. The full API race suite now passes.
+- The metrics restart test compared the live queue-age histogram byte-for-byte. A legitimate transition across the one-second bucket boundary failed under load. Compare all durable groups exactly, and independently require the available queue-age population to remain one.
+- Updated isolated control mocks and exact CSRF request counts for dispatch-time grant refresh. Duplicate-click, uncertain-delivery, conflict and no-replay assertions remain intact. Reviewed and updated the exact embedded asset digest: `99428e599d568671e1f3e1ba78de56b6dbfd0ed99023020f4b5d82d6224052c2`.
+
+## Passing verification
+
+- `go run ./cmd/check`, `go vet ./...`, `go build ./...`, and JavaScript syntax checks for every embedded script.
+- Python maintenance safety suite: 39 tests with the deployed `/usr/bin/python3` runtime; the same 39 tests also passed with the development Python runtime.
+- `DARWIN_REQUIRE_CHROME=1 NEXUS_REQUIRE_FIREFOX=1 DARWIN_PROCESS_OWNER_DIR="$(mktemp -d)" go test -p=1 -race -count=1 -timeout=45m ./webui ./internal/browserauth ./internal/webuiapp ./internal/maintenance ./internal/api ./resources ./sessions ./submissions ./approvals ./contextengine ./remote`.
+- Full Web UI suite includes Chrome and the 24-scenario Firefox matrix: chat/history, uploads/downloads, approvals, ComfyUI, models, settings drafts, live stylesheet updates, refresh failures, workboards, Spark sidebar/controls, routing, jobs, inspector, cron, collaboration, dependencies, logging, remote models and discovery. Shared shell checks span 15 pages at 1440/1024/768/390/320 pixels; chat includes short and landscape layouts. Checked control names, keyboard focus, reduced motion, contrast, hidden controls and overflow. Inspected desktop and narrow Firefox screenshots.
+- New dispatch unit regression checks exact body preservation, fresh tokens, unchanged caller options, no cross-origin/out-of-scope token dispatch, no mutation on grant failure, no automatic replay after 503, and unchanged reads. Separate real-handler/browser test verifies the eight-grant eviction scenario.
+- `go test -race -count=1 -timeout=45m ./internal/releasepack -run 'TestSnapshot|TestBoundedOutput'`.
+- Full `cmd/verify-release` race suite passed after the packaging fix, including `TestTrustRecordCLIEndToEnd` (22.574 seconds). Later frontend changes do not alter the tested snapshot implementation or the checked-in oversized logo.
+- `go test -race -count=1 -timeout=45m -v ./internal/chatfiles ./internal/documenttext ./runtime ./workers`: all passed; runtime 219.331 seconds and workers 47.108 seconds. No skips were reported in this run. PDF/DOCX fuzz seeds passed; no extended fuzz campaign was run.
+
+## Limits and unresolved verification gaps
+
+- This is not a full `make check` pass or a complete-MVP claim. The untouched baseline failed release packaging, API integration and application tests. It was stopped after recording application failures, rather than continuing a known-failed gate. Final affected suites above passed after fixes.
+- Remaining baseline application failures include adaptive-capacity, fallback, delegation/recovery and event-sink scenarios. Several fixtures have incomplete synthetic swap/resource data or resource settings inconsistent with current admission rules, but these failures have not all been independently triaged. Do not classify every remaining failure as fixture-only or as a confirmed product defect.
+- A separate broad releasepack run exceeded the default ten-minute Go test timeout while exercising publication-boundary cases. Its result is incomplete, not a pass; full release qualification uses the repository's 45-minute timeout. Snapshot bounds and the real CLI boundary passed separately.
+- One extra Chrome screenshot run failed its five-second browser-start deadline under concurrent validation load. A standalone diagnostic exposed the debugging port successfully; the final full Chrome/Firefox race suite passed after the failed baseline was stopped. No readiness or functional assertions were weakened.
+- Document tests include a real macOS legacy Word conversion and PDF/DOCX bounds/failure paths; mixed PDF OCR callbacks are synthetic. No fresh live Spark, Linux reader, real OCR/model, cloud-provider, physical mobile keyboard or Safari qualification was performed. Browser assertions are not a full accessibility certification; fuzz seeds are not an extended fuzz campaign.
+- Production installation remains unchanged. Deployment of the cleanup recovery fix must install the matching qualified `cleanup-schedule.py` alongside the new executable, following the existing backup, cleanup-lock and idle-boundary workflow.

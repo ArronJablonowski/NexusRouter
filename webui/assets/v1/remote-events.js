@@ -2,8 +2,9 @@
 window.NexusRemoteEvents=(()=>{
  function attach(parent,instance,request,task,base,csrf){
   const card=document.createElement("section"),title=document.createElement("h5"),refresh=document.createElement("button"),next=document.createElement("button"),status=document.createElement("output"),list=document.createElement("ul");
+  card.className="remote-progress-card";refresh.className=next.className="remote-chat-action";
   title.textContent="Progress: "+task;refresh.type=next.type="button";refresh.textContent="Refresh progress";next.textContent="Next progress page";next.hidden=true;status.setAttribute("role","status");status.setAttribute("aria-live","polite");status.textContent="Load lifecycle events. Result text is available from task status.";
-  const follow=document.createElement("button");follow.type="button";follow.textContent="Follow progress";
+  const follow=document.createElement("button");follow.className="remote-chat-action";follow.type="button";follow.textContent="Follow progress";
   let busy=false,cursor=0,following=false,timer=null,generation=0,until=0,head=0;
   function stop(message){following=false;generation++;if(timer!==null)clearTimeout(timer);timer=null;follow.textContent="Follow progress";if(message)status.textContent=message;}
   function visible(){return card.isConnected&&!document.hidden&&card.getClientRects().length>0;}
@@ -20,7 +21,7 @@ window.NexusRemoteEvents=(()=>{
     if(!grant.ok)throw Error();const session=await grant.json();
     if(session.version!==1||typeof session.csrf_token!=="string"||!session.csrf_token||session.csrf_token.length>4096)throw Error();csrf=session.csrf_token;
     if(epoch!==generation)return;
-    const response=await fetch(base+"/api/v1/remote-task-events",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,instance,request_id:request,task_id:task,after})});
+    const response=await window.NexusLive.authorizedFetch(base+"/api/v1/remote-task-events",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,instance,request_id:request,task_id:task,after})});
     if(!response.ok)throw Error();const p=await response.json();
     if(epoch!==generation)return;
     if(live&&!visible()){stop("Progress following stopped because this view is no longer visible.");return;}

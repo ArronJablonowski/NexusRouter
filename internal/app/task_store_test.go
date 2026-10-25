@@ -63,3 +63,25 @@ func TestActiveTaskStorageDoesNotReplaceClosedHandle(t *testing.T) {
 		t.Fatal("closed active store silently replaced")
 	}
 }
+
+func TestApprovalControlBorrowsActiveStoreAndRejectsClosedHandle(t *testing.T) {
+	s, _ := autoFixture(t)
+	ctx := context.Background()
+	db, release, err := s.openTaskStore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.taskStore = db
+	borrowed, done, err := s.openApprovalStore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if borrowed != db {
+		t.Fatal("approval path reopened storage")
+	}
+	done()
+	release()
+	if _, _, err = s.openApprovalStore(ctx); err == nil {
+		t.Fatal("stale approval store silently replaced")
+	}
+}

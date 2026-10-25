@@ -47,7 +47,7 @@ window.NexusRemoteDispatch=(()=>{
     try{const url=new URL(window.location.href);url.hash=new URLSearchParams({remote_peer:peer.id,remote_request:key}).toString();window.history.replaceState(null,"",url);}catch{notice.textContent="Cannot preserve the request recovery link. No work was sent.";return;}
     busy=true;const task=reviewed;reviewed=null;confirm.hidden=true;review.disabled=true;Object.values(fields).forEach(f=>f.disabled=true);notice.textContent="Sending request "+key+"…";
     try{
-     const response=await fetch(base+"/api/v1/remote-dispatch",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,instance:peer.id,request_id:key,task})});
+     const response=await window.NexusLive.authorizedFetch(base+"/api/v1/remote-dispatch",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,instance:peer.id,request_id:key,task})});
      if(!response.ok)throw Error();const p=await response.json();if(!p||p.version!==1||p.instance!==peer.id||p.request_id!==key||typeof p.submission_id!=="string"||!p.submission_id)throw Error();
      notice.textContent="Request "+key+" acknowledged. Load status to inspect progress and results.";
     }catch{notice.textContent="Delivery of "+key+" could not be confirmed. It may have been admitted. Inspect this request before creating any replacement; no retry was sent.";}

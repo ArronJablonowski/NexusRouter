@@ -136,14 +136,24 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 }
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
-	// Reviewed v1 assets: additive ComfyUI page, scoped saved-job controls,
+	// Reviewed v1 assets: persisted paired chats in shared sidebar, read-only cached history; explicit disabled-first cloud configuration; pinned remote continuation and private history/downloads; active-task late approval observation; fixed conversation heading outside message scroller; bounded chat uploads, readable transparent previews, .doc and scanned-PDF help,
+	// explicit one-click approvals, opt-in automatic approval
+	// setting, graded quality ratings without manual cost, viewport-pinned composer,
+	// chat-scoped output cards, raster previews/downloads,
+	// compact responsive layout, stable refresh and same-origin private reads.
+	// Additive ComfyUI page, scoped saved-job controls,
 	// same-origin image retrieval, CSRF requests and no automatic submission replay.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
+	// Reviewed live local cleanup schedule: explicit saved on/off, daily/weekly calendar, CSRF and conflict/recovery controls.
+	// Reviewed cleanup settings: authenticated last-run read, preview-bound explicit cleanup, no mutation replay.
+	// Reviewed pinned chat activity states, reduced motion and no dispatch/reasoning disclosure.
+	// Reviewed dispatch-time CSRF refresh, exact mutation body/no replay and settled cleanup error state.
+	// Reviewed UI QA fixes: stronger field boundaries and revisioned same-origin CSS refresh.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "ce05267026bc54a0857a3b5e4811ad28e557e047fbfac931bc23797967909cf1" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "b11cd5cee73e6855923e943c439a4d4dcc71925e2aeb8b99b1bcc7ca63723cc7" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/comfy.js", "assets/v1/status.js", "assets/v1/cron.js", "assets/v1/remote-models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/chat-render.js", "assets/v1/chat-descriptions.js", "assets/v1/host-mentions.js", "assets/v1/collaboration.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/active-jobs.js", "assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/chat-activity.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/comfy.js", "assets/v1/status.js", "assets/v1/cron.js", "assets/v1/remote-models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/routing-remote.js", "assets/v1/chat-uploads.js", "assets/v1/chat-render.js", "assets/v1/chat-files.js", "assets/v1/chat-descriptions.js", "assets/v1/host-mentions.js", "assets/v1/remote-chats.js", "assets/v1/collaboration.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -265,7 +275,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/chat-render.js", "assets/v1/chat-descriptions.js", "assets/v1/host-mentions.js", "assets/v1/collaboration.js", "assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/comfy.js", "assets/v1/status.js", "assets/v1/cron.js", "assets/v1/remote-models.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/chat-uploads.js", "assets/v1/chat-render.js", "assets/v1/chat-files.js", "assets/v1/chat-descriptions.js", "assets/v1/host-mentions.js", "assets/v1/remote-chats.js", "assets/v1/collaboration.js", "assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/live.js", "assets/v1/chat-activity.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/remote-discovery.js", "assets/v1/remote-pair-form.js", "assets/v1/remote-inspection.js", "assets/v1/remote-task-controls.js", "assets/v1/remote-events.js", "assets/v1/remote-dispatch.js", "assets/v1/remote-automatic.js", "assets/v1/remote-review.js", "assets/v1/models.js", "assets/v1/comfy.js", "assets/v1/status.js", "assets/v1/cron.js", "assets/v1/remote-models.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -451,7 +461,7 @@ func TestWorkboardRouteDoesNotStartChatOrInspectorRequests(t *testing.T) {
 	body := string(script)
 	guard := strings.Index(body, `const workboardRoute = window.NexusRoutes.workboards(relativePath)`)
 	chat := strings.Index(body, `loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals()`)
-	csrf := strings.Index(body, `fetch(base + "/api/v1/session/csrf"`)
+	csrf := strings.Index(body, `window.NexusLive.authorizedFetch(base + "/api/v1/session/csrf"`)
 	if guard < 0 || !strings.Contains(body[guard:chat], `if (!comfyRoute && !collaborationRoute && !dependenciesRoute && !loggingRoute && !cronRoute && !statusRoute && !jobsRoute && !skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute)`) || chat < guard || csrf < chat {
 		t.Fatal("workboard route does not guard unrelated startup requests")
 	}
@@ -684,7 +694,7 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 	}
 	body := string(script)
 	for _, required := range []string{
-		`fetch(base + "/api/v1/session/csrf"`, `method: "POST"`, `const limit = Math.min(25, 100 - items.length)`, `items.length >= 100`,
+		`window.NexusLive.authorizedFetch(base + "/api/v1/session/csrf"`, `method: "POST"`, `const limit = Math.min(25, 100 - items.length)`, `items.length >= 100`,
 		`window.crypto.getRandomValues(bytes)`, `client.freezeIntent(path, body)`, `const resolution = client.mutationResolution`,
 		`!csrfToken || !operationsReady || operationReadFailed || inFlight || Boolean(pendingIntent) || unresolved.length > 0`,
 		`new Set([400, 401, 403, 404, 409, 422])`, `response.status === 401 || response.status === 403`,
@@ -710,7 +720,7 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 			t.Fatalf("workboard mutation safety guard missing %q", required)
 		}
 	}
-	if strings.Count(body, `fetch(base + built.path`) != 1 {
+	if strings.Count(body, `window.NexusLive.authorizedFetch(base + built.path`) != 1 {
 		t.Fatal("workboard intent has an automatic replay path")
 	}
 	for _, forbidden := range []string{"localStorage", "sessionStorage", "innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"} {
@@ -842,8 +852,8 @@ func TestEmbeddedChatMutationsAreExplicitFencedAndAccessible(t *testing.T) {
 		"if (pendingIntent || unresolvedOperations.length > 0 || !operationsReady || !csrfToken) return", `"X-Darwin-CSRF"`, `credentials: "same-origin"`, `cache: "no-store"`,
 		"Outcome unknown. Check current status before taking another action.", "reconcile.hidden = !canReconcile", "response.status >= 500", "pendingIntent.key !== intent.key",
 		`action: "submit"`, `action: "resume"`, `action: "steer"`, `action: "cancel"`, `action: "cancel_submission"`,
-		`expected_revision: controls.revision`, `action: revise ? "revise" : "record"`, "payload.attempt_cost = cost",
-		`attemptCost.value.trim() === "" || !Number.isFinite(cost) || cost < 0`,
+		`expected_revision: controls.revision`, `action: revise ? "revise" : "record"`, "accepted: rating >= 6, rating",
+		`attemptCost.value.trim() === "" || !Number.isInteger(rating) || rating < 1 || rating > 10`,
 		`/controls`, `/feedback`, `/approvals?limit=`, "const maxApprovals = 25", "const maxApprovalPrompt = 16 << 10",
 		`approvalDialogScope.textContent = "Scope: " + item.scopeSummary`, `approvalDialogPrompt.textContent = item.proposalText ? item.prompt`, `"\n\nExact proposal:\n" + item.proposalText`, `item.canDeny ? approvalDeny : approvalClose`, `event.key === "Escape"`,
 		`event.key !== "Tab"`, `event.isComposing`, `!event.shiftKey`, "composer.requestSubmit()", `aria-busy`,
@@ -888,7 +898,7 @@ func TestEmbeddedMutationReconciliationIsReadOnlyBoundedAndContractShaped(t *tes
 		`acknowledgeUnresolved.addEventListener("click", acknowledgeOutcome)`, `approvalAcknowledge.addEventListener("click", acknowledgeOutcome)`,
 		`if (approvalResolved && activeApproval)`, "closeApproval();", "loadApprovals();", "The operation was rejected. No request was replayed.",
 		`body.current_revision`, `body.retryable`, `body.operation_id`, `body.requested ? "Cancellation requested; submission is still "`,
-		`Number.isSafeInteger(item.reference_count)`, `String(item.reference_count)`, `textBytes(item.scope_summary) > maxApprovalScope`,
+		`Number.isSafeInteger(item.reference_count)`, `"Your rating: " + context.rating + "/10"`, `textBytes(item.scope_summary) > maxApprovalScope`,
 		`validApprovalProposal(item.proposal, item.tool_name)`, `Object.hasOwn(item, "proposal")`, `const maxApprovalScope = 4096, maxApprovalProposal = 128 << 10`,
 		`event.key === "Escape" && !pendingIntent && unresolvedOperations.length === 0 && operationsReady`,
 	} {
@@ -915,7 +925,7 @@ func TestEmbeddedMutationReconciliationIsReadOnlyBoundedAndContractShaped(t *tes
 		t.Fatal(err)
 	}
 	markup := string(index)
-	if !strings.Contains(markup, "Zero is valid; leave it blank when the cost is unknown.") {
+	if !strings.Contains(markup, "NexusRouter calculates available model costs automatically; no cost input is needed.") {
 		t.Fatal("feedback cost guidance does not distinguish zero from unknown")
 	}
 	scope := strings.Index(markup, `id="approval-dialog-scope"`)

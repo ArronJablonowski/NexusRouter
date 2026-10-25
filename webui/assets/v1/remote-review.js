@@ -14,7 +14,7 @@ window.NexusRemoteReview=(()=>{
   function lock(value){busy=value;inspect.disabled=value;prepare.disabled=value||attempted;confirm.disabled=value;Object.values(fields).forEach(f=>f.disabled=value);}
   async function send(action,request){
    if(busy)return;lock(true);notice.textContent=action==="status"?"Checking current review evidence…":"Evaluating the authenticated completed output…";
-   try{const r=await fetch(base+"/api/v1/remote-auto-review",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({action,request})});if(!r.ok)throw Error();const p=await r.json();if(!p||p.version!==1||p.request_id!==key||typeof p.status!=="string")throw Error();
+   try{const r=await window.NexusLive.authorizedFetch(base+"/api/v1/remote-auto-review",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({action,request})});if(!r.ok)throw Error();const p=await r.json();if(!p||p.version!==1||p.request_id!==key||typeof p.status!=="string")throw Error();
     if(action==="status"&&p.status==="recorded"&&p.verdict)attempted=true;
     if(action==="status")notice.textContent=p.status==="unrecorded"?"No recorded quality evidence for this completed output.":"Current evidence: "+(p.classification||"unknown")+"; verdict: "+(p.verdict||"none")+"; method: "+(p.method||"none")+".";
     else notice.textContent="Evaluation attempt: "+p.status+". Review applied: "+(p.review_applied?"yes":"no")+". Check current review to see the latest evidence; no repeat evaluation was sent.";

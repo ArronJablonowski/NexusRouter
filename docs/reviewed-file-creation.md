@@ -95,9 +95,10 @@ Hosts own authentication and safe preview delivery. Without either control,
 execution is denied before task dispatch. Side-effecting definitions cannot
 bypass authority by changing policy from `ask` to `allow`.
 
-The default headless CLI and daemon do not install an interactive reviewer.
-Durable submission execution is rejected for this process-local capability;
-there is no silent approval or resumed call with freshly attached authority.
+The default headless CLI and a daemon without the browser approval presenter
+do not install an interactive reviewer. Queued creation requires that trusted
+presenter; a synchronous reviewer alone cannot authorize it. There is no silent
+approval or replay of a spent call with freshly attached authority.
 Children remain read-only even when the parent has creation enabled.
 
 Existing-file modification, bulk writes, executable tools and unattended
@@ -107,3 +108,9 @@ still requires the broader tool, recovery and isolation requirements.
 A separate opt-in [reviewed replacement](reviewed-file-replacement.md) tool now
 supports bounded full-content edits of existing files with private recovery
 copies. Enabling creation does not enable replacement.
+
+## Browser chat creation
+
+Queued Web UI chats can create files when the owning service has a trusted interactive approval presenter. Pending/approved `create_file` requests show the exact relative path and complete new content in a bounded `file_create` proposal, bound to the pending durable call and argument digest. Each write still requires an authenticated Allow once decision; a synchronous reviewer alone cannot authorize queued writes. Replacement/workboard queued-write restrictions are unchanged. Saved generated file cards allow downloading the confirmed original content from chat.
+
+The commander's operator-authorized configuration enables creation in `/Users/aj_lab/.NexusRouter/outputs`. Select a configured local tool-capable model (for example `@local/qwen3-5-9b`) in a new chat; default commander selection is unchanged. This creates UTF-8 documents such as Markdown, CSV and HTML, not arbitrary binary office formats or shell execution. Existing files are never overwritten.

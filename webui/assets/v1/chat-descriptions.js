@@ -78,6 +78,6 @@ window.NexusChatDescriptions=(()=>{
  }
  document.addEventListener("click",e=>{if(openMenu&&!openMenu.trigger.parentElement.contains(e.target))closeMenu(false);});
  document.addEventListener("focusin",e=>{if(openMenu&&!openMenu.trigger.parentElement.contains(e.target))closeMenu(false);});
- function order(list,ids=[]){if(openMenu||editing)return;const scroll=list.scrollTop,rows=[...list.children],rank=new Map(ids.map((id,i)=>[id,i]));rows.sort((a,b)=>Number(b.dataset.pinned==='true')-Number(a.dataset.pinned==='true')||(rank.get(a.firstElementChild.dataset.chatId)??ids.length)-(rank.get(b.firstElementChild.dataset.chatId)??ids.length));const focus=document.activeElement;for(const row of rows)list.append(row);if(focus&&list.contains(focus))focus.focus({preventScroll:true});list.scrollTop=scroll;}
+ function order(list,ids=[]){if(openMenu||editing)return;const scroll=list.scrollTop,rows=[...list.children],rank=new Map(ids.map((id,i)=>[id,i]));rows.sort((a,b)=>Number(b.dataset.pinned==='true')-Number(a.dataset.pinned==='true')||(rows.some(r=>r.dataset.remoteRoot)?Number(b.dataset.orderTime||0)-Number(a.dataset.orderTime||0):0)||(rank.get(a.firstElementChild.dataset.chatId)??ids.length)-(rank.get(b.firstElementChild.dataset.chatId)??ids.length));const focus=document.activeElement;for(const row of rows)list.append(row);if(focus&&list.contains(focus))focus.focus({preventScroll:true});list.scrollTop=scroll;}
  return {get:chatDescription,decorate,actions,order,busy:()=>!!openMenu||editing||saving};
 })();

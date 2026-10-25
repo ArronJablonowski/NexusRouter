@@ -169,3 +169,23 @@ func TestLaunchMetadataCaptureBound(t *testing.T) {
 		t.Fatal("unbounded metadata capture")
 	}
 }
+
+func TestLauncherAdditionalCodexModels(t *testing.T) {
+	for _, model := range []string{"gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-daybreak-blue-latest"} {
+		t.Run(model, func(t *testing.T) {
+			spec := launcherSpec(t)
+			spec.Model = model
+			first, final := launcherFrames(spec.CWD)
+			wires := []*scriptedSessionWire{{frames: first, closed: make(chan struct{})}, {frames: final, closed: make(chan struct{})}}
+			calls := 0
+			s, err := launchChecked(context.Background(), spec, func(context.Context, codexrpc.ProcessSpec) (Wire, error) { w := wires[calls]; calls++; return w, nil }, launcherMetadata)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			if s.options.Model != model || calls != 2 {
+				t.Fatal("model changed")
+			}
+		})
+	}
+}

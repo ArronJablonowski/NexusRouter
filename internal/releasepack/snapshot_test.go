@@ -1,6 +1,7 @@
 package releasepack
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -71,5 +72,45 @@ func TestBoundedOutputCannotBypassWriteThroughReadFrom(t *testing.T) {
 	reader := struct{ io.Reader }{strings.NewReader(strings.Repeat("x", (1<<20)+1))}
 	if _, err := io.Copy(&output, reader); err == nil || !output.overflow || output.Len() > 1<<20 {
 		t.Fatal("capture cap bypassed", err, output.Len())
+	}
+}
+
+func TestSnapshotBinaryBlobHasSeparateBoundFromCommandMetadata(t *testing.T) {
+	ctx := context.Background()
+	repo := t.TempDir()
+	env := environment()
+	git := func(args ...string) string {
+		t.Helper()
+		out, err := command(ctx, repo, env, "git", args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	git("init", "-q")
+	if err := os.WriteFile(filepath.Join(repo, "go.mod"), []byte("module example.com/release\n\ngo 1.27.1\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	binary := bytes.Repeat([]byte{0, 1, 2, 255}, (1<<18)+1024)
+	if err := os.WriteFile(filepath.Join(repo, "asset.png"), binary, 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".")
+	git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "large binary")
+	dest := t.TempDir()
+	if err := snapshot(ctx, repo, git("rev-parse", "HEAD"), dest, env); err != nil {
+		t.Fatal("legitimate blob larger than metadata cap rejected", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dest, "asset.png"))
+	if err != nil || !bytes.Equal(got, binary) {
+		t.Fatal("binary changed", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "asset.png"), make([]byte, maxSnapshotBlobBytes+1), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".")
+	git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "oversized binary")
+	if snapshot(ctx, repo, git("rev-parse", "HEAD"), t.TempDir(), env) == nil {
+		t.Fatal("oversized blob accepted")
 	}
 }

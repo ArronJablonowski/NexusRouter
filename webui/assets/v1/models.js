@@ -54,6 +54,22 @@
 	function detail(list, label, value) { list.append(element("dt", "", label), element("dd", "", value)); }
 	function notice(node, message, failed) { node.textContent = message; node.classList.toggle("error", Boolean(failed)); node.hidden = false; }
 	function badge(label, className) { return element("span", "model-badge" + (className ? " " + className : ""), label); }
+ let registrationModels=[];
+ function configure(node,item){
+  const templates=registrationModels.filter(m=>m.configured&&m.locality==='cloud'&&m.provider===item.provider&&Number.isSafeInteger(m.context_tokens)&&m.context_tokens>0);
+  if(item.configured||item.locality!=='cloud'||!templates.length)return;
+  const form=element('form','model-registration'),label=element('label','','Use connection settings from'),select=element('select'),contextLabel=element('label','','Conversation limit (tokens)'),context=element('input'),save=element('button','','Configure model'),message=element('p','model-use-feedback');
+  select.setAttribute('aria-label','Existing model settings for '+item.model);context.type='number';context.min='1';context.required=true;context.setAttribute('aria-label','Conversation limit for '+item.model);save.type='submit';message.setAttribute('role','status');
+  for(const t of templates){const option=element('option','',t.model);option.value=t.id;select.append(option);}
+  function defaults(){const t=templates.find(t=>t.id===select.value)||templates[0];context.max=String(Math.min(t.context_tokens,item.context_tokens||t.context_tokens));context.value=String(Math.min(4096,Number(context.max)));}
+  select.addEventListener('change',defaults);defaults();label.append(select);contextLabel.append(context);form.hidden=!expanded.has(item.id);form.append(label,contextLabel,element('p','','Uses the existing provider connection and its routing cost estimate; actual billing and model access remain unverified. Saves disabled. Restart when idle, then enable it.'),save,message);node.append(form);
+  form.addEventListener('submit',async event=>{event.preventDefault();if(save.disabled||!form.reportValidity())return;save.disabled=true;message.textContent='Saving model configuration…';try{
+   const settings=await window.NexusLive.fetch(base+'/api/v1/settings',{credentials:'same-origin',cache:'no-store'});if(!settings.ok)throw Error();const current=await settings.json();
+   const grant=await window.NexusLive.fetch(base+'/api/v1/session/csrf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1})});if(!grant.ok)throw Error();const auth=await grant.json();
+   const response=await window.NexusLive.fetch(base+'/api/v1/model-registration',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Darwin-CSRF':auth.csrf_token},body:JSON.stringify({version:1,expected_digest:current.digest,catalog_id:item.id,template_id:select.value,context_tokens:Number(context.value)})});if(!response.ok)throw Error();const result=await response.json();if(result.version!==1||result.restart_required!==true||result.enabled!==false)throw Error();message.textContent='Saved disabled. Restart NexusRouter when idle, then enable this model. Access has not been tested.';
+  }catch{message.textContent='Configuration could not be confirmed. Refresh before trying again; unsupported models or changed settings are rejected.';}finally{save.disabled=false;}});
+ }
+
 	function card(item) {
 		const node = element("li", "model-card"), heading = element("button", "model-card-toggle"), identity = element("span", "model-card-identity"), badges = element("span", "model-badges");
 		const open = expanded.has(item.id), detailsID = "model-details-" + item.id;
@@ -84,7 +100,7 @@
 			const next = heading.getAttribute("aria-expanded") !== "true";
 			heading.setAttribute("aria-expanded", String(next)); details.hidden = !next; node.classList.toggle("expanded", next);
 			disclosure.textContent = next ? "−" : "+";
-			if (next) expanded.add(item.id); else expanded.delete(item.id);
+			if (next) expanded.add(item.id); else expanded.delete(item.id);const registration=node.querySelector(".model-registration");if(registration)registration.hidden=!next;
 		});
 		node.append(details);
         if(item.id===commanderID) badges.append(badge("Commander","usable"));
@@ -96,12 +112,12 @@
            const response=await window.NexusLive.fetch(base+"/api/v1/settings",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Darwin-CSRF":token.csrf_token},body:JSON.stringify({version:1,expected_digest:current.digest,settings:{...current.saved,commander_model:item.id}})});if(!response.ok)throw Error();const saved=await response.json();message.textContent=saved.restart_required?"Commander saved. Restart NexusRouter when idle to activate.":"Commander selected.";
           }catch{message.textContent="Could not save commander. Refresh and try again.";}finally{choose.disabled=false;}});
         }
-        if(window.NexusModelUse)window.NexusModelUse.attach(node,"local",item.id,item.configured); return node;
+        configure(node,item);if(window.NexusModelUse)window.NexusModelUse.attach(node,"local",item.id,item.configured); return node;
 	}
 	function render(page) {
 		const locals = page.models.filter(item => item.locality === "local"), clouds = page.models.filter(item => item.locality === "cloud");
 		const present = new Set(page.models.map(item => item.id)); expanded.forEach(id => { if (!present.has(id)) expanded.delete(id); });
-		commanderID=page.commander_id||"";
+		commanderID=page.commander_id||"";registrationModels=page.models;
 		const signature = JSON.stringify([page.models,commanderID]);
 		if (signature !== modelSignature && !localList.contains(document.activeElement) && !cloudList.contains(document.activeElement)) { localList.replaceChildren(...locals.map(card)); cloudList.replaceChildren(...clouds.map(card)); modelSignature = signature; }
 		localCount.textContent = String(locals.length); cloudCount.textContent = String(clouds.length);

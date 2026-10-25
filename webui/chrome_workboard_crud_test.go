@@ -264,7 +264,8 @@ func (f *chromeWorkboardCRUDFixture) assert(t *testing.T) {
 	}
 	// Opening the board link is a full authenticated document navigation, so
 	// each of the two documents rotates CSRF and scans its operation barrier once.
-	if f.stage != 7 || len(f.requests) != 7 || f.csrfRequests != 2 || f.operationGets != 2 {
+	// Two initial grants plus one fresh grant for each of seven explicit writes.
+	if f.stage != 7 || len(f.requests) != 7 || f.csrfRequests != 9 || f.operationGets != 2 {
 		t.Fatalf("unexpected request counts: stage=%d mutations=%d csrf=%d operation_scans=%d", f.stage, len(f.requests), f.csrfRequests, f.operationGets)
 	}
 	for stage := 1; stage <= 7; stage++ {

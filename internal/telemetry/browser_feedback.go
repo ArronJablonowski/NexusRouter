@@ -17,17 +17,22 @@ const MaxBrowserFeedbackRevisions = 100
 var ErrBrowserFeedback = errors.New("invalid browser feedback history")
 
 type BrowserFeedback struct {
-	Version     int       `json:"version"`
-	ID          string    `json:"id"`
-	TaskID      string    `json:"task_id"`
-	Supersedes  string    `json:"supersedes,omitempty"`
-	Accepted    bool      `json:"accepted"`
-	AttemptCost float64   `json:"attempt_cost"`
-	CreatedAt   time.Time `json:"created_at"`
+	Rating       int       `json:"rating,omitempty"`
+	Model        string    `json:"model,omitempty"`
+	Provider     string    `json:"provider,omitempty"`
+	CreativeKind string    `json:"creative_kind,omitempty"`
+	CostStatus   string    `json:"cost_status,omitempty"`
+	Version      int       `json:"version"`
+	ID           string    `json:"id"`
+	TaskID       string    `json:"task_id"`
+	Supersedes   string    `json:"supersedes,omitempty"`
+	Accepted     bool      `json:"accepted"`
+	AttemptCost  float64   `json:"attempt_cost"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func (r BrowserFeedback) Valid() bool {
-	return r.Version == 1 && sessions.ValidEventPageID(r.ID) && sessions.ValidEventPageID(r.TaskID) &&
+	return r.Rating >= 0 && r.Rating <= 10 && (r.Rating == 0 || (r.Model != "" && r.Provider != "" && r.CreativeKind != "" && r.Accepted == (r.Rating >= 6) && (r.CostStatus == "unknown" || r.CostStatus == "estimate"))) && r.Version == 1 && sessions.ValidEventPageID(r.ID) && sessions.ValidEventPageID(r.TaskID) &&
 		(r.Supersedes == "" || sessions.ValidEventPageID(r.Supersedes)) && r.ID != r.Supersedes &&
 		!math.IsNaN(r.AttemptCost) && !math.IsInf(r.AttemptCost, 0) && r.AttemptCost >= 0 &&
 		!r.CreatedAt.IsZero() && r.CreatedAt.Equal(r.CreatedAt.UTC())
@@ -51,7 +56,7 @@ func (s *Store) AppendBrowserFeedback(ctx context.Context, record BrowserFeedbac
 		return ErrBrowserFeedback
 	}
 	if existing, readErr := readBrowserFeedback(ctx, tx, record.ID); readErr == nil {
-		if existing.TaskID == record.TaskID && existing.Supersedes == record.Supersedes && existing.Accepted == record.Accepted && existing.AttemptCost == record.AttemptCost {
+		if existing.TaskID == record.TaskID && existing.Supersedes == record.Supersedes && existing.Accepted == record.Accepted && existing.AttemptCost == record.AttemptCost && existing.Rating == record.Rating && existing.Model == record.Model && existing.Provider == record.Provider && existing.CreativeKind == record.CreativeKind && existing.CostStatus == record.CostStatus {
 			return tx.Commit()
 		}
 		return ErrBrowserOperationConflict
@@ -103,6 +108,10 @@ func browserFeedbackHistory(ctx context.Context, q interface {
 		r.Version, r.Accepted = 1, accepted
 		r.CreatedAt = time.Unix(0, created).UTC()
 		var encoded BrowserFeedback
+		if json.Unmarshal(body, &encoded) != nil {
+			return nil, ErrBrowserFeedback
+		}
+		r.Rating, r.Model, r.Provider, r.CreativeKind, r.CostStatus = encoded.Rating, encoded.Model, encoded.Provider, encoded.CreativeKind, encoded.CostStatus
 		canonical, marshalErr := json.Marshal(r)
 		if marshalErr != nil || json.Unmarshal(body, &encoded) != nil || !bytes.Equal(body, canonical) || encoded != r || !r.Valid() {
 			return nil, ErrBrowserFeedback
@@ -124,13 +133,20 @@ func readBrowserFeedback(ctx context.Context, q interface {
 	var r BrowserFeedback
 	var accepted bool
 	var created int64
-	err := q.QueryRowContext(ctx, `SELECT id,task_id,COALESCE(supersedes,''),accepted,attempt_cost,created_at FROM browser_feedback WHERE id=?`, id).Scan(&r.ID, &r.TaskID, &r.Supersedes, &accepted, &r.AttemptCost, &created)
+	var body []byte
+	err := q.QueryRowContext(ctx, `SELECT id,task_id,COALESCE(supersedes,''),accepted,attempt_cost,created_at,body FROM browser_feedback WHERE id=?`, id).Scan(&r.ID, &r.TaskID, &r.Supersedes, &accepted, &r.AttemptCost, &created, &body)
 	if err != nil {
 		return BrowserFeedback{}, err
 	}
 	r.Version, r.Accepted = 1, accepted
+	var encoded BrowserFeedback
+	if json.Unmarshal(body, &encoded) != nil {
+		return BrowserFeedback{}, ErrBrowserFeedback
+	}
+	r.Rating, r.Model, r.Provider, r.CreativeKind, r.CostStatus = encoded.Rating, encoded.Model, encoded.Provider, encoded.CreativeKind, encoded.CostStatus
 	r.CreatedAt = time.Unix(0, created).UTC()
-	if !r.Valid() {
+	canonical, marshalErr := json.Marshal(r)
+	if !r.Valid() || marshalErr != nil || encoded != r || !bytes.Equal(body, canonical) {
 		return BrowserFeedback{}, ErrBrowserFeedback
 	}
 	return r, nil

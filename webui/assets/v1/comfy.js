@@ -15,7 +15,7 @@
  function message(text) { notice.textContent = text; }
  function controls() { run.disabled = busy || !csrf || !workflow || uncertain; cancel.disabled = busy || !csrf || !confirmed || confirmed !== selected || selected !== key.value.trim(); }
  async function request(path, options) {
-  const response = await fetch(base + "/api/v1" + path, {credentials: "same-origin", cache: "no-store", ...options});
+  const response = await window.NexusLive.authorizedFetch(base + "/api/v1" + path, {credentials: "same-origin", cache: "no-store", ...options});
   if (!response.ok) throw new Error("Request unavailable");
   return response.json();
  }

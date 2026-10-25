@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
@@ -80,5 +81,20 @@ func TestRedactCodexHistoryPlaintextAndDepthBoundary(t *testing.T) {
 	got, err := redactCodexHistoryMessages(codexRedactionMessages(content), nil)
 	if err != nil || got[2].Content != content {
 		t.Fatal("depth 64 rejected")
+	}
+}
+
+func TestAttachmentStructuredRedaction(t *testing.T) {
+	for _, secret := range []string{`upload<&"token`, "secret"} {
+		image := "/9j/secretAA"
+		input := attachments.Encode("Read", []attachments.Input{{Name: "notes.txt", Text: "credential " + secret}, {Name: "photo.jpg", Image: image}})
+		out, err := redactCodexHistoryMessages([]providers.Message{{Role: "user", Content: input}}, []string{secret})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, files := attachments.Decode(out[0].Content)
+		if len(files) != 2 || strings.Contains(files[0].Text, secret) || files[1].Image != image {
+			t.Fatal("structured upload redaction failed", len(files))
+		}
 	}
 }

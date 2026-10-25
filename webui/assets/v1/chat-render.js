@@ -1,15 +1,14 @@
 "use strict";
 window.NexusChatRender = (() => {
  function preserve(root, change) {
-  const top = root.scrollTop, bottom = root.children.length > 0 && root.scrollHeight - root.clientHeight - top < 24;
-  const edge = root.getBoundingClientRect().top;
+  const viewport = root.closest(".conversation-scroll") || root;
+  const top = viewport.scrollTop, bottom = root.children.length > 0 && viewport.scrollHeight - viewport.clientHeight - top < 24;
+  const edge = viewport.getBoundingClientRect().top;
   const anchor = [...root.children].find(node => node.getBoundingClientRect().bottom > edge);
   const offset = anchor ? anchor.getBoundingClientRect().top : 0;
-  const panel = root.closest('.transcript-panel'), panelTop = panel && panel.scrollTop;
   change();
-  if (bottom) root.scrollTop = root.scrollHeight;
-  else root.scrollTop = anchor && anchor.isConnected ? top + anchor.getBoundingClientRect().top - offset : top;
-  if (panel) panel.scrollTop = panelTop;
+  if (bottom) viewport.scrollTop = viewport.scrollHeight;
+  else viewport.scrollTop = anchor && anchor.isConnected ? top + anchor.getBoundingClientRect().top - offset : top;
  }
  function messages(root, items, reset) {
   preserve(root, () => {
@@ -21,7 +20,7 @@ window.NexusChatRender = (() => {
     const key = item.id || item.role + ':' + item.text;
     let row = existing.get(key);
     if (!row) {row=document.createElement('li');row.className='message '+item.role;row.dataset.messageKey=key;const label=document.createElement('span');label.className='message-label';label.textContent=item.role;row.append(label,document.createElement('p'));}
-    const content=row.querySelector('p');if(content.textContent!==item.text)content.textContent=item.text;
+    const content=row.querySelector('p');if(!window.NexusChatUploads?.renderMessage(row,item)&&content.textContent!==item.text)content.textContent=item.text;
     keep.add(row);
     if (reset) {if(row!==cursor)root.insertBefore(row,cursor);cursor=row.nextElementSibling;}
     else if(!row.isConnected)root.append(row);
@@ -35,7 +34,7 @@ window.NexusChatRender = (() => {
    row = element("li", "message approval-message"); row.dataset.approvalId = item.id;
    row.append(element("span", "message-label", "Tool approval"), element("p", "approval-request"), element("p", "approval-scope"), element("pre", "approval-proposal"), element("p", "approval-result"));
    const actions = element("div", "control-actions");
-   for (const [action, label] of [["allow", "Allow once"], ["deny", "Deny"], ["revoke", "Revoke approval"]]) {
+   for (const [action, label] of [["allow", "Approve once"], ["deny", "Deny"], ["revoke", "Revoke approval"]]) {
     const button = element("button", action === "allow" ? "" : "secondary", label);
     button.type = "button"; button.dataset.approvalAction = action;
     button.addEventListener("click", () => decideApproval(action, row.approvalItem)); actions.append(button);
@@ -49,7 +48,7 @@ window.NexusChatRender = (() => {
   set(".approval-request", item.toolName + " · " + item.prompt);
   set(".approval-scope", "Scope: " + item.scopeSummary + " · " + stateLabel(item.behavior));
   set(".approval-proposal", item.proposalText); row.querySelector(".approval-proposal").hidden=!item.proposalText;
-  set(".approval-result", stateLabel(item.state) + (["approved","denied","revoked","consumed"].includes(item.state) ? " · Decision recorded in the approval log." : ""));
+  set(".approval-result", (item.state==="consumed"?"Approval used · This call was already approved; it cannot be approved again.":item.state==="pending"?"Waiting for your approval":stateLabel(item.state)) + (["approved","denied","revoked","consumed"].includes(item.state) ? " · Decision recorded in the approval log." : ""));
   for(const [action, permitted] of [["allow",item.canAllow],["deny",item.canDeny],["revoke",item.canRevoke]]) row.querySelector('[data-approval-action="'+action+'"]').hidden=!permitted;
   return row;
  }

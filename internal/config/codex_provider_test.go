@@ -89,3 +89,16 @@ func TestCodexProviderConfigurationRejectsInvalid(t *testing.T) {
 		})
 	}
 }
+
+func TestAdditionalCodexModels(t *testing.T) {
+	for _, model := range []string{"gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-daybreak-blue-latest"} {
+		t.Run(model, func(t *testing.T) {
+			s := codexProviderSettings()
+			s.Models[0].Model = model
+			s.Models[0].ReasoningEffort = "medium"
+			if err := s.Validate(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

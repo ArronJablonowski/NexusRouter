@@ -13,7 +13,7 @@ type apiFixtureProfiler struct{}
 
 func (apiFixtureProfiler) Measure(context.Context) (resources.Measurement, error) {
 	return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{
-		Time: time.Now().UTC(), CPUs: 2, TotalRAM: 8 << 30, AvailableRAM: 8 << 30, Source: "api-fixture",
+		SwapUsed: new(uint64), Time: time.Now().UTC(), CPUs: 2, TotalRAM: 8 << 30, AvailableRAM: 8 << 30, Source: "api-fixture",
 	}}, nil
 }
 

@@ -38,7 +38,7 @@
  }
  function validInfo(value,id){return value&&value.version===1&&Number.isFinite(Date.parse(value.observed_at))&&value.info&&value.info.version===1&&value.info.instance===id&&(value.info.hostname===undefined||typeof value.info.hostname==='string'&&/^[A-Za-z0-9._-]{0,253}$/.test(value.info.hostname))&&typeof value.info.available==='boolean'&&Array.isArray(value.info.models)&&value.info.models.length<=4096&&value.info.models.every(m=>m&&text(m.id,128)&&text(m.model)&&text(m.provider,128)&&typeof m.local==='boolean'&&(m.capabilities==null||Array.isArray(m.capabilities)&&m.capabilities.length<=128&&m.capabilities.every(c=>text(c,128))));}
  async function json(path,options,signal){const timeout=new AbortController(),abort=()=>timeout.abort();signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();const deadline=setTimeout(abort,12000);
-  try{const response=await fetch(base+path,{credentials:'same-origin',cache:'no-store',...options,signal:timeout.signal});if(!response.ok)throw Error();return await response.json();}
+  try{const response=await window.NexusLive.authorizedFetch(base+path,{credentials:'same-origin',cache:'no-store',...options,signal:timeout.signal});if(!response.ok)throw Error();return await response.json();}
   finally{clearTimeout(deadline);signal.removeEventListener('abort',abort);}
  }
  function card(peer){

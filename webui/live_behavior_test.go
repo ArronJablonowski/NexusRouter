@@ -31,3 +31,21 @@ func TestLiveFetchRejectsOversizedStreamBeforeBufferingWholeBody(t *testing.T) {
 	steps := `(async()=>{let rejected=false;try{await window.NexusLive.fetch('/oversize');}catch(e){rejected=e.message==='Live response too large';}if(!rejected||!signal.aborted||!canceled||reads!==9)throw Error('oversized stream was not stopped at byte bound: '+reads);})().catch(e=>{console.error(e);process.exitCode=1});`
 	runRoutingMapScript(t, preamble+source+steps)
 }
+
+func TestAuthorizedFetchRefreshesGrantWithoutReplayingMutation(t *testing.T) {
+	source := strings.Split(string(mustAsset(t, "assets/v1/live.js")), "// Styles can be replaced")[0]
+	preamble := `let grantOK=true,mutationStatus=200,calls=[];
+ const window={location:{href:'http://localhost/app/settings',origin:'http://localhost'},addEventListener(){}},document={body:{dataset:{basePath:'/app'}},addEventListener(){}},navigator={onLine:true};
+ const fetch=async(url,options={})=>{calls.push({url,options});if(url.endsWith('/session/csrf'))return new Response(JSON.stringify({version:1,csrf_token:'fresh-token'}),{status:grantOK?200:403});return new Response('{}',{status:mutationStatus});};`
+	steps := `(async()=>{
+ const options={method:'POST',headers:{'X-Darwin-CSRF':'expired'},body:'exact-idempotent-body'};
+ await window.NexusLive.authorizedFetch('/app/api/v1/settings',options);
+ if(calls.length!==2||calls[1].options.body!==options.body||calls[1].options.headers.get('X-Darwin-CSRF')!=='fresh-token'||options.headers['X-Darwin-CSRF']!=='expired')throw Error('dispatch integrity');
+ calls=[];grantOK=false;let rejected=false;try{await window.NexusLive.authorizedFetch('/app/api/v1/settings',options)}catch{rejected=true}if(!rejected||calls.length!==1)throw Error('dispatched without grant');
+ for(const url of ['http://other.test/app/api/v1/settings','/outside/api/v1/settings']){calls=[];rejected=false;try{await window.NexusLive.authorizedFetch(url,options)}catch{rejected=true}if(!rejected||calls.length)throw Error('token scope leak');}
+ calls=[];grantOK=true;mutationStatus=503;
+ const failed=await window.NexusLive.authorizedFetch('/app/api/v1/settings',options);if(failed.status!==503||calls.length!==2)throw Error('mutation replay');
+ calls=[];await window.NexusLive.authorizedFetch('/app/api/v1/settings');if(calls.length!==1)throw Error('read minted grant');
+ })().catch(e=>{console.error(e);process.exitCode=1});`
+	runRoutingMapScript(t, preamble+source+steps)
+}

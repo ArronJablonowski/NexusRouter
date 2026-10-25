@@ -2,7 +2,11 @@ package webuiapp
 
 import (
 	"context"
+	"errors"
+	"github.com/ArronJablonowski/NexusRouter/attachments"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/remote"
@@ -15,22 +19,29 @@ type RemoteDispatcher interface {
 	Dispatch(context.Context, string, string, remote.Task) (submissions.Status, error)
 }
 type RecordedRemoteDispatcher struct {
-	Client *remote.Client
-	Store  *remote.RouteStore
+	indexMu         sync.Mutex
+	indexAfter      int64
+	indexDirty      atomic.Bool
+	Client          *remote.Client
+	Store           *remote.RouteStore
+	UploadDirectory string
+	PrepareUploads  func(context.Context, string, []attachments.File) (string, error)
 }
 
 func (d *RecordedRemoteDispatcher) Dispatch(ctx context.Context, instance, key string, task remote.Task) (submissions.Status, error) {
 	if d == nil || d.Client == nil || d.Store == nil {
 		return submissions.Status{}, remote.ErrInvalid
 	}
-	return d.Client.DispatchRecorded(ctx, d.Store, instance, key, task)
+	return d.DispatchFiles(ctx, instance, key, task, nil)
 }
 
 type remoteDispatchRequest struct {
-	Version   int         `json:"version"`
-	Instance  string      `json:"instance"`
-	RequestID string      `json:"request_id"`
-	Task      remote.Task `json:"task"`
+	Version         int                `json:"version"`
+	Instance        string             `json:"instance"`
+	RequestID       string             `json:"request_id"`
+	ParentRequestID string             `json:"parent_request_id,omitempty"`
+	Task            remote.Task        `json:"task"`
+	Files           []attachments.File `json:"files,omitempty"`
 }
 
 func (h *Handler) serveRemoteDispatch(w http.ResponseWriter, r *http.Request) bool {
@@ -50,7 +61,7 @@ func (h *Handler) serveRemoteDispatch(w http.ResponseWriter, r *http.Request) bo
 	}
 	defer releaseMutationSlot(h, true)
 	var input remoteDispatchRequest
-	if decodeMutationJSON(r, &input, remote.MaxBody) != nil || input.Version != 1 || !remoteControlID(input.Instance, 1) || !remoteControlID(input.RequestID, 16) || input.Task.Validate() != nil {
+	if decodeMutationJSON(r, &input, 12<<20) != nil || input.Version != 1 || !remoteControlID(input.Instance, 1) || !remoteControlID(input.RequestID, 16) || !remoteTaskFits(input.Task) || attachments.Validate(input.Files) != nil || (input.ParentRequestID != "" && !remoteControlID(input.ParentRequestID, 16)) {
 		h.writeError(w, r, http.StatusBadRequest, "invalid_request")
 		return true
 	}
@@ -58,11 +69,29 @@ func (h *Handler) serveRemoteDispatch(w http.ResponseWriter, r *http.Request) bo
 		h.writeError(w, r, http.StatusServiceUnavailable, "dispatch_disabled")
 		return true
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
 	defer cancel()
 	s, err := safeCall(func() (submissions.Status, error) {
+		if input.ParentRequestID != "" {
+			d, ok := h.remoteDispatcher.(*RecordedRemoteDispatcher)
+			if !ok {
+				return submissions.Status{}, errRemoteUpload
+			}
+			return d.DispatchContinuation(ctx, input.Instance, input.RequestID, input.ParentRequestID, input.Task, input.Files)
+		}
+		if len(input.Files) > 0 {
+			d, ok := h.remoteDispatcher.(remoteFileDispatcher)
+			if !ok {
+				return submissions.Status{}, errRemoteUpload
+			}
+			return d.DispatchFiles(ctx, input.Instance, input.RequestID, input.Task, input.Files)
+		}
 		return h.remoteDispatcher.Dispatch(ctx, input.Instance, input.RequestID, input.Task)
 	})
+	if errors.Is(err, errRemoteUpload) {
+		h.writeError(w, r, 422, "upload_rejected")
+		return true
+	}
 	// Once dispatch was called, any failure is conservatively uncertain. Do not
 	// erase durable intent, generate a new key, retry or expose remote diagnostics.
 	if err != nil || !validRemoteControlStatus(s) {

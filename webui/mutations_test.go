@@ -71,7 +71,7 @@ func TestChatMutationActionsHaveExactFields(t *testing.T) {
 
 func TestMutationProjectionRejectsAuthorityAndInvalidState(t *testing.T) {
 	now, revision := mutationTime(), int64(2)
-	validApproval := ApprovalSummary{ID: "approval", State: "pending", Revision: 1, Prompt: "Review the bounded project scope.", ScopeSummary: "Project file: internal/router.go", ToolName: "create_file", ToolBehavior: "non_idempotent_write", ExpiresAt: now.Add(time.Minute), CanAllow: true, CanDeny: true}
+	validApproval := ApprovalSummary{ID: "approval", State: "pending", Revision: 1, Prompt: "Review the bounded project scope.", ScopeSummary: "Project file: internal/router.go", ToolName: "create_file", Proposal: &ApprovalProposal{Version: 1, Kind: "file_create", Arguments: json.RawMessage(`{"path":"result.txt","content":"reviewed"}`)}, ToolBehavior: "non_idempotent_write", ExpiresAt: now.Add(time.Minute), CanAllow: true, CanDeny: true}
 	valid := []func() error{
 		(ChatMutationReceipt{Version: 1, OperationID: "operation", SubmissionID: "submission", State: "queued"}).Validate,
 		(CancellationReceipt{Version: 1, OperationID: "operation", TargetKind: "submission", TargetID: "submission", State: "queued", Requested: true}).Validate,

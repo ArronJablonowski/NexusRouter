@@ -47,3 +47,19 @@ func TestCollaborationSettingPresenceAndStrictDecode(t *testing.T) {
 		}
 	}
 }
+
+func TestAutoApproveSettingPresence(t *testing.T) {
+	for _, raw := range []string{`{"settings":{}}`, `{"settings":{"auto_approve":false}}`, `{"settings":{"auto_approve":true}}`} {
+		var r SettingsUpdateRequest
+		if json.Unmarshal([]byte(raw), &r) != nil {
+			t.Fatal(raw)
+		}
+		if r.HasAutoApproveSetting() != (raw != `{"settings":{}}`) {
+			t.Fatal("presence lost", raw)
+		}
+	}
+	var r SettingsUpdateRequest
+	if json.Unmarshal([]byte(`{"settings":{"auto_approve":null}}`), &r) == nil {
+		t.Fatal("null approval mode accepted")
+	}
+}
