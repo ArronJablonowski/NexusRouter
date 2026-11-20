@@ -303,6 +303,16 @@ func healthResources(s resources.Snapshot, err error, ram, vram float64) (string
 	if float64(s.TotalRAM-s.AvailableRAM) > float64(s.TotalRAM)*ram/100 || s.ThermalPressure != nil && *s.ThermalPressure || s.SwapPressure != nil && *s.SwapPressure {
 		host, code = "degraded", "capacity_exhausted"
 	}
+	// Unified-memory accelerators share the measured host RAM pool. Admission
+	// uses the RAM limit for this pool, not a second independent VRAM budget.
+	// Keep dedicated VRAM fields absent: this is shared-memory capacity health,
+	// not a fabricated GPU allocation/utilization measurement.
+	if s.UnifiedMemory {
+		if s.VRAMTotal != nil || s.VRAMAvailable != nil {
+			return host, code, "unknown", "metrics_unknown"
+		}
+		return host, code, host, code
+	}
 	if s.VRAMTotal == nil || s.VRAMAvailable == nil {
 		return host, code, "unknown", "metrics_unknown"
 	}

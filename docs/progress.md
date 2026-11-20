@@ -1,3 +1,7 @@
+## 2026-11-20 — Unified-memory accelerator health
+
+GPU resource health now follows the measured shared RAM capacity and pressure on explicitly unified-memory hosts, matching admission's single RAM pool. It does not synthesize dedicated VRAM or utilization measurements. Missing discrete metrics, contradictory VRAM fields, stale/invalid snapshots and actual pressure remain visible. Added threshold, malformed-observation and complete-report regression tests. Race-enabled health/resource/API checks and scoped vet passed; an existing dispatcher fixture also fails on the unchanged source and is recorded separately. [Validation scope](validation/unified-memory-health-2026-11-20.md). Live deployment verification is recorded in private operational evidence; no runtime state or credentials are committed.
+
 ## 2026-10-09 — Spark workboard schema allegations checked
 
 93/634 primary batches succeeded; qwen batch 94 active. Invalid-field test cases do not show key-validation failure, and oneOf rejects both reorder neighbors. [Triage](qa/2026-10-09-spark-nexusrouter-findings.md) saved. No new reproduced defect/failure; one empty-output source gap and cost reproduction remain pending. Worker healthy; documentation checks only.

@@ -350,3 +350,69 @@ func TestScopedHealthDoesNotProbeUnpermittedModels(t *testing.T) {
 		t.Fatal("permitted provider not probed", err, calls.Load())
 	}
 }
+
+func TestHealthResourcesUnifiedMemory(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		mutate            func(*resources.Snapshot)
+		wantHost, wantGPU string
+	}{
+		{"shared capacity available", func(s *resources.Snapshot) {}, "healthy", "healthy"},
+		{"shared RAM exhausted", func(s *resources.Snapshot) { s.AvailableRAM = 100 }, "degraded", "degraded"},
+		{"thermal pressure", func(s *resources.Snapshot) { v := true; s.ThermalPressure = &v }, "degraded", "degraded"},
+		{"swap pressure", func(s *resources.Snapshot) { v := true; s.SwapPressure = &v }, "degraded", "degraded"},
+		{"stale observation", func(s *resources.Snapshot) { s.Time = time.Now().Add(-time.Minute) }, "unknown", "unknown"},
+		{"invalid RAM observation", func(s *resources.Snapshot) { s.AvailableRAM = s.TotalRAM + 1 }, "unknown", "unknown"},
+		{"partial VRAM invalid", func(s *resources.Snapshot) { v := uint64(100); s.VRAMTotal = &v }, "healthy", "unknown"},
+		{"independent VRAM invalid", func(s *resources.Snapshot) {
+			total, free := uint64(100), uint64(90)
+			s.VRAMTotal, s.VRAMAvailable = &total, &free
+		}, "healthy", "unknown"},
+		{"discrete GPU stays unknown", func(s *resources.Snapshot) { s.UnifiedMemory = false }, "healthy", "unknown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _ := healthProfile(context.Background())
+			s.UnifiedMemory = true
+			tc.mutate(&s)
+			host, hostCode, gpu, gpuCode := healthResources(s, nil, 80, 85)
+			if host != tc.wantHost || gpu != tc.wantGPU {
+				t.Fatal(host, hostCode, gpu, gpuCode)
+			}
+			if tc.wantGPU == "healthy" && gpuCode != "capacity_available" || tc.wantGPU == "degraded" && gpuCode != "capacity_exhausted" || tc.wantGPU == "unknown" && gpuCode != "metrics_unknown" {
+				t.Fatal(gpuCode)
+			}
+		})
+	}
+}
+
+func TestHealthReportUnifiedMemoryCapacityIsHealthy(t *testing.T) {
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" || r.URL.Path != "/api/tags" {
+			t.Error("health probe executed provider work")
+		}
+		fmt.Fprintln(w, `{"models":[{"name":"fixture"}]}`)
+	}))
+	defer provider.Close()
+	s := submissionService(t)
+	s.settings.Mode = "local_only"
+	s.settings.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
+	s.settings.Models = []config.Model{{ID: "fixture", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1}}
+	s.profile = func(ctx context.Context) (resources.Snapshot, error) {
+		snapshot, err := healthProfile(ctx)
+		snapshot.UnifiedMemory = true
+		pressure := false
+		snapshot.ThermalPressure = &pressure
+		return snapshot, err
+	}
+	db, err := telemetry.Open(context.Background(), s.settings.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	report, err := s.HealthReport(context.Background(), healthySupervisor())
+	if err != nil || report.Validate() != nil || report.Status != "healthy" || !report.Ready {
+		t.Fatal(report, err)
+	}
+}

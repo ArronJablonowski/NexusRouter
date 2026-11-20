@@ -1,0 +1,18 @@
+# Unified-memory health validation — 2026-11-20
+
+The accelerator resource check previously required independent VRAM counters even when the resource profiler explicitly reported unified memory. Apple silicon intentionally leaves those counters absent. The health check now uses the measured host RAM capacity and its configured RAM threshold, including thermal/swap pressure. Dedicated VRAM fields stay absent; this is shared-memory capacity health, not a claim of GPU allocation/utilization telemetry. Contradictory unified/VRAM observations remain unknown.
+
+## Change-scoped validation
+
+- `go test -race ./internal/app -run "^(TestHealth|TestScopedHealth)" -count=1`: passed, including shared-memory pressure/invalid-input cases, complete healthy-report integration, configured GPU binding and scoped provider discovery.
+- `go test -race ./resources -count=1`: passed.
+- `go test -race ./resources ./health ./internal/app ./internal/cli ./daemon ./internal/webuiapp -run "Test(.*Health|Doctor|.*Inspection|.*ResourceThreshold)" -count=1`: health, CLI and web UI checks passed; the application package also selected an unrelated pre-existing dispatcher failure. Resources and daemon had no matches in this selection; resources were tested in full separately.
+- `go vet ./internal/app ./health ./resources`: passed.
+- `gofmt` on changed Go files and `git diff --check`: passed.
+- `go build -o <private staged service executable> ./cmd/nexus`: passed; native configuration validation and live resource profiling passed.
+
+`TestDispatcherHealthRenewalDuringBlockedProvider` reports `provider not entered`. A Go build overlay restoring both health source/test files from base commit `1099afbb` reproduces the same failure without this change. No assertion was weakened or dispatcher behavior changed. This remains an unqualified dispatcher fixture; these checks are not a full-suite pass or a complete release qualification.
+
+## Runtime verification scope
+
+The operator will activate the build only after backups and an idle-work check, then inspect authenticated readiness, every enabled health check, lease attention, provider discovery and a deliberately submitted local inference. Operational backups, owner-lock proof and task identifiers remain private and outside Git. This patch changes no scheduler settings, task dispatch authority, tool permissions or lease recovery rules.
