@@ -111,6 +111,10 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer client.Close()
+	// The health endpoint may spend five seconds profiling and discovering
+	// providers. Its diagnostic budget must not inherit the three-second
+	// timeout used by fast daemon identity/control requests.
+	client.client.Timeout = 7 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, client.base+"/v1/health", nil)

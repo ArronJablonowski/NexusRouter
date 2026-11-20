@@ -91,3 +91,40 @@ func TestDoctorReadsAuthenticatedValidatedDaemonHealth(t *testing.T) {
 		t.Fatalf("invalid doctor output: %s", out.String())
 	}
 }
+
+func TestDoctorAllowsServerHealthBudget(t *testing.T) {
+	token := strings.Repeat("h", 32)
+	report := health.Report{Version: 1, CheckedAt: time.Now().UTC(), Status: "healthy", Ready: true, Checks: []health.Check{
+		{Component: "daemon", Status: "healthy", Code: "serving"},
+		{Component: "database", Status: "healthy", Code: "available"},
+		{Component: "supervisor", Status: "healthy", Code: "supervisor_ok"},
+		{Component: "resources", ID: "host", Status: "healthy", Code: "capacity_available"},
+		{Component: "model", ID: "local-fast", Status: "healthy", Code: "available"},
+	}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/health" || r.Header.Get("Authorization") != "Bearer "+token {
+			t.Error("unauthenticated or wrong health request")
+		}
+		// Model a valid health response taking longer than daemon control's budget.
+		timer := time.NewTimer(3100 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-r.Context().Done():
+			return
+		}
+		_ = json.NewEncoder(w).Encode(report)
+	}))
+	defer server.Close()
+	endpoint, _ := url.Parse(server.URL)
+	path := diagnosticFixture(t, endpoint.Host)
+	t.Setenv("NEXUS_API_TOKEN", token)
+	var out, stderr bytes.Buffer
+	if code := RunWithInput([]string{"doctor", "--config", path}, strings.NewReader(""), &out, &stderr, "test"); code != 0 || stderr.Len() != 0 {
+		t.Fatalf("valid slow health response rejected: code=%d err=%s", code, stderr.String())
+	}
+	var got health.Report
+	if json.Unmarshal(out.Bytes(), &got) != nil || got.Validate() != nil || got.Status != "healthy" || !got.Ready {
+		t.Fatal("invalid health report", out.String())
+	}
+}

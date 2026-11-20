@@ -16,3 +16,9 @@ The accelerator resource check previously required independent VRAM counters eve
 ## Runtime verification scope
 
 The operator will activate the build only after backups and an idle-work check, then inspect authenticated readiness, every enabled health check, lease attention, provider discovery and a deliberately submitted local inference. Operational backups, owner-lock proof and task identifiers remain private and outside Git. This patch changes no scheduler settings, task dispatch authority, tool permissions or lease recovery rules.
+
+## Diagnostic deadline follow-up
+
+Live activation of the shared-memory patch produced an authenticated `healthy`, ready report with no degraded/unknown checks, and an operator-labeled local submission returned `NEXUS_HEALTH_OK`. The separate `nexus doctor` client inherited daemon control's three-second HTTP timeout despite a seven-second context and a server health budget of five seconds. A timed-out client could therefore report unavailable while direct health inspection succeeded.
+
+Doctor now uses a seven-second HTTP timeout matching its existing diagnostic context. Fast daemon status/stop controls retain their original timeout. A loopback test waits 3.1 seconds before returning an authenticated, validated healthy response; the doctor must accept it. `go test -race ./internal/cli -run "^Test(Doctor|DaemonControl)" -count=1` and `go vet ./internal/cli` passed. This change requires no new inference qualification because dispatch code is unchanged; final native doctor inspection will verify the activated executable.
