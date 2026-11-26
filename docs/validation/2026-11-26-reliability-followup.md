@@ -39,3 +39,26 @@ availability still produces a degraded overall status. The Web UI bootstrap
 returned HTTP 200. No active tasks, submissions, unattended lease attention,
 or Workboard claims were present at the service boundary. The subsequent
 releasepack fix affects test fixtures only.
+
+## Spark deployment and local model test
+
+Deployed the clean Linux ARM64 build at source commit `ca1310a0`. The
+executable SHA-256 was verified before and after installation. The previous
+executable, runtime configuration, unit definition, and verified SQLite
+snapshots for tasks and remote receipts were saved in the private Spark
+deployment backup. The task database remained at schema 53. Only the
+remote router service was restarted, at an idle boundary. The dedicated
+Ollama process retained its PID and the configuration and unit digests
+matched their pre-deployment values.
+
+Authenticated inspection of the paired `dgx-spark` instance returned
+available on `spark-9c8a`, with measured resources and 33 of 34 models
+usable, matching the pre-deployment inventory. One private, zero-cost
+request ran through NexusRouter on `qwen3:8b` using `spark-ollama`.
+It returned the expected `SPARK_SMOKE=49`. The committed start event
+confirmed the model, provider, and local-only privacy. The task completed
+without fallback and reported 41 input tokens and 242 output tokens.
+
+Post-test checks confirmed the router was active with zero automatic
+restarts and no nonterminal tasks, pending submissions, or unreleased
+leases. This validates the paired local inference path.
