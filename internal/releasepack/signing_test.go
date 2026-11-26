@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -33,7 +34,7 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 	writeSigningFixture(t, seedFile, []byte(hex.EncodeToString(private.Seed())+"\n"), 0600)
 	writeSigningFixture(t, publicFile, []byte(hex.EncodeToString(public)+"\n"), 0644)
 	var sums strings.Builder
-	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: strings.Repeat("a", 40), Created: "2026-09-13T18:00:00Z", Toolchain: "go1.27.1"}
+	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: strings.Repeat("a", 40), Created: "2026-09-13T18:00:00Z", Toolchain: runtime.Version()}
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "NexusRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
 		body := signingArchiveFixture(t, target[0], target[1])

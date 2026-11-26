@@ -20,3 +20,22 @@ Release qualification with external artifacts and live Telegram delivery were
 outside this test run.
 
 The complete application suite passed using the normal test entry point with a 12-minute package budget. The SDK and application suites retain their established opt-in live tests.
+
+The follow-up application race selection covered fallback, delegation, recovery,
+and Workboard journal integration. The releasepack run passed 169 top-level
+tests and skipped the opt-in release qualification. Seven signing/trust tests
+failed because the fixture hardcoded Go 1.27.1 in the manifest while its SBOM
+used the running Go version. After aligning the fixture metadata, the signing
+and trust-record suites passed with the race detector. The archive and
+signature verification rules are unchanged.
+
+Commander deployment used code commit 4430abed. The initial launchd bootstrap
+returned exit 5, so the previous binary was restored and its readiness
+verified. Restarting the registered job then activated the candidate with
+verified binary digest and a quick-checked SQLite rollback backup. After the
+existing database startup validation completed, authenticated doctor reported
+ready and retained all previously healthy checks. Existing provider/model
+availability still produces a degraded overall status. The Web UI bootstrap
+returned HTTP 200. No active tasks, submissions, unattended lease attention,
+or Workboard claims were present at the service boundary. The subsequent
+releasepack fix affects test fixtures only.
