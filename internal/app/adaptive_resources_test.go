@@ -32,7 +32,10 @@ func TestAdaptiveResourceServiceConstruction(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, cfg := autoFixture(t)
 			cfg.Hardware.Concurrent = tc.setting
+			strict := false
+			cfg.Hardware.BackendManagedMemory = &strict
 			cfg.Hardware.MaxRAM = 100
+			cfg.Hardware.MacMemoryPercent = 100
 			cfg.Workers.Max = tc.workers
 			s, err := NewService(cfg, nil)
 			if err != nil {

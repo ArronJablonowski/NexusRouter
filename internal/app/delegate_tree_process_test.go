@@ -24,7 +24,7 @@ import (
 )
 
 func delegateProcessProfile(context.Context) (resources.Snapshot, error) {
-	return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 100000, AvailableRAM: 100000}, nil
+	return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 100000, AvailableRAM: 100000}, nil
 }
 
 func TestDelegateTreeProcessHelper(t *testing.T) {

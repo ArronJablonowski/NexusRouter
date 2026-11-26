@@ -103,7 +103,7 @@ func TestCrossProviderFallbackQualification(t *testing.T) {
 				t.Fatal(err)
 			}
 			svc.profile = func(context.Context) (resources.Snapshot, error) {
-				return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
+				return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
 			}
 
 			out, runErr := svc.Run(context.Background(), Request{Prompt: prompt, Domain: "qualification", MaxCost: localCost + cloudCost, LocalRequired: localRequired})

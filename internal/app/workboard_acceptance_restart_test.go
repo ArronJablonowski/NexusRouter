@@ -103,7 +103,7 @@ func configuredWorkboardRestartService(t *testing.T, settings config.Settings) *
 		t.Fatal(err)
 	}
 	service.profile = func(context.Context) (resources.Snapshot, error) {
-		return resources.Snapshot{Time: time.Now().UTC(), TotalRAM: 100, AvailableRAM: 100}, nil
+		return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now().UTC(), TotalRAM: 100, AvailableRAM: 100}, nil
 	}
 	return service
 }

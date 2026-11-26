@@ -123,7 +123,7 @@ func TestHybridSolCoordinatorDelegatesToIsolatedOllama(t *testing.T) {
 				t.Fatal(err)
 			}
 			svc.profile = func(context.Context) (resources.Snapshot, error) {
-				return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
+				return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
 			}
 			result, err := svc.Run(ctx, Request{ModelID: "coordinator", Prompt: "Delegate the implementation, then review it. Parent-only context.", LocalRequired: scenario == "private_request"})
 			if scenario == "local_only" || scenario == "private_request" {

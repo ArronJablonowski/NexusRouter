@@ -87,8 +87,9 @@ await evaluate('window.fileImage=document.querySelector(".chat-file-preview img"
 await new Promise(r=>setTimeout(r,250));
 if(!await evaluate('window.fileImage===document.querySelector(".chat-file-preview img")&&document.activeElement.classList.contains("chat-file-download")'))throw Error('refresh replaced image or keyboard focus');
 await evaluate('document.querySelectorAll(".chat-file-download")[1].click()');
-const fs=await import('node:fs');const deadline=Date.now()+5000;let file=` + string(directory) + `+'/notes.html';while(!fs.existsSync(file)&&Date.now()<deadline)await new Promise(r=>setTimeout(r,50));
-if(!fs.existsSync(file)||fs.readFileSync(file,'utf8')!=='<script>not run</script>\n')throw Error('download bytes changed or missing');
+const fs=await import('node:fs');const deadline=Date.now()+5000;let file=` + string(directory) + `+'/notes.html';const completed=()=>fs.existsSync(file)&&fs.readFileSync(file,'utf8')==='<script>not run</script>\n';
+while(!completed()&&Date.now()<deadline)await new Promise(r=>setTimeout(r,50));
+if(!completed())throw Error('download bytes changed or missing');
 await cdp('Page.reload',{ignoreCache:true});
 await eventually('document.querySelectorAll(".chat-file-card").length===2&&document.querySelector(".chat-file-preview img").naturalWidth>0','reload lost files');
 await evaluate('document.querySelector("#chat-files").scrollIntoView({block:"start"})');

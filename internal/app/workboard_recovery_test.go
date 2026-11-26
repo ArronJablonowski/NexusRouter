@@ -213,7 +213,7 @@ func runCoordinatorRecoveryProcess(t *testing.T, path string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestWorkboardRecoveryCoordinatorForeignHelper$")
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"),
+	cmd.Env = []string{"HOME=" + t.TempDir(), "PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"),
 		"DARWIN_WORKBOARD_COORDINATOR_HELPER=1", "DARWIN_WORKBOARD_COORDINATOR_DB=" + path}
 	cmd.WaitDelay = time.Second
 	if output, err := cmd.CombinedOutput(); err != nil {

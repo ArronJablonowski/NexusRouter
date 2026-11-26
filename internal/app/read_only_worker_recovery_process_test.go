@@ -109,7 +109,7 @@ func TestReadOnlyWorkerAfterSIGKILLRecoversFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDelegateTreeProcessHelper$", "-test.count=1")
-	cmd.Env = []string{"DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(root, "owners"), "DARWIN_DELEGATE_TREE_HELPER=1", "DARWIN_DELEGATE_TREE_CONFIG=" + configuration}
+	cmd.Env = []string{"HOME=" + t.TempDir(), "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(root, "owners"), "DARWIN_DELEGATE_TREE_HELPER=1", "DARWIN_DELEGATE_TREE_CONFIG=" + configuration}
 	cmd.WaitDelay = time.Second
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)

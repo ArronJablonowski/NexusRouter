@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -146,6 +147,10 @@ func TestPressureExplicitCapacityRetryAndProfileFailure(t *testing.T) {
 			s.settings.Hardware.LocalPressurePolicy = "wait"
 			s.settings.Hardware.LocalQueueTimeout = "1s"
 			calls := 0
+			expectedCalls := 2
+			if runtime.GOOS == "darwin" {
+				expectedCalls++ // The accepted execution also checks the swap baseline.
+			}
 			s.profile = func(context.Context) (resources.Snapshot, error) {
 				calls++
 				if profileFailure {
@@ -162,7 +167,7 @@ func TestPressureExplicitCapacityRetryAndProfileFailure(t *testing.T) {
 				if !errors.Is(err, ErrAdmission) || errors.Is(err, resources.ErrCapacity) || calls != 1 || out.TaskID != "" {
 					t.Fatal(out, err, calls)
 				}
-			} else if err != nil || out.TaskID == "" || calls != 2 {
+			} else if err != nil || out.TaskID == "" || calls != expectedCalls {
 				t.Fatal(out, err, calls)
 			}
 		})

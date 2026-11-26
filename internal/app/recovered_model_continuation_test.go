@@ -147,7 +147,7 @@ func TestRecoveredModelExplicitContinuation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	restarted.profile = healthProfile
+	restarted.profile = s.profile
 	result, err := restarted.Run(ctx, Request{ModelID: "chat", Prompt: "explicit follow-up", ContinueTaskID: start.TaskID})
 	if err != nil {
 		t.Fatal("explicit continuation failed", err)

@@ -3,11 +3,11 @@ package app
 import (
 	"context"
 	"errors"
-	"github.com/ArronJablonowski/NexusRouter/tools"
 	"math"
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
@@ -16,6 +16,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/responsecontract"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 var ErrHarnessUnsupported = errors.New("native harness request or configured capability is unsupported")
@@ -160,7 +161,8 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 func nativePiConfig(entry NativeHarness, p config.Provider, m config.Model, contextTokens int, policyDigest, key string, tr http.RoundTripper, messages []providers.Message) pi.Config {
 	endpoint := strings.TrimRight(p.ResolvedEndpoint(), "/")
 
-	return pi.Config{UpstreamProtocol: p.Kind, Messages: messages, Executable: entry.Executable, ExecutableSHA256: entry.ExecutableSHA256, ModelRevision: entry.ModelRevision, Provider: p.ID, Model: m.Model, BaseURL: endpoint, APIKey: key, ContextTokens: contextTokens, MaxOutputTokens: entry.MaxOutputTokens, Prices: entry.Prices, Timeout: httpProviderTimeout(p), Transport: tr, TransportPolicySHA256: policyDigest,
+	// Native adapters enforce a shorter deadline than direct HTTP providers.
+	return pi.Config{UpstreamProtocol: p.Kind, Messages: messages, Executable: entry.Executable, ExecutableSHA256: entry.ExecutableSHA256, ModelRevision: entry.ModelRevision, Provider: p.ID, Model: m.Model, BaseURL: endpoint, APIKey: key, ContextTokens: contextTokens, MaxOutputTokens: entry.MaxOutputTokens, Prices: entry.Prices, Timeout: min(httpProviderTimeout(p), 15*time.Minute), Transport: tr, TransportPolicySHA256: policyDigest,
 		// The caller already owns the ordinary model + native-process reservation.
 		Admit: func(context.Context) (func(), error) { return func() {}, nil }}
 }

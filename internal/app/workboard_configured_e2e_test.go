@@ -49,7 +49,7 @@ func TestConfiguredWorkboardScheduleSupervisorPersistsAcceptedCandidateEndToEnd(
 		t.Fatal(err)
 	}
 	service.profile = func(context.Context) (resources.Snapshot, error) {
-		return resources.Snapshot{Time: time.Now().UTC(), TotalRAM: 100, AvailableRAM: 100}, nil
+		return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now().UTC(), TotalRAM: 100, AvailableRAM: 100}, nil
 	}
 	store, boardID, cardID, _ := readyFactoryCard(t, database, workboard.WorkBudget{
 		AttemptLimit: 3, TimeLimitMS: 60_000, TokenLimit: 50_000, CostMicros: 1_000_000})

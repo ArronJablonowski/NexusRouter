@@ -80,7 +80,7 @@ func TestInterruptedDelegationRestoresResultAndExplicitlyContinues(t *testing.T)
 				t.Fatal(err)
 			}
 			svc.profile = func(context.Context) (resources.Snapshot, error) {
-				return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
+				return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
 			}
 			request := Request{ModelID: "parent", Prompt: "delegate and review"}
 			status, err := svc.Submit(ctx, "interrupted-delegation-key", request)

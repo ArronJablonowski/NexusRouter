@@ -104,3 +104,10 @@ func TestSDKRequestResultFieldParity(t *testing.T) {
 		}
 	}
 }
+
+func TestSDKDisableFallbackReachesExecutionRequest(t *testing.T) {
+	request := Request{DisableFallback: true}
+	if !request.internal().DisableFallback {
+		t.Fatal("exact model preference lost")
+	}
+}

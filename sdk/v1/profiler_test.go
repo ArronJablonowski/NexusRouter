@@ -26,13 +26,15 @@ func (f sdkFixtureProfiler) Measure(ctx context.Context) (resources.Measurement,
 	return f(ctx)
 }
 func sdkGoodMeasurement() resources.Measurement {
-	return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{Time: time.Now().UTC(), CPUs: 2, TotalRAM: 8 << 30, AvailableRAM: 8 << 30, Source: "sdk-fixture"}}
+	return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{SwapUsed: new(uint64), Time: time.Now().UTC(), CPUs: 2, TotalRAM: 8 << 30, AvailableRAM: 8 << 30, Source: "sdk-fixture"}}
 }
 func sdkProfilerClient(t *testing.T, endpoint string, profiler resources.Profiler, mode, locality string) (*sdk.Client, string) {
 	t.Helper()
 	cfg := config.Defaults()
 	cfg.Mode = mode
 	cfg.Hardware.AutoProfile = false
+	strict := false
+	cfg.Hardware.BackendManagedMemory = &strict
 	cfg.Hardware.Concurrent = "1"
 	cfg.Workers.Max = 2
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "tasks.db")

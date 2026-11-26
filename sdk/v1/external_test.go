@@ -142,7 +142,7 @@ import (
 func check(ok bool, label string) { if !ok { panic(label) } }
 type fixtureProfiler struct{}
 func (fixtureProfiler) Measure(ctx context.Context)(resources.Measurement,error){
- return resources.Measurement{Version:1,Snapshot:resources.Snapshot{Time:time.Now().UTC(),CPUs:2,TotalRAM:8<<30,AvailableRAM:8<<30}},ctx.Err()
+ return resources.Measurement{Version:1,Snapshot:resources.Snapshot{SwapUsed: new(uint64), Time:time.Now().UTC(),CPUs:2,TotalRAM:8<<30,AvailableRAM:8<<30}},ctx.Err()
 }
 type fixtureEvaluator struct{}
 func (fixtureEvaluator) Descriptor() sdk.EvaluatorDescriptor {

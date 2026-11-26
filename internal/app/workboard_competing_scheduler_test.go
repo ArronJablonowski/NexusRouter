@@ -48,7 +48,7 @@ func TestCompetingConfiguredWorkboardSchedulersRelyOnDurableClaimCAS(t *testing.
 			t.Fatal(serviceErr)
 		}
 		service.profile = func(context.Context) (resources.Snapshot, error) {
-			return resources.Snapshot{Time: time.Now().UTC(), TotalRAM: 100, AvailableRAM: 100}, nil
+			return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now().UTC(), TotalRAM: 100, AvailableRAM: 100}, nil
 		}
 		plan, prepareErr := PrepareConfiguredWorkboardSchedule(ctx, service, store)
 		if prepareErr != nil {

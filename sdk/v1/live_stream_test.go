@@ -47,7 +47,7 @@ func TestSDKLiveStreamAdmission(t *testing.T) {
 type liveSDKProfiler struct{}
 
 func (liveSDKProfiler) Measure(context.Context) (resources.Measurement, error) {
-	return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{Time: time.Now().UTC(), CPUs: 2, TotalRAM: 8 << 30, AvailableRAM: 8 << 30, Source: "sdk-fixture"}}, nil
+	return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{SwapUsed: new(uint64), Time: time.Now().UTC(), CPUs: 2, TotalRAM: 8 << 30, AvailableRAM: 8 << 30, Source: "sdk-fixture"}}, nil
 }
 
 func TestSDKLiveStreamForwardsBeforeCompletion(t *testing.T) {

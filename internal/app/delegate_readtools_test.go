@@ -160,7 +160,7 @@ func TestDelegateReadToolsInheritedScopeAndNoRecursion(t *testing.T) {
 				t.Fatal(err)
 			}
 			svc.profile = func(context.Context) (resources.Snapshot, error) {
-				return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
+				return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
 			}
 			result, err := svc.Run(ctx, Request{ModelID: "parent", Prompt: "ambient parent data"})
 			if err != nil || result.Text != "parent final" || parents.Load() != 2 {
@@ -368,7 +368,7 @@ func TestCloudCoordinatorDelegatesBoundedCountWithoutDirectFilesystemAuthority(t
 		t.Fatal(err)
 	}
 	svc.profile = func(context.Context) (resources.Snapshot, error) {
-		return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
+		return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
 	}
 	result, err := svc.Run(ctx, Request{ModelID: "coordinator", Prompt: "How many regular files are in the configured directory?"})
 	if err != nil || result.Text != "There are 2 direct regular files and 3 recursively." || parentCalls.Load() != 2 || childCalls.Load() != 2 {

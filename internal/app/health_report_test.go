@@ -23,7 +23,7 @@ func healthySupervisor() health.Check {
 	return health.Check{Component: "supervisor", Status: "healthy", Code: "supervisor_ok"}
 }
 func healthProfile(context.Context) (resources.Snapshot, error) {
-	return resources.Snapshot{Time: time.Now().UTC(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 900}, nil
+	return resources.Snapshot{Time: time.Now().UTC(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 900, SwapUsed: new(uint64)}, nil
 }
 
 func TestHealthReportReadOnlyCatalogAndSafeMetadata(t *testing.T) {

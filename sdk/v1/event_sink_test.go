@@ -65,7 +65,7 @@ func newSDKEventSinkClient(t *testing.T, database string, concurrency int, sink 
 		ProjectFile: configPath,
 		EventSink:   sink,
 		ResourceProfiler: sdkFixtureProfiler(func(context.Context) (resources.Measurement, error) {
-			return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{Time: time.Now().UTC(), CPUs: concurrency + 1, TotalRAM: 16 << 30, AvailableRAM: 16 << 30}}, nil
+			return resources.Measurement{Version: 1, Snapshot: resources.Snapshot{SwapUsed: new(uint64), Time: time.Now().UTC(), CPUs: concurrency + 1, TotalRAM: 16 << 30, AvailableRAM: 16 << 30}}, nil
 		}),
 		ProviderFactory: factory,
 		LookupSecret: func(name string) string {

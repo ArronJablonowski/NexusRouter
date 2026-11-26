@@ -58,7 +58,7 @@ func TestRecoveredModelContinuationProcessHelper(t *testing.T) {
 func runRecoveredModelContinuationChild(t *testing.T, ctx context.Context, configuration, task string, denied bool) string {
 	t.Helper()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRecoveredModelContinuationProcessHelper$", "-test.count=1")
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_MODEL_CONTINUATION_CHILD=1", "DARWIN_MODEL_CONTINUATION_CONFIG=" + configuration, "DARWIN_MODEL_CONTINUATION_SOURCE=" + task}
+	cmd.Env = []string{"HOME=" + t.TempDir(), "PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_MODEL_CONTINUATION_CHILD=1", "DARWIN_MODEL_CONTINUATION_CONFIG=" + configuration, "DARWIN_MODEL_CONTINUATION_SOURCE=" + task}
 	if denied {
 		cmd.Env = append(cmd.Env, "DARWIN_MODEL_CONTINUATION_DENIED=1")
 	}

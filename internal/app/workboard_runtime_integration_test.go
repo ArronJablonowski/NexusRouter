@@ -58,7 +58,7 @@ func TestWorkboardRuntimeBindingRunsOneRealJournalWithoutSyntheticTask(t *testin
 		t.Fatal(err)
 	}
 	svc.profile = func(context.Context) (resources.Snapshot, error) {
-		return resources.Snapshot{Time: time.Now().UTC(), TotalRAM: 1000, AvailableRAM: 1000}, nil
+		return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now().UTC(), TotalRAM: 1000, AvailableRAM: 1000}, nil
 	}
 	var sinkStarts atomic.Int32
 	svc.eventSink = runtime.EventSinkFunc(func(sinkCtx context.Context, event runtime.Event) error {

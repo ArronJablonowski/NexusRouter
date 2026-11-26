@@ -3082,3 +3082,7 @@ Validation on macOS ARM64 with Go 1.27.4:
   untouched baseline. Isolated browser reruns included a Chrome profile
   cleanup failure, and the Firefox activity case passed in isolation.
   Remaining application, SDK, release and browser findings need separate triage.
+
+### SDK, browser, application and release follow-up — 2026-11-26
+
+Exposed the SDK fallback switch, corrected native harness deadline selection, and repaired resource, restart and browser fixtures. See [follow-up validation](validation/2026-11-26-reliability-followup.md).

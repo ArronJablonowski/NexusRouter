@@ -50,7 +50,7 @@ func workerFinishFixture(t *testing.T, cancelProvider context.CancelFunc) (*Serv
 		t.Fatal(err)
 	}
 	svc.profile = func(context.Context) (resources.Snapshot, error) {
-		return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
+		return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
 	}
 	return svc, cfg, &calls
 }
@@ -207,7 +207,7 @@ func TestWorkerFinishFailureCannotReachActualParentModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.profile = func(context.Context) (resources.Snapshot, error) {
-		return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
+		return resources.Snapshot{SwapUsed: new(uint64), Time: time.Now(), CPUs: 4, TotalRAM: 1000, AvailableRAM: 1000}, nil
 	}
 	result, _ := svc.Run(ctx, Request{ModelID: "parent", Prompt: "delegate bounded task"})
 	if childCalls.Load() != 1 || strings.Contains(result.Text, "private accepted child output") {
