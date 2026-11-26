@@ -150,6 +150,19 @@ func replyChunks(text string) []string {
 	}
 	// Use UTF-16 code units conservatively, below Telegram's 4096 character cap.
 	var chunks []string
+	appendChunk := func(chunk string) bool {
+		// The transport rejects whitespace-only messages. Treat these
+		// boundaries as formatting, not as an uncertain send.
+		if strings.TrimSpace(chunk) == "" {
+			return true
+		}
+		if len(chunks) == 7 {
+			chunks = append(chunks, "Reply truncated. The full answer is retained in the private task record on the host.")
+			return false
+		}
+		chunks = append(chunks, chunk)
+		return true
+	}
 	var buf strings.Builder
 	units := 0
 	for _, r := range text {
@@ -158,20 +171,16 @@ func replyChunks(text string) []string {
 			n = 2
 		}
 		if units+n > 3500 {
-			chunks = append(chunks, buf.String())
+			if !appendChunk(buf.String()) {
+				return chunks
+			}
 			buf.Reset()
 			units = 0
-		}
-		if len(chunks) == 7 {
-			chunks = append(chunks, "Reply truncated. The full answer is retained in the private task record on the host.")
-			return chunks
 		}
 		buf.WriteRune(r)
 		units += n
 	}
-	if buf.Len() > 0 {
-		chunks = append(chunks, buf.String())
-	}
+	appendChunk(buf.String())
 	return chunks
 }
 

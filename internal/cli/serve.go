@@ -659,7 +659,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer dispatcher.Close()
-	telegramWorker, telegramErr := telegrambridge.Start(ctx, s, os.Getenv, *instance, func(message string) { log.Print(message) })
+	var telegramErr error
+	telegramWorker, telegramErr = telegrambridge.Start(ctx, s, os.Getenv, *instance, func(message string) { log.Print(message) })
 	if telegramErr != nil {
 		fmt.Fprintln(stderr, "cannot initialize Telegram connector (disabled unless explicitly configured)")
 		return 1

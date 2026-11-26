@@ -309,9 +309,10 @@ func qualifyDaemonWebUI(t *testing.T, ctx context.Context, binary, configuration
 		if err != nil {
 			t.Fatal("browser request failed", err)
 		}
-		raw, readErr := io.ReadAll(io.LimitReader(response.Body, 65537))
+		const maxBrowserResponse = 1 << 20 // Includes the embedded authenticated shell.
+		raw, readErr := io.ReadAll(io.LimitReader(response.Body, maxBrowserResponse+1))
 		closeErr := response.Body.Close()
-		if readErr != nil || closeErr != nil || len(raw) > 65536 {
+		if readErr != nil || closeErr != nil || len(raw) > maxBrowserResponse {
 			t.Fatal("browser response unreadable", readErr, closeErr)
 		}
 		return response, raw

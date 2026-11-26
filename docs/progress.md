@@ -3049,3 +3049,36 @@ account connection, real message, deployment or daemon restart was performed.
 Live Telegram validation is intentionally outstanding. Validation evidence is
 recorded in `docs/validation/2026-10-25-telegram.md`; broader existing application
 fixture failures from the prior QA campaign remain outside this scoped change.
+
+### Reliability review — 2026-11-26
+
+Reviewed source from `b09cc499`, focusing on daemon startup, health reporting,
+and Telegram reply delivery. The enabled Telegram worker now appears in daemon
+health and reports stopped after a terminal connector error. The reply splitter
+skips whitespace-only chunks, which the transport rejects, so blank regions no
+longer stop delivery of the remaining text. The send-intent and uncertain-delivery
+rules still apply to actual outbound requests.
+
+Reproduced seven fixture failures on the baseline. Updated the dispatcher
+heartbeat fixture with valid resource and model discovery data, gave the shared
+daemon process fixture a private home for subprocess auditing, and adjusted
+the browser test's read bound to accommodate the current embedded shell.
+
+Source checks, full Go vet and build, and focused race tests passed. Linear
+required reauthentication, so the checked-in PRD was the requirements reference.
+Telegram was exercised with fixtures, without live Bot API delivery. Changes
+were prepared as a source checkpoint, with installed services outside this review.
+
+Validation on macOS ARM64 with Go 1.27.4:
+
+- Passed `go run ./cmd/check`, `go vet ./...`, and `go build ./...`.
+- Race tests passed for Telegram, configuration, daemon and health packages,
+  plus the targeted dispatcher heartbeat and six CLI daemon process cases.
+  The two CLI chat tests that failed in the broad race run passed in isolation
+  on both baseline and changed source.
+- The broad Go test run was not green. With a four-minute package budget,
+  application and releasepack timed out, while SDK and browser tests reported
+  failures. The SDK manual-profiler admission failure also reproduces on the
+  untouched baseline. Isolated browser reruns included a Chrome profile
+  cleanup failure, and the Firefox activity case passed in isolation.
+  Remaining application, SDK, release and browser findings need separate triage.

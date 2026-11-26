@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/ArronJablonowski/NexusRouter/health"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ArronJablonowski/NexusRouter/connectors/telegram"
+	"github.com/ArronJablonowski/NexusRouter/health"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
@@ -86,11 +86,8 @@ func Start(ctx context.Context, s config.Settings, secret func(string) string, d
 	}
 	go func() {
 		defer close(worker.done)
-		defer func() {
-			if runCtx.Err() != nil {
-				worker.state.Store(3)
-			}
-		}()
+		defer worker.state.Store(3)
+		defer cancel()
 		defer client.Close()
 		defer store.close()
 		defer closeResources()

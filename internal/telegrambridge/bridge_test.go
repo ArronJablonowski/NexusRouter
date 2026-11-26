@@ -347,3 +347,22 @@ func TestStoreDoesNotAdoptAnUnrelatedTaskDatabase(t *testing.T) {
 		t.Fatal("history modified")
 	}
 }
+
+func TestWhitespaceAcrossReplyBoundaryStillDelivers(t *testing.T) {
+	b, api, backend, _ := fixture(t)
+	defer b.store.close()
+	api.updates = []telegram.Update{update(1, 7, "hello")}
+	answer := strings.Repeat("a", 3500) + strings.Repeat(" ", 3500) + "tail" + strings.Repeat(" ", 3500)
+	backend.status.Result.Text = answer
+	for range 5 {
+		step(t, b)
+	}
+	for _, chunk := range api.sent {
+		if strings.TrimSpace(chunk) == "" {
+			t.Fatal("bridge produced a blank message, which the Telegram client rejects")
+		}
+	}
+	if got := strings.TrimRight(strings.Join(api.sent, ""), " "); got != strings.Repeat("a", 3500)+"tail" || b.store.value.Offset != 2 {
+		t.Fatal("nonblank answer chunks were lost or the update did not finish")
+	}
+}

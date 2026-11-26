@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 func TestTransientClaimErrorsDoNotRequireSupervisorInspection(t *testing.T) {
@@ -70,6 +72,10 @@ func TestDispatcherHealthRenewalDuringBlockedProvider(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/tags" {
+			fmt.Fprintln(w, `{"models":[{"name":"fixture"}]}`)
+			return
+		}
 		close(entered)
 		select {
 		case <-release:
@@ -79,6 +85,10 @@ func TestDispatcherHealthRenewalDuringBlockedProvider(t *testing.T) {
 	}))
 	defer server.Close()
 	s.settings.Providers[0].Endpoint = server.URL
+	s.settings.Models[0].ContextTokens = 8192
+	s.profile = func(context.Context) (resources.Snapshot, error) {
+		return resources.Snapshot{Time: time.Now(), CPUs: 4, TotalRAM: 64 << 30, AvailableRAM: 48 << 30, SwapUsed: new(uint64)}, nil
+	}
 	claim := recoveryClaim(t, s, db)
 	now := time.Now()
 	d := &Dispatcher{db: db, configuredWorkers: 1, renewInterval: time.Millisecond, healthNow: func() time.Time { return now }}

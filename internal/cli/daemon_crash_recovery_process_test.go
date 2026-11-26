@@ -221,7 +221,7 @@ func TestDaemonRestartRecoversInterruptedModelWithoutRedispatch(t *testing.T) {
 func startOwnedDaemon(t *testing.T, ctx context.Context, binary, configuration, token, owners string) *ownedDaemonProcess {
 	t.Helper()
 	command := exec.CommandContext(ctx, binary, "serve", "--config", configuration)
-	command.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_API_TOKEN=" + token, "DARWIN_PROCESS_OWNER_DIR=" + owners}
+	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + filepath.Dir(owners), "DARWIN_API_TOKEN=" + token, "DARWIN_PROCESS_OWNER_DIR=" + owners}
 	output := &daemonProcessOutput{}
 	command.Stdout, command.Stderr = output, output
 	if err := command.Start(); err != nil {
