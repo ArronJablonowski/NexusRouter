@@ -62,3 +62,31 @@ without fallback and reported 41 input tokens and 242 output tokens.
 Post-test checks confirmed the router was active with zero automatic
 restarts and no nonterminal tasks, pending submissions, or unreleased
 leases. This validates the paired local inference path.
+
+## Spark thermal startup investigation
+
+Spark on DGX OS 7.6.0, kernel 7.0.0-1025-nvidia and BIOS
+5.36_0ACUM028 exposed seven ACPI thermal zones. All seven had readable
+temperatures and a 104.8 °C critical shutdown trip, with no passive trip
+or cooling-device binding. NVIDIA documents ACPI passive trips as the
+threshold for CPU software throttling on Grace. Reading below the critical
+trip alone therefore leaves host thermal headroom unknown.
+[NVIDIA Grace thermal documentation](https://docs.nvidia.com/dccpu/grace-perf-tuning-guide/power-thermals.html#cpu-temperature-management)
+
+The GPU driver reported a positive T.Limit margin and inactive thermal
+slowdown flags. These readings establish GPU conditions at the time of
+sampling. The CPU driver exposed `perf_limited` on all 20 CPU policies,
+each reading zero. Its sticky bits record delivered-performance excursions
+from thermal, power or current limits and cannot establish thermal headroom
+before a limit is reached. These readings do not fill the missing host
+thermal evidence. No registers were cleared. The configured firmware
+inventory reported no applicable update.
+[NVIDIA GPU thermal fields](https://docs.nvidia.com/deploy/nvidia-smi/#temperature)
+[Linux CPU telemetry ABI](https://github.com/torvalds/linux/blob/master/Documentation/ABI/testing/sysfs-devices-system-cpu)
+
+The installed `nexus resources` command still reported unknown thermal
+pressure with enough RAM to start the runner. Authenticated paired
+inspection confirmed Spark available and 33 of 34 models usable.
+`spark-vllm-qwen3-8b` was the sole unavailable model. The vLLM service
+remained inactive. This was a read-only investigation. No product fix was
+deployed, no service settings changed, and no vLLM inference was dispatched.
